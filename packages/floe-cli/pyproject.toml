@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "floe-cli"
+version = "0.1.0"
+description = "Developer CLI for floe-runtime"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [{ name = "Floe Team" }]
+keywords = ["data", "pipeline", "cli"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "click>=8.1",
+    "rich>=13.9",
+    "floe-core",
+]
+
+[project.scripts]
+floe = "floe_cli.main:cli"
+
+[project.urls]
+Homepage = "https://github.com/your-org/floe-runtime"
+Documentation = "https://github.com/your-org/floe-runtime/tree/main/docs"
+Repository = "https://github.com/your-org/floe-runtime"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/floe_cli"]
+
+[tool.uv.sources]
+floe-core = { workspace = true }

@@ -1,0 +1,107 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# uv
+.uv/
+uv.lock
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Linting
+.ruff_cache/
+
+# dbt
+target/
+dbt_packages/
+dbt_modules/
+logs/
+*.log
+
+# Dagster
+.dagster/
+dagster_home/
+**/dagster_runs/
+.dagster-cache/
+
+# Iceberg
+**/metadata/
+*.metadata.json
+*.avro
+
+# Data files
+data/
+warehouse/
+*.parquet
+*.csv
+*.orc
+*.json.gz
+*.db
+*.sqlite
+*.duckdb
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Secrets and credentials
+.env
+.env.*
+!.env.example
+secrets/
+credentials/
+*.key
+*.pem
+*.crt
+
+# Compiled artifacts
+.floe/
+compiled_artifacts.json
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Profiling
+*.prof
+*.lprof
+
+# Temporary
+*.tmp
+*.temp
+*.bak
+*.orig
+
+# Pre-commit
+.pre-commit-cache/

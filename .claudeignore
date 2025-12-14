@@ -1,0 +1,148 @@
+# Python artifacts
+venv/
+.venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.tox/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+*.cover
+.cache/
+
+# dbt artifacts
+target/
+dbt_packages/
+logs/
+dbt_modules/
+*.log
+
+# Dagster artifacts
+.dagster/
+dagster_logs/
+**/dagster_runs/
+.dagster-cache/
+dagster_home/
+
+# Data files (Large)
+data/
+warehouse/
+*.parquet
+*.csv
+*.orc
+*.json.gz
+*.db
+*.sqlite
+*.duckdb
+
+# Iceberg metadata
+**/metadata/
+*.metadata.json
+*.avro
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+secrets/
+credentials/
+*.key
+*.pem
+*.crt
+.aws/
+.gcp/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Git
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# Build and packaging
+node_modules/
+.npm/
+.yarn/
+package-lock.json
+yarn.lock
+*.whl
+*.tar.gz
+
+# Testing artifacts
+.pytest_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+.hypothesis/
+*.cover
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*~
+.swp
+.swo
+*.orig
+
+# CI/CD artifacts
+.github/workflows/.cache/
+.gitlab-ci.yml.cache/
+
+# Documentation generated
+docs/_build/
+docs/.doctrees/
+site/
+_build/
+.sphinx/
+
+# Large directories
+vendor/
+third_party/
+
+# OS-specific
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Profiling
+*.prof
+*.lprof
+.prof/
+
+# Backup files
+*.bak
+*.backup
+*~.nib

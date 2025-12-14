@@ -1,0 +1,140 @@
+# Cursor Rules for floe-runtime
+
+You are an AI assistant helping develop floe-runtime, an open-source data execution layer.
+
+## Project Context
+
+- **Project**: floe-runtime - Open-source data execution layer (Apache 2.0)
+- **Architecture**: Monorepo with 7 Python packages (floe-core, floe-cli, floe-dagster, floe-dbt, floe-iceberg, floe-polaris, floe-cube)
+- **Philosophy**: Standalone-first (works without SaaS), type-safe, security-first
+- **Tech Stack**: Python 3.10+, Pydantic v2, Dagster, dbt, PyIceberg, Apache Polaris, Cube
+
+## Critical Rules
+
+### 1. Standalone-First (MANDATORY)
+- Every feature MUST work without SaaS Control Plane
+- Use standard open formats: Iceberg, OpenLineage, OpenTelemetry
+- No hardcoded SaaS endpoints or proprietary integrations
+
+### 2. Type Safety (MANDATORY)
+- `from __future__ import annotations` at top of every .py file
+- Type hints on ALL functions, methods, variables
+- Run `mypy --strict` on all code
+- Modern generics: `list[str]`, `dict[str, int]`
+
+### 3. Pydantic for ALL Data Validation
+- Use Pydantic v2 for ALL configuration, schemas, validation
+- `@field_validator` (NOT `@validator`)
+- `model_config = ConfigDict(...)` (NOT `class Config:`)
+- `model_json_schema()` (NOT `.schema()`)
+- Use `SecretStr` for passwords/API keys
+
+### 4. Security (MANDATORY)
+- NEVER use `eval()`, `exec()`, `pickle.loads()` on untrusted data
+- Validate ALL user input with Pydantic
+- Use parameterized queries (no SQL injection)
+- NEVER log secrets or PII
+- Use `SecretStr` for sensitive data
+
+### 5. Component Ownership
+- **dbt owns SQL** - NEVER parse SQL in Python
+- Dagster owns orchestration
+- Iceberg owns storage format
+- Polaris owns catalog
+- Cube owns semantic layer
+
+### 6. Testing
+- > 80% code coverage required
+- Unit tests: Fast, isolated
+- Integration tests: Use testcontainers
+- Property-based tests: Use hypothesis
+
+### 7. Code Quality
+- Black formatting (100 char line length)
+- isort for imports
+- Ruff for linting
+- Bandit for security scanning
+- Google-style docstrings
+
+## Package Structure
+
+```
+floe-cli → floe-core → CompiledArtifacts → floe-dagster
+                                        ├─► floe-dbt
+                                        ├─► floe-iceberg
+                                        ├─► floe-polaris
+                                        └─► floe-cube
+```
+
+**CompiledArtifacts is the sole integration contract** between packages.
+
+## Development Workflow
+
+1. Read architecture docs in `/docs/` before implementing
+2. Use Pydantic for all data structures
+3. Let dbt handle SQL (never parse it)
+4. Run quality checks: `mypy`, `black`, `isort`, `ruff`, `bandit`, `pytest`
+5. Test standalone functionality (no SaaS required)
+
+## Error Handling
+
+- Catch specific exceptions (not bare `except:`)
+- Log technical details internally
+- Show generic messages to users
+- NEVER expose stack traces or internals
+
+## Forbidden Patterns
+
+❌ Parsing SQL in Python
+❌ Using `eval()` or `exec()`
+❌ Hardcoding SaaS endpoints
+❌ Missing type hints
+❌ Using Pydantic v1 syntax
+❌ Logging secrets or PII
+❌ SQL injection vulnerabilities
+
+## Recommended Patterns
+
+✅ Pydantic v2 for validation
+✅ Type hints everywhere
+✅ Standalone-first design
+✅ Component ownership boundaries
+✅ Structured logging
+✅ > 80% test coverage
+
+## Quick Commands
+
+```bash
+# Format code
+black --line-length 100 . && isort .
+
+# Type check
+mypy --strict packages/
+
+# Lint
+ruff check .
+
+# Security scan
+bandit -r packages/
+
+# Run tests
+pytest --cov=packages --cov-report=term-missing
+
+# dbt
+dbt debug
+dbt compile
+dbt run
+
+# Dagster
+dagster dev
+```
+
+## Documentation
+
+- Architecture: `/docs/00-overview.md`, `/docs/04-building-blocks.md`
+- Constraints: `/docs/01-constraints.md`
+- Glossary: `/docs/10-glossary.md`
+- Skills: `.claude/skills/` (Pydantic, Dagster, dbt, PyIceberg, Polaris, Cube)
+- Commands: `.claude/commands/` (init-dev-env, validate, compile, trace, lineage)
+
+For detailed guidance, refer to `.claude/CLAUDE.md` and `.claude/rules/`.

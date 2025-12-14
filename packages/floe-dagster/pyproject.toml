@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "floe-dagster"
+version = "0.1.0"
+description = "Dagster integration for floe-runtime"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [{ name = "Floe Team" }]
+keywords = ["data", "pipeline", "dagster", "orchestration"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "dagster>=1.9",
+    "dagster-dbt>=0.25",
+    "openlineage-python>=1.24",
+    "opentelemetry-api>=1.28",
+    "floe-core",
+]
+
+[project.urls]
+Homepage = "https://github.com/your-org/floe-runtime"
+Documentation = "https://github.com/your-org/floe-runtime/tree/main/docs"
+Repository = "https://github.com/your-org/floe-runtime"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/floe_dagster"]
+
+[tool.uv.sources]
+floe-core = { workspace = true }

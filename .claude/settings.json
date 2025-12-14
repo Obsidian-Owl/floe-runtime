@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "PYTHONPATH": "${PWD}:${PWD}/packages/*",
+    "DAGSTER_HOME": "${PWD}/.dagster",
+    "DBT_PROFILES_DIR": "${PWD}/packages/floe-dbt",
+    "PYTEST_TIMEOUT": "300",
+    "PYTHON_VERSION": "3.10"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest:*)",
+      "Bash(python -m black:*)",
+      "Bash(python -m isort:*)",
+      "Bash(python -m mypy:*)",
+      "Bash(python -m bandit:*)",
+      "Bash(dbt:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(tree:*)",
+      "Bash(ls:*)",
+      "Read(**)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(sudo:*)",
+      "Bash(curl:*)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/.env*)",
+      "Read(secrets/**)",
+      "Edit(.env*)",
+      "Edit(secrets/**)",
+      "Write(.env*)",
+      "Write(secrets/**)"
+    ]
+  },
+  "model": "claude-sonnet-4-5-20250929",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matchers": [
+          {
+            "tool": "Edit|Write",
+            "pathPattern": "*.py"
+          }
+        ],
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -m black --line-length 100 \"$FILE_PATH\" 2>/dev/null || true"
+          },
+          {
+            "type": "command",
+            "command": "python -m isort \"$FILE_PATH\" 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  },
+  "companyAnnouncements": [
+    "🔒 Security: Never commit secrets or use eval()/exec()",
+    "📝 Type Safety: Use Pydantic for ALL data validation",
+    "🎯 Standalone-First: Every feature must work without SaaS",
+    "✅ Quality: Maintain > 80% test coverage"
+  ],
+  "attribution": {
+    "commit": "🤖 Generated with Claude Code\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>",
+    "pr": "🤖 Generated with [Claude Code](https://claude.com/claude-code)"
+  }
+}

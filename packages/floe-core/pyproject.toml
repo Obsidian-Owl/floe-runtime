@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "floe-core"
+version = "0.1.0"
+description = "Core schemas and compilation for floe-runtime"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [{ name = "Floe Team" }]
+keywords = ["data", "pipeline", "schema", "pydantic"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "pydantic>=2.10",
+    "pydantic-settings>=2.6",
+    "pyyaml>=6.0",
+    "structlog>=24.4",
+]
+
+[project.urls]
+Homepage = "https://github.com/your-org/floe-runtime"
+Documentation = "https://github.com/your-org/floe-runtime/tree/main/docs"
+Repository = "https://github.com/your-org/floe-runtime"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/floe_core"]
+
+[tool.uv.sources]
+# No workspace dependencies for floe-core (it's the base package)
