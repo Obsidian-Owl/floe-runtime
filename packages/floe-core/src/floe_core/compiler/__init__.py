@@ -1,14 +1,32 @@
 """Compiler module for floe-runtime.
 
-This module provides the Compiler class that transforms
-FloeSpec → CompiledArtifacts.
+T045: [US2] Export Compiler from compiler/__init__.py
+
+This module exports the Compiler class and output models:
+- Compiler: Main compiler class
+- CompiledArtifacts: Output contract model
+- ArtifactMetadata: Compilation metadata model
+- EnvironmentContext: Optional SaaS context model
+- extract_column_classifications: Classification extraction function
 """
 
 from __future__ import annotations
 
-# Public API exports will be added when Compiler is implemented
-# from floe_core.compiler.compiler import Compiler
+from floe_core.compiler.compiler import Compiler
+from floe_core.compiler.extractor import extract_column_classifications
+from floe_core.compiler.models import (
+    ArtifactMetadata,
+    CompiledArtifacts,
+    EnvironmentContext,
+)
 
 __all__: list[str] = [
-    # "Compiler",
+    # Compiler class
+    "Compiler",
+    # Output models
+    "CompiledArtifacts",
+    "ArtifactMetadata",
+    "EnvironmentContext",
+    # Extraction function
+    "extract_column_classifications",
 ]
