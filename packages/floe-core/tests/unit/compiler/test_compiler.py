@@ -250,9 +250,7 @@ class TestCompilerWithDbtProject:
         dbt_dir = tmp_floe_with_dbt / "dbt"
         target_dir = dbt_dir / "target"
         target_dir.mkdir(parents=True)
-        (target_dir / "manifest.json").write_text(
-            json.dumps({"nodes": {}, "sources": {}})
-        )
+        (target_dir / "manifest.json").write_text(json.dumps({"nodes": {}, "sources": {}}))
 
         compiler = Compiler()
         artifacts = compiler.compile(tmp_floe_with_dbt / "floe.yaml")
@@ -384,9 +382,7 @@ def tmp_floe_with_dbt(tmp_path: Path, sample_floe_yaml: dict[str, Any]) -> Path:
 
 
 @pytest.fixture
-def tmp_floe_with_dbt_classifications(
-    tmp_path: Path, sample_floe_yaml: dict[str, Any]
-) -> Path:
+def tmp_floe_with_dbt_classifications(tmp_path: Path, sample_floe_yaml: dict[str, Any]) -> Path:
     """Create a floe project with dbt project containing classifications."""
     project_dir = tmp_path / "test-project"
     project_dir.mkdir()

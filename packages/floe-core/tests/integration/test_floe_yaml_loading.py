@@ -317,9 +317,7 @@ consumption:
         assert len(spec.transforms) == len(spec2.transforms)
         assert spec.consumption.enabled == spec2.consumption.enabled
 
-    def test_conftest_fixture_compatibility(
-        self, sample_floe_yaml: dict[str, Any]
-    ) -> None:
+    def test_conftest_fixture_compatibility(self, sample_floe_yaml: dict[str, Any]) -> None:
         """Integration test: Verify conftest fixture produces valid FloeSpec."""
         from floe_core.schemas import FloeSpec
 

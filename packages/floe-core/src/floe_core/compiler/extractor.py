@@ -59,10 +59,7 @@ def extract_column_classifications(
 
     # Handle missing manifest gracefully
     if not manifest_path.exists():
-        msg = (
-            f"dbt manifest not found at {manifest_path}. "
-            "Run 'dbt parse' or 'dbt compile' first."
-        )
+        msg = f"dbt manifest not found at {manifest_path}. Run 'dbt parse' or 'dbt compile' first."
         if strict:
             raise FileNotFoundError(msg)
         logger.warning(msg)
@@ -96,9 +93,7 @@ def extract_column_classifications(
         "Classification extraction complete",
         extra={
             "models_with_classifications": len(classifications),
-            "total_classified_columns": sum(
-                len(cols) for cols in classifications.values()
-            ),
+            "total_classified_columns": sum(len(cols) for cols in classifications.values()),
         },
     )
 

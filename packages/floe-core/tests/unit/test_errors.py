@@ -41,9 +41,7 @@ class TestFloeError:
             raise FloeError("Test raise")
         assert exc_info.value.user_message == "Test raise"
 
-    def test_floe_error_logs_internal_details(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_floe_error_logs_internal_details(self, capsys: pytest.CaptureFixture[str]) -> None:
         """FloeError should log internal_details when provided."""
         FloeError(
             "User sees this",
@@ -57,9 +55,7 @@ class TestFloeError:
         # User message should also be in log
         assert "User sees this" in captured.out
 
-    def test_floe_error_no_log_without_internal_details(
-        self, caplog: LogCaptureFixture
-    ) -> None:
+    def test_floe_error_no_log_without_internal_details(self, caplog: LogCaptureFixture) -> None:
         """FloeError should not log if internal_details is None."""
         with caplog.at_level(logging.ERROR):
             FloeError("Just a user message")
@@ -198,9 +194,7 @@ class TestSecurityCompliance:
         assert "Traceback" not in error.user_message
         assert "line 42" not in error.user_message
 
-    def test_internal_details_logged_separately(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_internal_details_logged_separately(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Internal details should be logged but not exposed in user message."""
         error = CompilationError(
             "Compilation failed - check logs for details",
