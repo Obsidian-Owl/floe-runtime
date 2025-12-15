@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from pydantic import ValidationError
 
 if TYPE_CHECKING:
     from typing import Any
@@ -362,7 +363,7 @@ compute:
         yaml_file = tmp_path / "floe.yaml"
         yaml_file.write_text("")
 
-        with pytest.raises(Exception):  # Could be TypeError or ValidationError
+        with pytest.raises((TypeError, ValidationError)):
             FloeSpec.from_yaml(yaml_file)
 
     def test_error_on_yaml_list_instead_of_dict(self, tmp_path: Path) -> None:
@@ -376,5 +377,5 @@ compute:
         yaml_file = tmp_path / "floe.yaml"
         yaml_file.write_text(yaml_content)
 
-        with pytest.raises(Exception):
+        with pytest.raises((TypeError, ValidationError)):
             FloeSpec.from_yaml(yaml_file)

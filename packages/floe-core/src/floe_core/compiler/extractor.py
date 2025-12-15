@@ -82,7 +82,7 @@ def extract_column_classifications(
     classifications: dict[str, dict[str, ColumnClassification]] = {}
 
     # Process models
-    for node_id, node in manifest.get("nodes", {}).items():
+    for _node_id, node in manifest.get("nodes", {}).items():
         if node.get("resource_type") != "model":
             continue
 

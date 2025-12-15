@@ -46,7 +46,7 @@ class TestCompilerCompile:
 
     def test_compile_minimal_spec(self, tmp_floe_project: Path) -> None:
         """Test compile() with minimal floe.yaml."""
-        from floe_core.compiler import Compiler, CompiledArtifacts
+        from floe_core.compiler import CompiledArtifacts, Compiler
 
         compiler = Compiler()
         floe_yaml_path = tmp_floe_project / "floe.yaml"
@@ -60,7 +60,7 @@ class TestCompilerCompile:
 
     def test_compile_full_spec(self, tmp_floe_project_full: Path) -> None:
         """Test compile() with full floe.yaml (all optional fields)."""
-        from floe_core.compiler import Compiler, CompiledArtifacts
+        from floe_core.compiler import CompiledArtifacts, Compiler
 
         compiler = Compiler()
         floe_yaml_path = tmp_floe_project_full / "floe.yaml"
@@ -74,8 +74,9 @@ class TestCompilerCompile:
 
     def test_compile_returns_immutable_artifacts(self, tmp_floe_project: Path) -> None:
         """Test compile() returns immutable CompiledArtifacts."""
-        from floe_core.compiler import Compiler
         from pydantic import ValidationError
+
+        from floe_core.compiler import Compiler
 
         compiler = Compiler()
         floe_yaml_path = tmp_floe_project / "floe.yaml"
@@ -210,13 +211,14 @@ class TestCompilerErrorHandling:
 
         compiler = Compiler()
 
-        with pytest.raises(Exception):  # yaml.YAMLError
+        with pytest.raises(yaml.YAMLError):
             compiler.compile(invalid_yaml)
 
     def test_compile_invalid_spec_raises(self, tmp_path: Path) -> None:
         """Test compile() raises ValidationError for invalid spec."""
-        from floe_core.compiler import Compiler
         from pydantic import ValidationError
+
+        from floe_core.compiler import Compiler
 
         # Missing required fields
         invalid_spec = tmp_path / "floe.yaml"

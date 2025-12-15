@@ -9,9 +9,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
 
-import pytest
 import yaml
 
 
@@ -20,7 +18,7 @@ class TestFullCompileFlow:
 
     def test_end_to_end_compile_minimal(self, tmp_path: Path) -> None:
         """Test end-to-end compilation with minimal configuration."""
-        from floe_core.compiler import Compiler, CompiledArtifacts
+        from floe_core.compiler import CompiledArtifacts, Compiler
 
         # Create minimal floe.yaml
         project_dir = tmp_path / "minimal-project"
@@ -58,7 +56,7 @@ class TestFullCompileFlow:
 
     def test_end_to_end_compile_full(self, tmp_path: Path) -> None:
         """Test end-to-end compilation with full configuration."""
-        from floe_core.compiler import Compiler, CompiledArtifacts
+        from floe_core.compiler import Compiler
 
         # Create full floe.yaml
         project_dir = tmp_path / "full-project"
@@ -232,7 +230,7 @@ class TestFullCompileFlow:
 
     def test_compile_then_serialize_round_trip(self, tmp_path: Path) -> None:
         """Test compile output can be serialized and deserialized."""
-        from floe_core.compiler import Compiler, CompiledArtifacts
+        from floe_core.compiler import CompiledArtifacts, Compiler
 
         # Create project
         project_dir = tmp_path / "serialize-project"

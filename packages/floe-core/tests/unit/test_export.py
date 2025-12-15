@@ -11,9 +11,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
-
-import pytest
 
 from floe_core.export import (
     export_compiled_artifacts_schema,
@@ -305,7 +302,7 @@ class TestSchemaValidation:
     def test_valid_floe_spec_passes_schema(self) -> None:
         """Valid FloeSpec instance passes schema validation."""
         # This tests that the schema is compatible with actual models
-        from floe_core.schemas import FloeSpec, ComputeConfig, ComputeTarget
+        from floe_core.schemas import ComputeConfig, ComputeTarget
 
         spec = FloeSpec(
             name="test-project",
@@ -327,7 +324,8 @@ class TestSchemaValidation:
     def test_valid_compiled_artifacts_passes_schema(self) -> None:
         """Valid CompiledArtifacts instance passes schema validation."""
         from datetime import datetime, timezone
-        from floe_core.compiler import CompiledArtifacts, ArtifactMetadata
+
+        from floe_core.compiler import ArtifactMetadata, CompiledArtifacts
         from floe_core.schemas import ComputeConfig, ComputeTarget
 
         artifacts = CompiledArtifacts(

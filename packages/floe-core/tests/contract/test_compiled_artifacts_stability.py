@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from typing import Any
-from uuid import uuid4
 
 import pytest
 
@@ -50,8 +49,9 @@ class TestCompiledArtifactsContractStability:
 
     def test_contract_frozen_immutable(self, sample_compiled_artifacts: dict) -> None:
         """Test contract is frozen (immutable)."""
-        from floe_core.compiler import CompiledArtifacts
         from pydantic import ValidationError
+
+        from floe_core.compiler import CompiledArtifacts
 
         artifacts = CompiledArtifacts(**sample_compiled_artifacts)
 
@@ -60,8 +60,9 @@ class TestCompiledArtifactsContractStability:
 
     def test_contract_extra_forbid(self, sample_compiled_artifacts: dict) -> None:
         """Test contract rejects unknown fields."""
-        from floe_core.compiler import CompiledArtifacts
         from pydantic import ValidationError
+
+        from floe_core.compiler import CompiledArtifacts
 
         sample_compiled_artifacts["unknown_field"] = "value"
 
@@ -296,9 +297,9 @@ class TestCompiledArtifactsCrossLanguageContract:
         loaded = CompiledArtifacts.model_validate_json(json_str)
 
         # Types should be preserved
-        assert type(original.version) == type(loaded.version)
-        assert type(original.compute.target) == type(loaded.compute.target)
-        assert type(original.metadata.compiled_at) == type(loaded.metadata.compiled_at)
+        assert isinstance(loaded.version, type(original.version))
+        assert isinstance(loaded.compute.target, type(original.compute.target))
+        assert isinstance(loaded.metadata.compiled_at, type(original.metadata.compiled_at))
 
 
 # Fixtures for contract tests

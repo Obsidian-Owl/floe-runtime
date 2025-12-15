@@ -385,7 +385,7 @@ class TestMissingCatalogGracefulHandling:
 
     def test_floe_spec_catalog_is_optional(self) -> None:
         """FloeSpec should work without catalog configuration."""
-        from floe_core.schemas import FloeSpec, ComputeConfig, ComputeTarget
+        from floe_core.schemas import ComputeConfig, ComputeTarget, FloeSpec
 
         spec = FloeSpec(
             name="test-project",
@@ -396,7 +396,7 @@ class TestMissingCatalogGracefulHandling:
 
     def test_floe_spec_catalog_default_is_none(self) -> None:
         """FloeSpec.catalog should default to None."""
-        from floe_core.schemas import FloeSpec, ComputeConfig, ComputeTarget
+        from floe_core.schemas import ComputeConfig, ComputeTarget, FloeSpec
 
         spec = FloeSpec(
             name="test-project",
@@ -408,7 +408,7 @@ class TestMissingCatalogGracefulHandling:
 
     def test_floe_spec_with_catalog(self) -> None:
         """FloeSpec should accept catalog configuration."""
-        from floe_core.schemas import FloeSpec, ComputeConfig, ComputeTarget, CatalogConfig
+        from floe_core.schemas import CatalogConfig, ComputeConfig, ComputeTarget, FloeSpec
 
         spec = FloeSpec(
             name="test-project",
@@ -425,7 +425,8 @@ class TestMissingCatalogGracefulHandling:
     def test_compiled_artifacts_catalog_is_optional(self) -> None:
         """CompiledArtifacts should work without catalog."""
         from datetime import datetime, timezone
-        from floe_core.compiler import CompiledArtifacts, ArtifactMetadata
+
+        from floe_core.compiler import ArtifactMetadata, CompiledArtifacts
         from floe_core.schemas import ComputeConfig, ComputeTarget
 
         artifacts = CompiledArtifacts(

@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+import yaml
+from pydantic import ValidationError
 
 if TYPE_CHECKING:
     from typing import Any
@@ -125,7 +127,7 @@ compute:
         yaml_file = tmp_path / "floe.yaml"
         yaml_file.write_text(yaml_content)
 
-        with pytest.raises(Exception):  # Could be yaml.YAMLError or ValidationError
+        with pytest.raises((yaml.YAMLError, ValidationError)):
             FloeSpec.from_yaml(yaml_file)
 
     def test_from_yaml_missing_required_field(self, tmp_path: Path) -> None:

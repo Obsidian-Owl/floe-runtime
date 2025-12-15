@@ -80,7 +80,7 @@ class ValidationError(FloeError):
     Example:
         >>> raise ValidationError(
         ...     "Invalid configuration",
-        ...     internal_details="Field 'compute.target' expected one of ['duckdb', 'snowflake'], got 'invalid'"
+        ...     internal_details="compute.target: expected ['duckdb', 'snowflake'], got 'invalid'"
         ... )
     """
 
