@@ -1,0 +1,303 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://floe.dev/schemas/floe-spec.schema.json",
+  "title": "FloeSpec",
+  "description": "Root configuration schema for floe.yaml pipeline definition",
+  "type": "object",
+  "required": ["name", "version", "compute"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference for IDE autocomplete"
+    },
+    "name": {
+      "type": "string",
+      "description": "Pipeline name (alphanumeric with hyphens/underscores, 1-100 chars)",
+      "pattern": "^[a-zA-Z][a-zA-Z0-9_-]{0,99}$",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "version": {
+      "type": "string",
+      "description": "Pipeline version (semantic versioning)",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.-]+)?(\\+[a-zA-Z0-9.-]+)?$"
+    },
+    "compute": {
+      "$ref": "#/$defs/ComputeConfig"
+    },
+    "transforms": {
+      "type": "array",
+      "description": "List of transformation steps",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/TransformConfig"
+      }
+    },
+    "consumption": {
+      "$ref": "#/$defs/ConsumptionConfig",
+      "default": {}
+    },
+    "governance": {
+      "$ref": "#/$defs/GovernanceConfig",
+      "default": {}
+    },
+    "observability": {
+      "$ref": "#/$defs/ObservabilityConfig",
+      "default": {}
+    },
+    "catalog": {
+      "oneOf": [
+        { "$ref": "#/$defs/CatalogConfig" },
+        { "type": "null" }
+      ],
+      "default": null,
+      "description": "Optional Iceberg catalog configuration"
+    }
+  },
+  "$defs": {
+    "ComputeTarget": {
+      "type": "string",
+      "enum": ["duckdb", "snowflake", "bigquery", "redshift", "databricks", "postgres", "spark"],
+      "description": "Supported compute targets (matching dbt adapter names)"
+    },
+    "ComputeConfig": {
+      "type": "object",
+      "description": "Compute target configuration",
+      "required": ["target"],
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/ComputeTarget"
+        },
+        "connection_secret_ref": {
+          "type": ["string", "null"],
+          "description": "Kubernetes secret name for connection credentials",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,252}$",
+          "default": null
+        },
+        "properties": {
+          "type": "object",
+          "description": "Target-specific properties",
+          "default": {},
+          "additionalProperties": true
+        }
+      }
+    },
+    "TransformConfig": {
+      "type": "object",
+      "description": "Transformation step configuration",
+      "required": ["type", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["dbt"],
+          "description": "Transform type (currently only 'dbt' supported)"
+        },
+        "path": {
+          "type": "string",
+          "description": "Path to transform source relative to floe.yaml"
+        },
+        "target": {
+          "type": ["string", "null"],
+          "description": "Optional target override",
+          "default": null
+        }
+      }
+    },
+    "ConsumptionConfig": {
+      "type": "object",
+      "description": "Cube semantic layer configuration",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable Cube semantic layer",
+          "default": false
+        },
+        "port": {
+          "type": "integer",
+          "description": "Cube API port",
+          "default": 4000,
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "api_secret_ref": {
+          "type": ["string", "null"],
+          "description": "Kubernetes secret for Cube API key",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,252}$",
+          "default": null
+        },
+        "database_type": {
+          "type": ["string", "null"],
+          "description": "Database driver type (postgres, snowflake, bigquery, duckdb, etc.)",
+          "default": null
+        },
+        "dev_mode": {
+          "type": "boolean",
+          "description": "Enable Cube Playground in development",
+          "default": false
+        },
+        "pre_aggregations": {
+          "$ref": "#/$defs/PreAggregationConfig",
+          "default": {}
+        },
+        "security": {
+          "$ref": "#/$defs/CubeSecurityConfig",
+          "default": {}
+        }
+      }
+    },
+    "PreAggregationConfig": {
+      "type": "object",
+      "description": "Cube pre-aggregation configuration",
+      "additionalProperties": false,
+      "properties": {
+        "refresh_schedule": {
+          "type": "string",
+          "description": "Cron expression for refresh schedule",
+          "default": "*/30 * * * *"
+        },
+        "timezone": {
+          "type": "string",
+          "description": "Timezone for schedule",
+          "default": "UTC"
+        }
+      }
+    },
+    "CubeSecurityConfig": {
+      "type": "object",
+      "description": "Cube row-level security configuration",
+      "additionalProperties": false,
+      "properties": {
+        "row_level": {
+          "type": "boolean",
+          "description": "Enable row-level security",
+          "default": true
+        },
+        "tenant_column": {
+          "type": "string",
+          "description": "Column name for tenant filtering",
+          "default": "tenant_id"
+        }
+      }
+    },
+    "GovernanceConfig": {
+      "type": "object",
+      "description": "Data governance configuration",
+      "additionalProperties": false,
+      "properties": {
+        "classification_source": {
+          "type": "string",
+          "enum": ["dbt_meta", "external"],
+          "description": "Source for column classifications",
+          "default": "dbt_meta"
+        },
+        "policies": {
+          "type": "object",
+          "description": "Policy definitions",
+          "default": {},
+          "additionalProperties": true
+        },
+        "emit_lineage": {
+          "type": "boolean",
+          "description": "Emit OpenLineage events",
+          "default": true
+        }
+      }
+    },
+    "ObservabilityConfig": {
+      "type": "object",
+      "description": "Observability configuration",
+      "additionalProperties": false,
+      "properties": {
+        "traces": {
+          "type": "boolean",
+          "description": "Enable OpenTelemetry traces",
+          "default": true
+        },
+        "metrics": {
+          "type": "boolean",
+          "description": "Enable metrics collection",
+          "default": true
+        },
+        "lineage": {
+          "type": "boolean",
+          "description": "Enable OpenLineage emission",
+          "default": true
+        },
+        "otlp_endpoint": {
+          "type": ["string", "null"],
+          "description": "OTLP exporter endpoint URL",
+          "format": "uri",
+          "default": null
+        },
+        "lineage_endpoint": {
+          "type": ["string", "null"],
+          "description": "OpenLineage API endpoint URL",
+          "format": "uri",
+          "default": null
+        },
+        "attributes": {
+          "type": "object",
+          "description": "Custom trace attributes (key-value pairs)",
+          "default": {},
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "CatalogConfig": {
+      "type": "object",
+      "description": "Iceberg catalog configuration",
+      "required": ["type", "uri"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["polaris", "glue", "nessie"],
+          "description": "Catalog type"
+        },
+        "uri": {
+          "type": "string",
+          "description": "Catalog endpoint URI",
+          "format": "uri"
+        },
+        "credential_secret_ref": {
+          "type": ["string", "null"],
+          "description": "Kubernetes secret for catalog credentials",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,252}$",
+          "default": null
+        },
+        "warehouse": {
+          "type": ["string", "null"],
+          "description": "Default warehouse name",
+          "default": null
+        },
+        "scope": {
+          "type": ["string", "null"],
+          "description": "OAuth2 scope for Polaris authentication (e.g., 'PRINCIPAL_ROLE:ALL')",
+          "default": null
+        },
+        "token_refresh_enabled": {
+          "type": ["boolean", "null"],
+          "description": "Enable OAuth2 token refresh for long-lived connections",
+          "default": null
+        },
+        "access_delegation": {
+          "type": ["string", "null"],
+          "description": "Iceberg access delegation header (e.g., 'vended-credentials')",
+          "default": null
+        },
+        "properties": {
+          "type": "object",
+          "description": "Catalog-specific properties",
+          "default": {},
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}
