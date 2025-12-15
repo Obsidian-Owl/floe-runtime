@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TransformConfig(BaseModel):
@@ -30,6 +30,15 @@ class TransformConfig(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    type: Literal["dbt"]
-    path: str
-    target: str | None = None
+    type: Literal["dbt"] = Field(
+        ...,
+        description="Transform type (currently only 'dbt' supported)",
+    )
+    path: str = Field(
+        ...,
+        description="Path to transform source relative to floe.yaml",
+    )
+    target: str | None = Field(
+        default=None,
+        description="Optional target override",
+    )

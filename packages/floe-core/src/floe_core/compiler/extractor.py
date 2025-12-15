@@ -122,9 +122,11 @@ def _load_manifest(manifest_path: Path) -> dict[str, Any]:
     try:
         import orjson
 
-        return orjson.loads(manifest_path.read_bytes())
+        result: dict[str, Any] = orjson.loads(manifest_path.read_bytes())
+        return result
     except ImportError:
-        return json.loads(manifest_path.read_text())
+        loaded: dict[str, Any] = json.loads(manifest_path.read_text())
+        return loaded
 
 
 def _extract_node_classifications(
