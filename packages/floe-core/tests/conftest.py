@@ -28,7 +28,7 @@ def sample_floe_yaml() -> dict[str, Any]:
         "transforms": [
             {
                 "type": "dbt",
-                "project_dir": "./dbt",
+                "path": "./dbt",
             }
         ],
     }
@@ -55,8 +55,7 @@ def sample_floe_yaml_full() -> dict[str, Any]:
         "transforms": [
             {
                 "type": "dbt",
-                "project_dir": "./dbt",
-                "profiles_dir": ".floe/profiles",
+                "path": "./dbt",
                 "target": "prod",
             }
         ],
@@ -65,18 +64,18 @@ def sample_floe_yaml_full() -> dict[str, Any]:
             "database_type": "snowflake",
             "port": 4000,
             "pre_aggregations": {
-                "enabled": True,
+                "refresh_schedule": "0 */6 * * *",
             },
             "security": {
-                "api_scopes_enabled": True,
+                "row_level": True,
             },
         },
         "governance": {
             "classification_source": "dbt_meta",
         },
         "observability": {
-            "traces_enabled": True,
-            "metrics_enabled": True,
+            "traces": True,
+            "metrics": True,
         },
         "catalog": {
             "type": "polaris",

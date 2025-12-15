@@ -62,31 +62,31 @@ Based on plan.md, using monorepo structure:
 
 > **NOTE: Write tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T010 [P] [US1] Unit tests for ComputeTarget enum at packages/floe-core/tests/unit/schemas/test_compute.py
-- [ ] T011 [P] [US1] Unit tests for ComputeConfig validation (secret ref pattern) at packages/floe-core/tests/unit/schemas/test_compute.py
-- [ ] T012 [P] [US1] Unit tests for TransformConfig validation at packages/floe-core/tests/unit/schemas/test_transforms.py
-- [ ] T013 [P] [US1] Unit tests for ConsumptionConfig defaults at packages/floe-core/tests/unit/schemas/test_consumption.py
-- [ ] T014 [P] [US1] Unit tests for GovernanceConfig defaults at packages/floe-core/tests/unit/schemas/test_governance.py
-- [ ] T015 [P] [US1] Unit tests for ObservabilityConfig defaults at packages/floe-core/tests/unit/schemas/test_observability.py
-- [ ] T016 [P] [US1] Unit tests for CatalogConfig validation at packages/floe-core/tests/unit/schemas/test_catalog.py
-- [ ] T017 [P] [US1] Unit tests for FloeSpec validation (name pattern, version semver) at packages/floe-core/tests/unit/schemas/test_floe_spec.py
-- [ ] T018 [P] [US1] Unit tests for FloeSpec.from_yaml() loading at packages/floe-core/tests/unit/schemas/test_floe_spec.py
-- [ ] T019 [P] [US1] Integration test for valid floe.yaml loading at packages/floe-core/tests/integration/test_floe_spec_loading.py
+- [x] T010 [P] [US1] Unit tests for ComputeTarget enum at packages/floe-core/tests/unit/schemas/test_compute_target.py
+- [x] T011 [P] [US1] Unit tests for ComputeConfig validation (secret ref pattern) at packages/floe-core/tests/unit/schemas/test_compute_config.py
+- [x] T012 [P] [US1] Unit tests for TransformConfig validation at packages/floe-core/tests/unit/schemas/test_transform_config.py
+- [x] T013 [P] [US1] Unit tests for ConsumptionConfig defaults at packages/floe-core/tests/unit/schemas/test_consumption_config.py
+- [x] T014 [P] [US1] Unit tests for GovernanceConfig defaults at packages/floe-core/tests/unit/schemas/test_governance_config.py
+- [x] T015 [P] [US1] Unit tests for ObservabilityConfig defaults at packages/floe-core/tests/unit/schemas/test_observability_config.py
+- [x] T016 [P] [US1] Unit tests for CatalogConfig validation at packages/floe-core/tests/unit/schemas/test_catalog_config.py
+- [x] T017 [P] [US1] Unit tests for FloeSpec validation (name pattern, version semver) at packages/floe-core/tests/unit/schemas/test_floe_spec.py
+- [x] T018 [P] [US1] Unit tests for FloeSpec.from_yaml() loading at packages/floe-core/tests/unit/schemas/test_floe_spec_yaml.py
+- [x] T019 [P] [US1] Integration test for valid floe.yaml loading at packages/floe-core/tests/integration/test_floe_yaml_loading.py
 
 ### Implementation for User Story 1
 
-- [ ] T020 [P] [US1] Implement ComputeTarget enum with 7 targets at packages/floe-core/src/floe_core/schemas/compute.py
-- [ ] T021 [P] [US1] Implement ComputeConfig with secret ref validation at packages/floe-core/src/floe_core/schemas/compute.py
-- [ ] T022 [P] [US1] Implement TransformConfig with type discriminator at packages/floe-core/src/floe_core/schemas/transforms.py
-- [ ] T023 [P] [US1] Implement PreAggregationConfig with defaults at packages/floe-core/src/floe_core/schemas/consumption.py
-- [ ] T024 [P] [US1] Implement CubeSecurityConfig with defaults at packages/floe-core/src/floe_core/schemas/consumption.py
-- [ ] T025 [P] [US1] Implement ConsumptionConfig with database_type and dev_mode at packages/floe-core/src/floe_core/schemas/consumption.py
-- [ ] T026 [P] [US1] Implement GovernanceConfig with classification_source enum at packages/floe-core/src/floe_core/schemas/governance.py
-- [ ] T027 [P] [US1] Implement ColumnClassification model at packages/floe-core/src/floe_core/schemas/governance.py
-- [ ] T028 [P] [US1] Implement ObservabilityConfig with attributes dict at packages/floe-core/src/floe_core/schemas/observability.py
-- [ ] T029 [P] [US1] Implement CatalogConfig with Polaris OAuth2 fields at packages/floe-core/src/floe_core/schemas/catalog.py
-- [ ] T030 [US1] Implement FloeSpec root model with from_yaml() method at packages/floe-core/src/floe_core/schemas/floe_spec.py
-- [ ] T031 [US1] Export all schema models from schemas/__init__.py at packages/floe-core/src/floe_core/schemas/__init__.py
+- [x] T020 [P] [US1] Implement ComputeTarget enum with 7 targets at packages/floe-core/src/floe_core/schemas/compute.py
+- [x] T021 [P] [US1] Implement ComputeConfig with secret ref validation at packages/floe-core/src/floe_core/schemas/compute.py
+- [x] T022 [P] [US1] Implement TransformConfig with type discriminator at packages/floe-core/src/floe_core/schemas/transforms.py
+- [x] T023 [P] [US1] Implement PreAggregationConfig with defaults at packages/floe-core/src/floe_core/schemas/consumption.py
+- [x] T024 [P] [US1] Implement CubeSecurityConfig with defaults at packages/floe-core/src/floe_core/schemas/consumption.py
+- [x] T025 [P] [US1] Implement ConsumptionConfig with database_type and dev_mode at packages/floe-core/src/floe_core/schemas/consumption.py
+- [x] T026 [P] [US1] Implement GovernanceConfig with classification_source enum at packages/floe-core/src/floe_core/schemas/governance.py
+- [x] T027 [P] [US1] Implement ColumnClassification model at packages/floe-core/src/floe_core/schemas/governance.py
+- [x] T028 [P] [US1] Implement ObservabilityConfig with attributes dict at packages/floe-core/src/floe_core/schemas/observability.py
+- [x] T029 [P] [US1] Implement CatalogConfig with Polaris OAuth2 fields at packages/floe-core/src/floe_core/schemas/catalog.py
+- [x] T030 [US1] Implement FloeSpec root model with from_yaml() method at packages/floe-core/src/floe_core/schemas/floe_spec.py
+- [x] T031 [US1] Export all schema models from schemas/__init__.py at packages/floe-core/src/floe_core/schemas/__init__.py
 
 **Checkpoint**: FloeSpec validation fully functional - users can define and validate floe.yaml
 
