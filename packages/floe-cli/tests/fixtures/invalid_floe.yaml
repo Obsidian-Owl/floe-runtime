@@ -1,0 +1,16 @@
+# Invalid floe.yaml test fixture
+# Contains schema violations for testing error messages
+
+# Missing required 'version' field
+name: test-pipeline
+
+compute:
+  # Invalid target - 'invalid_target' is not a valid ComputeTarget
+  target: invalid_target
+  properties:
+    path: ":memory:"
+
+# Invalid transform type
+transforms:
+  - type: invalid_transform_type
+    path: ./dbt

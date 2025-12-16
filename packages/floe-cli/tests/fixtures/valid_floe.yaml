@@ -1,0 +1,22 @@
+# Valid floe.yaml test fixture
+# Used for testing CLI commands with valid configuration
+
+name: test-pipeline
+version: "1.0.0"
+
+compute:
+  target: duckdb
+  properties:
+    path: ":memory:"
+    threads: 4
+
+transforms:
+  - type: dbt
+    path: ./dbt
+
+governance:
+  classification_source: dbt_meta
+
+observability:
+  traces: true
+  metrics: true

@@ -49,6 +49,9 @@ target-version = "py310"
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["floe_core", "floe_cli", "floe_dagster", "floe_dbt", "floe_iceberg", "floe_polaris", "floe_cube"]
+
 [tool.pytest.ini_options]
 testpaths = [
     "tests",
