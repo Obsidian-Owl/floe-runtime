@@ -80,4 +80,6 @@ class SparkProfileGenerator:
         if method == "odbc" and "driver" in properties:
             profile["driver"] = properties["driver"]
 
+        # target_name is guaranteed to be set by model_validator
+        assert config.target_name is not None
         return {config.target_name: profile}

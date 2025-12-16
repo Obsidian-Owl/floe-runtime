@@ -138,7 +138,7 @@ class ProfileGeneratorConfig(BaseModel):
         return f"{{{{ env_var('{service}_{env_upper}_{secret_name}') }}}}"
 
     @classmethod
-    def from_artifacts(cls, artifacts: dict[str, Any]) -> "ProfileGeneratorConfig":
+    def from_artifacts(cls, artifacts: dict[str, Any]) -> ProfileGeneratorConfig:
         """Create ProfileGeneratorConfig from CompiledArtifacts.
 
         Extracts environment from environment_context if present,
@@ -199,7 +199,7 @@ class ProfileGenerator(Protocol):
     @abstractmethod
     def generate(
         self,
-        artifacts: "CompiledArtifacts",
+        artifacts: CompiledArtifacts,
         config: ProfileGeneratorConfig,
     ) -> dict[str, Any]:
         """Generate dbt profile configuration for this target.

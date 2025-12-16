@@ -34,7 +34,7 @@ class JSONFormatter(logging.Formatter):
         }
     """
 
-    def __init__(self, tracing_manager: "TracingManager | None" = None) -> None:
+    def __init__(self, tracing_manager: TracingManager | None = None) -> None:
         """Initialize JSONFormatter.
 
         Args:
@@ -107,7 +107,11 @@ class JSONFormatter(logging.Formatter):
             Dictionary with trace_id and span_id.
         """
         if self._tracing_manager:
-            return self._tracing_manager.get_current_trace_context()
+            ctx = self._tracing_manager.get_current_trace_context()
+            return {
+                "trace_id": ctx.get("trace_id") or "",
+                "span_id": ctx.get("span_id") or "",
+            }
 
         # Fallback to direct OTel API
         current_span = trace.get_current_span()
@@ -129,7 +133,7 @@ def configure_logging(
     name: str,
     handler: logging.Handler | None = None,
     level: int = logging.INFO,
-    tracing_manager: "TracingManager | None" = None,
+    tracing_manager: TracingManager | None = None,
 ) -> logging.Logger:
     """Configure structured logging with JSON format.
 
@@ -204,7 +208,7 @@ class BoundLogger:
         self._logger = logger
         self._context = context
 
-    def bind(self, **context: Any) -> "BoundLogger":
+    def bind(self, **context: Any) -> BoundLogger:
         """Create new BoundLogger with additional context.
 
         Args:

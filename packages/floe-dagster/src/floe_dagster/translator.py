@@ -5,7 +5,8 @@ T043: [US1] Implement FloeTranslator (extends DagsterDbtTranslator)
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from dagster import AssetKey, MetadataValue
 from dagster_dbt import DagsterDbtTranslator
@@ -52,9 +53,7 @@ class FloeTranslator(DagsterDbtTranslator):
 
         return AssetKey(key_parts)
 
-    def get_metadata(
-        self, dbt_resource_props: Mapping[str, Any]
-    ) -> Mapping[str, Any]:
+    def get_metadata(self, dbt_resource_props: Mapping[str, Any]) -> Mapping[str, Any]:
         """Get metadata from dbt resource properties.
 
         Extracts both standard dbt metadata and floe-specific metadata
@@ -101,18 +100,19 @@ class FloeTranslator(DagsterDbtTranslator):
 
         return metadata
 
-    def get_description(self, dbt_resource_props: Mapping[str, Any]) -> Optional[str]:
+    def get_description(self, dbt_resource_props: Mapping[str, Any]) -> str:
         """Get description from dbt resource properties.
 
         Args:
             dbt_resource_props: dbt manifest node properties.
 
         Returns:
-            Description string or None.
+            Description string (empty string if not found).
         """
-        return dbt_resource_props.get("description", "") or None
+        description = dbt_resource_props.get("description", "")
+        return str(description) if description else ""
 
-    def get_group_name(self, dbt_resource_props: Mapping[str, Any]) -> Optional[str]:
+    def get_group_name(self, dbt_resource_props: Mapping[str, Any]) -> str | None:
         """Get group name from dbt resource properties.
 
         Uses schema as group name, falling back to package name.
@@ -125,17 +125,15 @@ class FloeTranslator(DagsterDbtTranslator):
         """
         # Try schema first
         if schema := dbt_resource_props.get("schema"):
-            return schema
+            return str(schema)
 
         # Fall back to package name
         if package := dbt_resource_props.get("package_name"):
-            return package
+            return str(package)
 
         return None
 
-    def get_owners(
-        self, dbt_resource_props: Mapping[str, Any]
-    ) -> Optional[Sequence[str]]:
+    def get_owners(self, dbt_resource_props: Mapping[str, Any]) -> Sequence[str] | None:
         """Get owners from dbt resource properties.
 
         Extracts owner from meta.floe.owner namespace.
@@ -153,9 +151,7 @@ class FloeTranslator(DagsterDbtTranslator):
 
         return None
 
-    def get_tags(
-        self, dbt_resource_props: Mapping[str, Any]
-    ) -> Mapping[str, str]:
+    def get_tags(self, dbt_resource_props: Mapping[str, Any]) -> Mapping[str, str]:
         """Get tags from dbt resource properties.
 
         Converts dbt tags to Dagster tag format.

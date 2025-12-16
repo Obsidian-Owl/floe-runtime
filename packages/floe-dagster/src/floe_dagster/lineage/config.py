@@ -73,7 +73,7 @@ class OpenLineageConfig(BaseModel):
         return self.endpoint is not None
 
     @classmethod
-    def from_artifacts(cls, artifacts: dict[str, Any]) -> "OpenLineageConfig":
+    def from_artifacts(cls, artifacts: dict[str, Any]) -> OpenLineageConfig:
         """Create OpenLineageConfig from CompiledArtifacts dictionary.
 
         Extracts lineage configuration from the observability section

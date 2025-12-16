@@ -90,9 +90,7 @@ class TestLineageDatasetBuilder:
             },
         }
 
-    def test_build_from_dbt_node_creates_dataset(
-        self, dbt_model_node: dict[str, Any]
-    ) -> None:
+    def test_build_from_dbt_node_creates_dataset(self, dbt_model_node: dict[str, Any]) -> None:
         """Test building LineageDataset from dbt model node."""
         from floe_dagster.lineage.builder import LineageDatasetBuilder
         from floe_dagster.lineage.events import LineageDataset
@@ -139,9 +137,7 @@ class TestLineageDatasetBuilder:
         assert datasource["name"] == "analytics_db"
         assert "snowflake" in datasource["uri"]
 
-    def test_build_from_dbt_source_node(
-        self, dbt_source_node: dict[str, Any]
-    ) -> None:
+    def test_build_from_dbt_source_node(self, dbt_source_node: dict[str, Any]) -> None:
         """Test building LineageDataset from dbt source node."""
         from floe_dagster.lineage.builder import LineageDatasetBuilder
 
@@ -151,9 +147,7 @@ class TestLineageDatasetBuilder:
 
         assert dataset.name == "raw_db.public.customers"
 
-    def test_build_classification_facet_extracts_pii(
-        self, dbt_model_node: dict[str, Any]
-    ) -> None:
+    def test_build_classification_facet_extracts_pii(self, dbt_model_node: dict[str, Any]) -> None:
         """Test building classification facet from columns with floe meta."""
         from floe_dagster.lineage.builder import LineageDatasetBuilder
 
@@ -203,15 +197,11 @@ class TestLineageDatasetBuilder:
 
         builder = LineageDatasetBuilder(namespace_prefix="snowflake://account")
 
-        classification_facet = builder.build_classification_facet(
-            node_without_classifications
-        )
+        classification_facet = builder.build_classification_facet(node_without_classifications)
 
         assert classification_facet is None
 
-    def test_build_dataset_with_classification_facet(
-        self, dbt_model_node: dict[str, Any]
-    ) -> None:
+    def test_build_dataset_with_classification_facet(self, dbt_model_node: dict[str, Any]) -> None:
         """Test built dataset includes classification facet when columns have classifications."""
         from floe_dagster.lineage.builder import LineageDatasetBuilder
 

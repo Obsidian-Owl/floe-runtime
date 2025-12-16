@@ -67,7 +67,7 @@ class TracingConfig(BaseModel):
         return self.endpoint is not None
 
     @classmethod
-    def from_artifacts(cls, artifacts: dict[str, Any]) -> "TracingConfig":
+    def from_artifacts(cls, artifacts: dict[str, Any]) -> TracingConfig:
         """Create TracingConfig from CompiledArtifacts dictionary.
 
         Extracts tracing configuration from the observability section

@@ -63,10 +63,11 @@ class ProfileWriter:
         Returns:
             YAML-formatted string.
         """
-        return yaml.safe_dump(
+        result: str = yaml.safe_dump(
             profile,
             default_flow_style=False,
             allow_unicode=True,
             sort_keys=False,
             width=120,
         )
+        return result

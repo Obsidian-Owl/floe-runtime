@@ -63,4 +63,6 @@ class DuckDBProfileGenerator:
         if "extensions" in properties:
             profile["extensions"] = properties["extensions"]
 
+        # target_name is guaranteed to be set by model_validator
+        assert config.target_name is not None
         return {config.target_name: profile}

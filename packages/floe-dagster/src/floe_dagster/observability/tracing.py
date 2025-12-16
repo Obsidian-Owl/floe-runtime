@@ -8,8 +8,9 @@ T074: [US4] Implement NoOpTracerProvider for graceful degradation
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Iterator
+from typing import TYPE_CHECKING, Any
 
 from opentelemetry import trace
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
@@ -118,11 +119,9 @@ class TracingManager:
 
             # Use BatchSpanProcessor for efficiency (or Simple for debugging)
             if self.config.batch_export:
-                processor = BatchSpanProcessor(exporter)
+                self._provider.add_span_processor(BatchSpanProcessor(exporter))
             else:
-                processor = SimpleSpanProcessor(exporter)
-
-            self._provider.add_span_processor(processor)
+                self._provider.add_span_processor(SimpleSpanProcessor(exporter))
 
             logger.info(
                 "Configured OTLP tracing to %s (batch=%s)",
@@ -144,7 +143,7 @@ class TracingManager:
         )
         self._configured = True
 
-    def get_tracer(self, name: str) -> "Tracer":
+    def get_tracer(self, name: str) -> Tracer:
         """Get a tracer instance.
 
         Args:
@@ -256,7 +255,7 @@ class TracingManager:
         if self._provider and hasattr(self._provider, "shutdown"):
             self._provider.shutdown()
 
-    def __enter__(self) -> "TracingManager":
+    def __enter__(self) -> TracingManager:
         """Enter context manager - configure tracing."""
         self.configure()
         return self

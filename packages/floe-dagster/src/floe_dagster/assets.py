@@ -104,7 +104,7 @@ class FloeAssetFactory:
         manifest_dict = cls._load_manifest(manifest_file)
 
         @dbt_assets(manifest=manifest_file, dagster_dbt_translator=translator)
-        def floe_dbt_assets(context, dbt: DbtCliResource):
+        def floe_dbt_assets(context, dbt: DbtCliResource):  # type: ignore[no-untyped-def]
             """Execute dbt models as Dagster assets with lineage and tracing."""
             # Start tracing span for the dbt run
             with tracing_manager.start_span(
@@ -239,7 +239,8 @@ class FloeAssetFactory:
             Parsed manifest dictionary.
         """
         with open(manifest_path) as f:
-            return json.load(f)
+            result: dict[str, Any] = json.load(f)
+            return result
 
     @classmethod
     def _filter_models(cls, manifest: dict[str, Any]) -> dict[str, Any]:
@@ -258,9 +259,7 @@ class FloeAssetFactory:
         }
 
     @classmethod
-    def _get_dependencies(
-        cls, manifest: dict[str, Any], model_id: str
-    ) -> list[str]:
+    def _get_dependencies(cls, manifest: dict[str, Any], model_id: str) -> list[str]:
         """Get dependencies for a model.
 
         Args:
@@ -271,7 +270,8 @@ class FloeAssetFactory:
             List of upstream node unique_ids.
         """
         node = manifest.get("nodes", {}).get(model_id, {})
-        return node.get("depends_on", {}).get("nodes", [])
+        deps: list[str] = node.get("depends_on", {}).get("nodes", [])
+        return deps
 
     @classmethod
     def _get_dbt_cli_config(cls, artifacts: dict[str, Any]) -> dict[str, str]:

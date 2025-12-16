@@ -6,7 +6,7 @@ T052: [US3] Unit tests for OpenLineageEmitter
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -244,8 +244,9 @@ class TestOpenLineageEmitter:
 
     def test_generate_run_id_returns_uuid(self, mock_config: Any) -> None:
         """Test _generate_run_id returns valid UUID string."""
-        from floe_dagster.lineage.client import OpenLineageEmitter
         import uuid
+
+        from floe_dagster.lineage.client import OpenLineageEmitter
 
         emitter = OpenLineageEmitter(mock_config)
 

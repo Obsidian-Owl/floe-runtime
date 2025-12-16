@@ -112,9 +112,7 @@ class LineageDatasetBuilder:
             facets=facets,
         )
 
-    def build_classification_facet(
-        self, node: dict[str, Any]
-    ) -> dict[str, Any] | None:
+    def build_classification_facet(self, node: dict[str, Any]) -> dict[str, Any] | None:
         """Build classification facet from dbt node columns.
 
         Extracts column-level classifications from the meta.floe

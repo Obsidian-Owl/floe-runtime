@@ -6,7 +6,7 @@ T069: [US4] Unit tests for TracingManager
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -179,10 +179,9 @@ class TestTracingManager:
         manager = TracingManager(mock_config)
         manager.configure()
 
-        with pytest.raises(ValueError):
-            with manager.start_span("failing_operation") as span:
-                manager.record_exception(span, ValueError("test error"))
-                raise ValueError("test error")
+        with pytest.raises(ValueError), manager.start_span("failing_operation") as span:
+            manager.record_exception(span, ValueError("test error"))
+            raise ValueError("test error")
 
     def test_set_span_status_ok(self, mock_config: Any) -> None:
         """Test setting span status to OK."""

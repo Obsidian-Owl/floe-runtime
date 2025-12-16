@@ -64,9 +64,7 @@ class ColumnClassification(BaseModel):
         return result
 
     @classmethod
-    def from_dbt_meta(
-        cls, column_name: str, meta: dict[str, Any]
-    ) -> "ColumnClassification | None":
+    def from_dbt_meta(cls, column_name: str, meta: dict[str, Any]) -> ColumnClassification | None:
         """Create ColumnClassification from dbt column meta.
 
         Extracts classification from the meta.floe namespace of a dbt

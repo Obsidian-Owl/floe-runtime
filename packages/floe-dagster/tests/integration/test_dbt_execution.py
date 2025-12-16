@@ -11,7 +11,6 @@ Requirements:
 
 from __future__ import annotations
 
-import json
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -46,9 +45,7 @@ def dbt_project(tmp_path: Path) -> Path:
     models_dir.mkdir()
 
     # Create a simple model
-    (models_dir / "test_model.sql").write_text(
-        "SELECT 1 as id, 'test' as name"
-    )
+    (models_dir / "test_model.sql").write_text("SELECT 1 as id, 'test' as name")
 
     # Create schema.yml for model metadata
     schema_config = {

@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Iterator
+from typing import TYPE_CHECKING
 
 from floe_dagster.lineage.config import OpenLineageConfig
 from floe_dagster.lineage.events import LineageDataset, LineageEvent, LineageEventType

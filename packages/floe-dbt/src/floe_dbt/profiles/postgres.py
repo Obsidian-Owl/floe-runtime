@@ -72,4 +72,6 @@ class PostgreSQLProfileGenerator:
         if "schema" in properties:
             profile["schema"] = properties["schema"]
 
+        # target_name is guaranteed to be set by model_validator
+        assert config.target_name is not None
         return {config.target_name: profile}

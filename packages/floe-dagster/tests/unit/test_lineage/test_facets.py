@@ -59,9 +59,7 @@ class TestColumnClassification:
         assert public.classification == "public"
 
         # Confidential
-        confidential = ColumnClassification(
-            column_name="salary", classification="confidential"
-        )
+        confidential = ColumnClassification(column_name="salary", classification="confidential")
         assert confidential.classification == "confidential"
 
     def test_pii_types(self) -> None:

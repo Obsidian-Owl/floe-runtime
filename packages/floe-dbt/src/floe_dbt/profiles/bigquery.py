@@ -73,4 +73,6 @@ class BigQueryProfileGenerator:
         if method == "service-account":
             profile["keyfile"] = config.get_secret_env_var("BIGQUERY", "KEYFILE")
 
+        # target_name is guaranteed to be set by model_validator
+        assert config.target_name is not None
         return {config.target_name: profile}

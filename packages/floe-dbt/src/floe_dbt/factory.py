@@ -5,8 +5,9 @@ T032: [US2] Implement ProfileFactory with target registry
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Callable
 
+from floe_dbt.profiles.base import ProfileGenerator
 from floe_dbt.profiles.bigquery import BigQueryProfileGenerator
 from floe_dbt.profiles.databricks import DatabricksProfileGenerator
 from floe_dbt.profiles.duckdb import DuckDBProfileGenerator
@@ -14,9 +15,6 @@ from floe_dbt.profiles.postgres import PostgreSQLProfileGenerator
 from floe_dbt.profiles.redshift import RedshiftProfileGenerator
 from floe_dbt.profiles.snowflake import SnowflakeProfileGenerator
 from floe_dbt.profiles.spark import SparkProfileGenerator
-
-if TYPE_CHECKING:
-    from floe_dbt.profiles.base import ProfileGenerator
 
 
 class ProfileFactory:
@@ -40,7 +38,7 @@ class ProfileFactory:
     """
 
     # Registry mapping target names to generator classes
-    _GENERATORS: dict[str, type] = {
+    _GENERATORS: dict[str, Callable[[], ProfileGenerator]] = {
         "duckdb": DuckDBProfileGenerator,
         "snowflake": SnowflakeProfileGenerator,
         "bigquery": BigQueryProfileGenerator,
@@ -51,7 +49,7 @@ class ProfileFactory:
     }
 
     @classmethod
-    def create(cls, target: str) -> "ProfileGenerator":
+    def create(cls, target: str) -> ProfileGenerator:
         """Create a profile generator for the specified target.
 
         Args:
@@ -69,8 +67,7 @@ class ProfileFactory:
         if target_lower not in cls._GENERATORS:
             supported = ", ".join(sorted(cls._GENERATORS.keys()))
             raise ValueError(
-                f"Unsupported compute target: '{target}'. "
-                f"Supported targets: {supported}"
+                f"Unsupported compute target: '{target}'. " f"Supported targets: {supported}"
             )
 
         generator_class = cls._GENERATORS[target_lower]
