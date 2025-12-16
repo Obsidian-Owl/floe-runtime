@@ -1,6 +1,9 @@
 """Unit tests for DuckDBProfileGenerator.
 
 T015: [P] [US2] Unit tests for DuckDBProfileGenerator
+
+This module uses the BaseProfileGeneratorTests pattern for standardized
+adapter testing. DuckDB-specific tests are added as additional methods.
 """
 
 from __future__ import annotations
@@ -9,56 +12,64 @@ from typing import Any
 
 import pytest
 
-from floe_dbt.profiles.base import ProfileGeneratorConfig
-
-# Import will work once generator is implemented
-# from floe_dbt.profiles.duckdb import DuckDBProfileGenerator
+from floe_dbt.profiles.base import ProfileGenerator, ProfileGeneratorConfig
+from testing.base_classes.adapter_test_base import BaseProfileGeneratorTests
 
 
-class TestDuckDBProfileGenerator:
-    """Test suite for DuckDB profile generation."""
+class TestDuckDBProfileGenerator(BaseProfileGeneratorTests):
+    """Test suite for DuckDB profile generation.
+
+    Inherits from BaseProfileGeneratorTests to get standardized tests:
+    - test_implements_protocol
+    - test_generate_returns_dict
+    - test_generate_includes_target_name
+    - test_generate_has_correct_type
+    - test_generate_has_required_fields
+    - test_generate_uses_config_threads
+    - test_generate_custom_target_name
+    - test_generate_with_different_environments
+    """
 
     @pytest.fixture
-    def generator(self) -> Any:
+    def generator(self) -> ProfileGenerator:
         """Create DuckDBProfileGenerator instance."""
         from floe_dbt.profiles.duckdb import DuckDBProfileGenerator
 
         return DuckDBProfileGenerator()
 
-    @pytest.fixture
-    def config(self) -> ProfileGeneratorConfig:
-        """Standard profile generator config."""
-        return ProfileGeneratorConfig(
-            profile_name="floe",
-            target_name="dev",
-            threads=4,
-        )
+    @property
+    def target_type(self) -> str:
+        """DuckDB adapter type."""
+        return "duckdb"
 
-    def test_generate_returns_valid_structure(
-        self,
-        generator: Any,
-        config: ProfileGeneratorConfig,
-        minimal_compiled_artifacts: dict[str, Any],
-    ) -> None:
-        """Test that generate returns correct structure."""
-        result = generator.generate(minimal_compiled_artifacts, config)
+    @property
+    def required_fields(self) -> set[str]:
+        """Required fields in DuckDB profile."""
+        return {"type", "path", "threads"}
 
-        assert config.target_name in result
-        target = result[config.target_name]
-        assert target["type"] == "duckdb"
-        assert "path" in target
-        assert "threads" in target
+    def get_minimal_artifacts(self) -> dict[str, Any]:
+        """Minimal CompiledArtifacts for DuckDB."""
+        return {
+            "version": "1.0.0",
+            "compute": {
+                "target": "duckdb",
+                "properties": {"path": ":memory:"},
+            },
+            "transforms": [],
+        }
+
+    # =========================================================================
+    # DuckDB-specific tests (not inherited from base class)
+    # =========================================================================
 
     def test_generate_uses_default_memory_path(
         self,
-        generator: Any,
+        generator: ProfileGenerator,
         config: ProfileGeneratorConfig,
-        base_metadata: dict[str, Any],
     ) -> None:
         """Test that default path is :memory: when not specified."""
-        artifacts = {
+        artifacts: dict[str, Any] = {
             "version": "1.0.0",
-            "metadata": base_metadata,
             "compute": {
                 "target": "duckdb",
                 "properties": {},
@@ -67,18 +78,17 @@ class TestDuckDBProfileGenerator:
         }
 
         result = generator.generate(artifacts, config)
+        assert config.target_name is not None
         assert result[config.target_name]["path"] == ":memory:"
 
     def test_generate_uses_configured_path(
         self,
-        generator: Any,
+        generator: ProfileGenerator,
         config: ProfileGeneratorConfig,
-        base_metadata: dict[str, Any],
     ) -> None:
         """Test that configured path is used."""
-        artifacts = {
+        artifacts: dict[str, Any] = {
             "version": "1.0.0",
-            "metadata": base_metadata,
             "compute": {
                 "target": "duckdb",
                 "properties": {"path": "/data/warehouse.db"},
@@ -87,37 +97,21 @@ class TestDuckDBProfileGenerator:
         }
 
         result = generator.generate(artifacts, config)
+        assert config.target_name is not None
         assert result[config.target_name]["path"] == "/data/warehouse.db"
-
-    def test_generate_uses_config_threads(
-        self,
-        generator: Any,
-        config: ProfileGeneratorConfig,
-        minimal_compiled_artifacts: dict[str, Any],
-    ) -> None:
-        """Test that thread count from config is used."""
-        custom_config = ProfileGeneratorConfig(
-            profile_name="floe",
-            target_name="dev",
-            threads=8,
-        )
-
-        result = generator.generate(minimal_compiled_artifacts, custom_config)
-        assert result[custom_config.target_name]["threads"] == 8
 
     def test_generate_includes_extensions_when_specified(
         self,
-        generator: Any,
+        generator: ProfileGenerator,
         config: ProfileGeneratorConfig,
-        base_metadata: dict[str, Any],
     ) -> None:
         """Test that extensions are included when specified."""
-        artifacts = {
+        artifacts: dict[str, Any] = {
             "version": "1.0.0",
-            "metadata": base_metadata,
             "compute": {
                 "target": "duckdb",
                 "properties": {
+                    "path": ":memory:",
                     "extensions": ["httpfs", "parquet"],
                 },
             },
@@ -125,20 +119,5 @@ class TestDuckDBProfileGenerator:
         }
 
         result = generator.generate(artifacts, config)
+        assert config.target_name is not None
         assert result[config.target_name].get("extensions") == ["httpfs", "parquet"]
-
-    def test_generate_custom_target_name(
-        self,
-        generator: Any,
-        minimal_compiled_artifacts: dict[str, Any],
-    ) -> None:
-        """Test generation with custom target name."""
-        config = ProfileGeneratorConfig(
-            profile_name="floe",
-            target_name="production",
-            threads=4,
-        )
-
-        result = generator.generate(minimal_compiled_artifacts, config)
-        assert "production" in result
-        assert "dev" not in result

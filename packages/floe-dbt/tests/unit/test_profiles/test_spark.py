@@ -1,6 +1,9 @@
 """Unit tests for SparkProfileGenerator.
 
 T021: [P] [US2] Unit tests for SparkProfileGenerator
+
+This module uses the BaseProfileGeneratorTests pattern for standardized
+adapter testing. Spark-specific tests cover different connection methods.
 """
 
 from __future__ import annotations
@@ -9,61 +12,60 @@ from typing import Any
 
 import pytest
 
-from floe_dbt.profiles.base import ProfileGeneratorConfig
+from floe_dbt.profiles.base import ProfileGenerator, ProfileGeneratorConfig
+from testing.base_classes.adapter_test_base import BaseProfileGeneratorTests
 
 
-class TestSparkProfileGenerator:
-    """Test suite for Spark profile generation."""
+class TestSparkProfileGenerator(BaseProfileGeneratorTests):
+    """Test suite for Spark profile generation.
+
+    Inherits from BaseProfileGeneratorTests to get standardized tests.
+    Spark-specific tests cover thrift, http, odbc, and session methods.
+    """
 
     @pytest.fixture
-    def generator(self) -> Any:
+    def generator(self) -> ProfileGenerator:
         """Create SparkProfileGenerator instance."""
         from floe_dbt.profiles.spark import SparkProfileGenerator
 
         return SparkProfileGenerator()
 
-    @pytest.fixture
-    def config(self) -> ProfileGeneratorConfig:
-        """Standard profile generator config."""
-        return ProfileGeneratorConfig(
-            profile_name="floe",
-            target_name="dev",
-            threads=4,
-        )
+    @property
+    def target_type(self) -> str:
+        """Spark adapter type."""
+        return "spark"
 
-    def test_generate_returns_valid_structure(
-        self,
-        generator: Any,
-        config: ProfileGeneratorConfig,
-        spark_compute_config: dict[str, Any],
-        base_metadata: dict[str, Any],
-    ) -> None:
-        """Test that generate returns correct structure."""
-        artifacts = {
+    @property
+    def required_fields(self) -> set[str]:
+        """Required fields in Spark profile."""
+        return {"type", "method", "threads"}
+
+    def get_minimal_artifacts(self) -> dict[str, Any]:
+        """Minimal CompiledArtifacts for Spark."""
+        return {
             "version": "1.0.0",
-            "metadata": base_metadata,
-            "compute": spark_compute_config,
+            "compute": {
+                "target": "spark",
+                "properties": {
+                    "method": "thrift",
+                    "host": "spark-thrift.local",
+                },
+            },
             "transforms": [],
         }
 
-        result = generator.generate(artifacts, config)
-
-        assert config.target_name in result
-        target = result[config.target_name]
-        assert target["type"] == "spark"
-        assert "method" in target
-        assert "host" in target
+    # =========================================================================
+    # Spark-specific tests
+    # =========================================================================
 
     def test_generate_thrift_method(
         self,
-        generator: Any,
+        generator: ProfileGenerator,
         config: ProfileGeneratorConfig,
-        base_metadata: dict[str, Any],
     ) -> None:
         """Test Thrift connection method configuration."""
-        artifacts = {
+        artifacts: dict[str, Any] = {
             "version": "1.0.0",
-            "metadata": base_metadata,
             "compute": {
                 "target": "spark",
                 "properties": {
@@ -76,6 +78,7 @@ class TestSparkProfileGenerator:
         }
 
         result = generator.generate(artifacts, config)
+        assert config.target_name is not None
         target = result[config.target_name]
 
         assert target["method"] == "thrift"
@@ -84,14 +87,12 @@ class TestSparkProfileGenerator:
 
     def test_generate_http_method(
         self,
-        generator: Any,
+        generator: ProfileGenerator,
         config: ProfileGeneratorConfig,
-        base_metadata: dict[str, Any],
     ) -> None:
         """Test HTTP connection method configuration."""
-        artifacts = {
+        artifacts: dict[str, Any] = {
             "version": "1.0.0",
-            "metadata": base_metadata,
             "compute": {
                 "target": "spark",
                 "properties": {
@@ -104,20 +105,17 @@ class TestSparkProfileGenerator:
         }
 
         result = generator.generate(artifacts, config)
-        target = result[config.target_name]
-
-        assert target["method"] == "http"
+        assert config.target_name is not None
+        assert result[config.target_name]["method"] == "http"
 
     def test_generate_session_method(
         self,
-        generator: Any,
+        generator: ProfileGenerator,
         config: ProfileGeneratorConfig,
-        base_metadata: dict[str, Any],
     ) -> None:
         """Test Session connection method configuration."""
-        artifacts = {
+        artifacts: dict[str, Any] = {
             "version": "1.0.0",
-            "metadata": base_metadata,
             "compute": {
                 "target": "spark",
                 "properties": {
@@ -128,20 +126,17 @@ class TestSparkProfileGenerator:
         }
 
         result = generator.generate(artifacts, config)
-        target = result[config.target_name]
-
-        assert target["method"] == "session"
+        assert config.target_name is not None
+        assert result[config.target_name]["method"] == "session"
 
     def test_generate_odbc_method(
         self,
-        generator: Any,
+        generator: ProfileGenerator,
         config: ProfileGeneratorConfig,
-        base_metadata: dict[str, Any],
     ) -> None:
         """Test ODBC connection method configuration."""
-        artifacts = {
+        artifacts: dict[str, Any] = {
             "version": "1.0.0",
-            "metadata": base_metadata,
             "compute": {
                 "target": "spark",
                 "properties": {
@@ -154,99 +149,41 @@ class TestSparkProfileGenerator:
         }
 
         result = generator.generate(artifacts, config)
-        target = result[config.target_name]
-
-        assert target["method"] == "odbc"
+        assert config.target_name is not None
+        assert result[config.target_name]["method"] == "odbc"
 
     def test_generate_uses_default_port(
         self,
-        generator: Any,
+        generator: ProfileGenerator,
         config: ProfileGeneratorConfig,
-        base_metadata: dict[str, Any],
     ) -> None:
         """Test that default Spark port 10000 is used when not specified."""
-        artifacts = {
-            "version": "1.0.0",
-            "metadata": base_metadata,
-            "compute": {
-                "target": "spark",
-                "properties": {
-                    "method": "thrift",
-                    "host": "localhost",
-                },
-            },
-            "transforms": [],
-        }
-
-        result = generator.generate(artifacts, config)
+        result = generator.generate(self.get_minimal_artifacts(), config)
+        assert config.target_name is not None
         assert result[config.target_name]["port"] == 10000
 
     def test_generate_includes_schema(
         self,
-        generator: Any,
+        generator: ProfileGenerator,
         config: ProfileGeneratorConfig,
-        base_metadata: dict[str, Any],
     ) -> None:
         """Test that schema is included when specified."""
-        artifacts = {
-            "version": "1.0.0",
-            "metadata": base_metadata,
-            "compute": {
-                "target": "spark",
-                "properties": {
-                    "method": "thrift",
-                    "host": "localhost",
-                    "schema": "analytics",
-                },
-            },
-            "transforms": [],
-        }
+        artifacts = self.get_minimal_artifacts()
+        artifacts["compute"]["properties"]["schema"] = "analytics"
 
         result = generator.generate(artifacts, config)
+        assert config.target_name is not None
         assert result[config.target_name]["schema"] == "analytics"
-
-    def test_generate_threads_from_config(
-        self,
-        generator: Any,
-        spark_compute_config: dict[str, Any],
-        base_metadata: dict[str, Any],
-    ) -> None:
-        """Test that thread count from config is used."""
-        config = ProfileGeneratorConfig(
-            profile_name="floe",
-            target_name="prod",
-            threads=16,
-        )
-        artifacts = {
-            "version": "1.0.0",
-            "metadata": base_metadata,
-            "compute": spark_compute_config,
-            "transforms": [],
-        }
-
-        result = generator.generate(artifacts, config)
-        assert result[config.target_name]["threads"] == 16
 
     def test_generate_supports_cluster_config(
         self,
-        generator: Any,
+        generator: ProfileGenerator,
         config: ProfileGeneratorConfig,
-        base_metadata: dict[str, Any],
     ) -> None:
         """Test that cluster configuration is supported."""
-        artifacts = {
-            "version": "1.0.0",
-            "metadata": base_metadata,
-            "compute": {
-                "target": "spark",
-                "properties": {
-                    "method": "thrift",
-                    "host": "localhost",
-                    "cluster": "my-spark-cluster",
-                },
-            },
-            "transforms": [],
-        }
+        artifacts = self.get_minimal_artifacts()
+        artifacts["compute"]["properties"]["cluster"] = "my-spark-cluster"
 
         result = generator.generate(artifacts, config)
+        assert config.target_name is not None
         assert result[config.target_name].get("cluster") == "my-spark-cluster"

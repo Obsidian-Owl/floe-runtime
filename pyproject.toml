@@ -31,7 +31,7 @@ target-version = ['py310', 'py311', 'py312']
 [tool.isort]
 profile = "black"
 line_length = 100
-known_first_party = ["floe_core", "floe_cli", "floe_dagster", "floe_dbt", "floe_iceberg", "floe_polaris", "floe_cube"]
+known_first_party = ["floe_core", "floe_cli", "floe_dagster", "floe_dbt", "floe_iceberg", "floe_polaris", "floe_cube", "testing"]
 
 [tool.mypy]
 strict = true
@@ -65,6 +65,16 @@ testpaths = [
 ]
 addopts = "--import-mode=importlib"
 filterwarnings = ["error"]
+pythonpath = ["."]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests requiring external services",
+    "contract: marks tests as contract tests for cross-package validation",
+    "e2e: marks tests as end-to-end tests",
+    "adapter: marks tests for a specific compute adapter (use with parameter)",
+    "requires_dbt: marks tests that require dbt-core to be installed",
+    "requires_container: marks tests that require Docker containers",
+]
 
 [tool.coverage.run]
 branch = true

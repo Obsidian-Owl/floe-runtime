@@ -1,6 +1,9 @@
 """Unit tests for SnowflakeProfileGenerator.
 
 T016: [P] [US2] Unit tests for SnowflakeProfileGenerator
+
+This module uses the BaseCredentialProfileGeneratorTests pattern for
+standardized adapter testing with credential validation.
 """
 
 from __future__ import annotations
@@ -9,69 +12,67 @@ from typing import Any
 
 import pytest
 
-from floe_dbt.profiles.base import ProfileGeneratorConfig
+from floe_dbt.profiles.base import ProfileGenerator, ProfileGeneratorConfig
+from testing.base_classes.adapter_test_base import BaseCredentialProfileGeneratorTests
 
 
-class TestSnowflakeProfileGenerator:
-    """Test suite for Snowflake profile generation."""
+class TestSnowflakeProfileGenerator(BaseCredentialProfileGeneratorTests):
+    """Test suite for Snowflake profile generation.
+
+    Inherits from BaseCredentialProfileGeneratorTests to get standardized tests
+    plus credential validation tests.
+    """
 
     @pytest.fixture
-    def generator(self) -> Any:
+    def generator(self) -> ProfileGenerator:
         """Create SnowflakeProfileGenerator instance."""
         from floe_dbt.profiles.snowflake import SnowflakeProfileGenerator
 
         return SnowflakeProfileGenerator()
 
-    @pytest.fixture
-    def config(self) -> ProfileGeneratorConfig:
-        """Standard profile generator config."""
-        return ProfileGeneratorConfig(
-            profile_name="floe",
-            target_name="dev",
-            threads=4,
-        )
+    @property
+    def target_type(self) -> str:
+        """Snowflake adapter type."""
+        return "snowflake"
 
-    def test_generate_returns_valid_structure(
-        self,
-        generator: Any,
-        config: ProfileGeneratorConfig,
-        snowflake_compiled_artifacts: dict[str, Any],
-    ) -> None:
-        """Test that generate returns correct structure."""
-        result = generator.generate(snowflake_compiled_artifacts, config)
+    @property
+    def required_fields(self) -> set[str]:
+        """Required fields in Snowflake profile."""
+        return {"type", "account", "user", "password", "threads"}
 
-        assert config.target_name in result
-        target = result[config.target_name]
-        assert target["type"] == "snowflake"
-        assert "account" in target
-        assert "user" in target
-        assert "password" in target
+    @property
+    def credential_fields(self) -> set[str]:
+        """Credential fields that must use env_var()."""
+        return {"user", "password"}
 
-    def test_generate_uses_env_var_for_credentials(
-        self,
-        generator: Any,
-        config: ProfileGeneratorConfig,
-        snowflake_compiled_artifacts: dict[str, Any],
-    ) -> None:
-        """Test that credentials use env_var() template syntax."""
-        result = generator.generate(snowflake_compiled_artifacts, config)
-        target = result[config.target_name]
+    def get_minimal_artifacts(self) -> dict[str, Any]:
+        """Minimal CompiledArtifacts for Snowflake."""
+        return {
+            "version": "1.0.0",
+            "compute": {
+                "target": "snowflake",
+                "properties": {
+                    "account": "xy12345.us-east-1",
+                    "warehouse": "COMPUTE_WH",
+                    "database": "ANALYTICS",
+                    "schema": "PUBLIC",
+                },
+            },
+            "transforms": [],
+        }
 
-        # Password should use env_var template
-        assert "env_var" in str(target["password"]) or "SNOWFLAKE_PASSWORD" in str(
-            target["password"]
-        )
-        # User should use env_var template
-        assert "env_var" in str(target["user"]) or "SNOWFLAKE_USER" in str(target["user"])
+    # =========================================================================
+    # Snowflake-specific tests
+    # =========================================================================
 
     def test_generate_includes_warehouse_config(
         self,
-        generator: Any,
+        generator: ProfileGenerator,
         config: ProfileGeneratorConfig,
-        snowflake_compiled_artifacts: dict[str, Any],
     ) -> None:
         """Test that warehouse configuration is included."""
-        result = generator.generate(snowflake_compiled_artifacts, config)
+        result = generator.generate(self.get_minimal_artifacts(), config)
+        assert config.target_name is not None
         target = result[config.target_name]
 
         assert "warehouse" in target
@@ -80,26 +81,25 @@ class TestSnowflakeProfileGenerator:
 
     def test_generate_includes_role(
         self,
-        generator: Any,
+        generator: ProfileGenerator,
         config: ProfileGeneratorConfig,
-        snowflake_compiled_artifacts: dict[str, Any],
     ) -> None:
         """Test that role is included when specified."""
-        result = generator.generate(snowflake_compiled_artifacts, config)
-        target = result[config.target_name]
+        artifacts = self.get_minimal_artifacts()
+        artifacts["compute"]["properties"]["role"] = "TRANSFORMER"
 
-        assert "role" in target
+        result = generator.generate(artifacts, config)
+        assert config.target_name is not None
+        assert result[config.target_name]["role"] == "TRANSFORMER"
 
     def test_generate_uses_account_from_properties(
         self,
-        generator: Any,
+        generator: ProfileGenerator,
         config: ProfileGeneratorConfig,
-        base_metadata: dict[str, Any],
     ) -> None:
         """Test that account is taken from properties."""
-        artifacts = {
+        artifacts: dict[str, Any] = {
             "version": "1.0.0",
-            "metadata": base_metadata,
             "compute": {
                 "target": "snowflake",
                 "properties": {
@@ -113,52 +113,5 @@ class TestSnowflakeProfileGenerator:
         }
 
         result = generator.generate(artifacts, config)
+        assert config.target_name is not None
         assert result[config.target_name]["account"] == "custom_account.us-west-2.aws"
-
-    def test_generate_threads_from_config(
-        self,
-        generator: Any,
-        snowflake_compiled_artifacts: dict[str, Any],
-    ) -> None:
-        """Test that thread count from config is used."""
-        config = ProfileGeneratorConfig(
-            profile_name="floe",
-            target_name="prod",
-            threads=16,
-        )
-
-        result = generator.generate(snowflake_compiled_artifacts, config)
-        assert result[config.target_name]["threads"] == 16
-
-    def test_never_hardcodes_credentials(
-        self,
-        generator: Any,
-        config: ProfileGeneratorConfig,
-        base_metadata: dict[str, Any],
-    ) -> None:
-        """Test that credentials are never hardcoded (FR-003)."""
-        # Even if password is in properties, it should use env_var reference
-        artifacts = {
-            "version": "1.0.0",
-            "metadata": base_metadata,
-            "compute": {
-                "target": "snowflake",
-                "properties": {
-                    "account": "acc",
-                    "warehouse": "WH",
-                    "database": "DB",
-                    "schema": "S",
-                    # These should NOT be used directly
-                    "password": "secret123",
-                    "user": "admin",
-                },
-            },
-            "transforms": [],
-        }
-
-        result = generator.generate(artifacts, config)
-        target = result[config.target_name]
-
-        # Should use env_var, not the actual values
-        assert target["password"] != "secret123"
-        assert "env_var" in str(target["password"]) or "SNOWFLAKE" in str(target["password"])

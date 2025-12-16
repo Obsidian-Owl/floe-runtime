@@ -1,6 +1,9 @@
 """Unit tests for BigQueryProfileGenerator.
 
 T017: [P] [US2] Unit tests for BigQueryProfileGenerator
+
+This module uses the BaseProfileGeneratorTests pattern for standardized
+adapter testing. BigQuery-specific tests are added for auth methods.
 """
 
 from __future__ import annotations
@@ -9,61 +12,61 @@ from typing import Any
 
 import pytest
 
-from floe_dbt.profiles.base import ProfileGeneratorConfig
+from floe_dbt.profiles.base import ProfileGenerator, ProfileGeneratorConfig
+from testing.base_classes.adapter_test_base import BaseProfileGeneratorTests
 
 
-class TestBigQueryProfileGenerator:
-    """Test suite for BigQuery profile generation."""
+class TestBigQueryProfileGenerator(BaseProfileGeneratorTests):
+    """Test suite for BigQuery profile generation.
+
+    Inherits from BaseProfileGeneratorTests to get standardized tests.
+    BigQuery-specific tests cover OAuth vs service account auth.
+    """
 
     @pytest.fixture
-    def generator(self) -> Any:
+    def generator(self) -> ProfileGenerator:
         """Create BigQueryProfileGenerator instance."""
         from floe_dbt.profiles.bigquery import BigQueryProfileGenerator
 
         return BigQueryProfileGenerator()
 
-    @pytest.fixture
-    def config(self) -> ProfileGeneratorConfig:
-        """Standard profile generator config."""
-        return ProfileGeneratorConfig(
-            profile_name="floe",
-            target_name="dev",
-            threads=4,
-        )
+    @property
+    def target_type(self) -> str:
+        """BigQuery adapter type."""
+        return "bigquery"
 
-    def test_generate_returns_valid_structure(
-        self,
-        generator: Any,
-        config: ProfileGeneratorConfig,
-        bigquery_compute_config: dict[str, Any],
-        base_metadata: dict[str, Any],
-    ) -> None:
-        """Test that generate returns correct structure."""
-        artifacts = {
+    @property
+    def required_fields(self) -> set[str]:
+        """Required fields in BigQuery profile."""
+        return {"type", "project", "method", "threads"}
+
+    def get_minimal_artifacts(self) -> dict[str, Any]:
+        """Minimal CompiledArtifacts for BigQuery."""
+        return {
             "version": "1.0.0",
-            "metadata": base_metadata,
-            "compute": bigquery_compute_config,
+            "compute": {
+                "target": "bigquery",
+                "properties": {
+                    "project": "my-gcp-project",
+                    "dataset": "analytics",
+                    "method": "oauth",
+                },
+            },
             "transforms": [],
         }
 
-        result = generator.generate(artifacts, config)
-
-        assert config.target_name in result
-        target = result[config.target_name]
-        assert target["type"] == "bigquery"
-        assert "project" in target
-        assert "method" in target
+    # =========================================================================
+    # BigQuery-specific tests
+    # =========================================================================
 
     def test_generate_oauth_method(
         self,
-        generator: Any,
+        generator: ProfileGenerator,
         config: ProfileGeneratorConfig,
-        base_metadata: dict[str, Any],
     ) -> None:
         """Test OAuth authentication method configuration."""
-        artifacts = {
+        artifacts: dict[str, Any] = {
             "version": "1.0.0",
-            "metadata": base_metadata,
             "compute": {
                 "target": "bigquery",
                 "properties": {
@@ -76,6 +79,7 @@ class TestBigQueryProfileGenerator:
         }
 
         result = generator.generate(artifacts, config)
+        assert config.target_name is not None
         target = result[config.target_name]
 
         assert target["method"] == "oauth"
@@ -84,14 +88,12 @@ class TestBigQueryProfileGenerator:
 
     def test_generate_service_account_method(
         self,
-        generator: Any,
+        generator: ProfileGenerator,
         config: ProfileGeneratorConfig,
-        base_metadata: dict[str, Any],
     ) -> None:
         """Test service account authentication method configuration."""
-        artifacts = {
+        artifacts: dict[str, Any] = {
             "version": "1.0.0",
-            "metadata": base_metadata,
             "compute": {
                 "target": "bigquery",
                 "properties": {
@@ -104,6 +106,7 @@ class TestBigQueryProfileGenerator:
         }
 
         result = generator.generate(artifacts, config)
+        assert config.target_name is not None
         target = result[config.target_name]
 
         assert target["method"] == "service-account"
@@ -115,14 +118,12 @@ class TestBigQueryProfileGenerator:
 
     def test_generate_includes_location(
         self,
-        generator: Any,
+        generator: ProfileGenerator,
         config: ProfileGeneratorConfig,
-        base_metadata: dict[str, Any],
     ) -> None:
         """Test that location is included when specified."""
-        artifacts = {
+        artifacts: dict[str, Any] = {
             "version": "1.0.0",
-            "metadata": base_metadata,
             "compute": {
                 "target": "bigquery",
                 "properties": {
@@ -136,58 +137,27 @@ class TestBigQueryProfileGenerator:
         }
 
         result = generator.generate(artifacts, config)
+        assert config.target_name is not None
         assert result[config.target_name]["location"] == "EU"
 
     def test_generate_includes_dataset(
         self,
-        generator: Any,
+        generator: ProfileGenerator,
         config: ProfileGeneratorConfig,
-        bigquery_compute_config: dict[str, Any],
-        base_metadata: dict[str, Any],
     ) -> None:
         """Test that dataset is included."""
-        artifacts = {
-            "version": "1.0.0",
-            "metadata": base_metadata,
-            "compute": bigquery_compute_config,
-            "transforms": [],
-        }
-
-        result = generator.generate(artifacts, config)
+        result = generator.generate(self.get_minimal_artifacts(), config)
+        assert config.target_name is not None
         assert "dataset" in result[config.target_name]
-
-    def test_generate_threads_from_config(
-        self,
-        generator: Any,
-        bigquery_compute_config: dict[str, Any],
-        base_metadata: dict[str, Any],
-    ) -> None:
-        """Test that thread count from config is used."""
-        config = ProfileGeneratorConfig(
-            profile_name="floe",
-            target_name="prod",
-            threads=8,
-        )
-        artifacts = {
-            "version": "1.0.0",
-            "metadata": base_metadata,
-            "compute": bigquery_compute_config,
-            "transforms": [],
-        }
-
-        result = generator.generate(artifacts, config)
-        assert result[config.target_name]["threads"] == 8
 
     def test_generate_uses_project_from_properties(
         self,
-        generator: Any,
+        generator: ProfileGenerator,
         config: ProfileGeneratorConfig,
-        base_metadata: dict[str, Any],
     ) -> None:
         """Test that project ID is taken from properties."""
-        artifacts = {
+        artifacts: dict[str, Any] = {
             "version": "1.0.0",
-            "metadata": base_metadata,
             "compute": {
                 "target": "bigquery",
                 "properties": {
@@ -200,4 +170,5 @@ class TestBigQueryProfileGenerator:
         }
 
         result = generator.generate(artifacts, config)
+        assert config.target_name is not None
         assert result[config.target_name]["project"] == "custom-gcp-project-123"
