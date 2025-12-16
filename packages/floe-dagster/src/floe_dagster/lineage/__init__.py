@@ -31,13 +31,27 @@ Example:
 
 from __future__ import annotations
 
-# Components will be exported as implemented
-# from floe_dagster.lineage.emitter import OpenLineageEmitter
-# from floe_dagster.lineage.dataset import LineageDatasetBuilder
-# from floe_dagster.lineage.facets import ClassificationFacetBuilder
+from floe_dagster.lineage.builder import LineageDatasetBuilder
+from floe_dagster.lineage.client import OpenLineageEmitter
+from floe_dagster.lineage.config import OpenLineageConfig
+from floe_dagster.lineage.events import LineageDataset, LineageEvent, LineageEventType
+from floe_dagster.lineage.facets import (
+    ColumnClassification,
+    build_classification_facet,
+)
 
 __all__: list[str] = [
-    # "OpenLineageEmitter",
-    # "LineageDatasetBuilder",
-    # "ClassificationFacetBuilder",
+    # Config
+    "OpenLineageConfig",
+    # Events
+    "LineageEventType",
+    "LineageDataset",
+    "LineageEvent",
+    # Facets
+    "ColumnClassification",
+    "build_classification_facet",
+    # Builder
+    "LineageDatasetBuilder",
+    # Client
+    "OpenLineageEmitter",
 ]
