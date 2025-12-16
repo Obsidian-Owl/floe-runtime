@@ -23,6 +23,7 @@ classifiers = [
 dependencies = [
     "dbt-core>=1.9",
     "floe-core",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -32,6 +33,11 @@ bigquery = ["dbt-bigquery>=1.9"]
 postgres = ["dbt-postgres>=1.9"]
 redshift = ["dbt-redshift>=1.9"]
 databricks = ["dbt-databricks>=1.9"]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "hypothesis>=6.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/your-org/floe-runtime"

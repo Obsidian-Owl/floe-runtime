@@ -8,8 +8,17 @@ from __future__ import annotations
 
 __version__ = "0.1.0"
 
-# Public API exports will be added as modules are implemented
-# from floe_dbt.profiles import generate_profiles, write_profiles
-# from floe_dbt.executor import DbtExecutor
+from floe_dbt.factory import ProfileFactory
+from floe_dbt.profiles import (
+    ProfileGenerator,
+    ProfileGeneratorConfig,
+)
+from floe_dbt.writer import ProfileWriter
 
-__all__ = ["__version__"]
+__all__ = [
+    "__version__",
+    "ProfileFactory",
+    "ProfileGenerator",
+    "ProfileGeneratorConfig",
+    "ProfileWriter",
+]
