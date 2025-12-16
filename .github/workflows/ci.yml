@@ -35,9 +35,6 @@ jobs:
       - name: Run ruff format
         run: uv run ruff format --check .
 
-      - name: Run black
-        run: uv run black --check .
-
       - name: Run isort
         run: uv run isort --check packages/
 

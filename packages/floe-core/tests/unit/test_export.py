@@ -291,9 +291,9 @@ class TestExtraForbidValidation:
         # Check key nested models
         for model_name in ["ComputeConfig", "TransformConfig", "ConsumptionConfig"]:
             model_def = defs[model_name]
-            assert (
-                model_def.get("additionalProperties") is False
-            ), f"{model_name} should have additionalProperties: false"
+            assert model_def.get("additionalProperties") is False, (
+                f"{model_name} should have additionalProperties: false"
+            )
 
 
 class TestSchemaValidation:
