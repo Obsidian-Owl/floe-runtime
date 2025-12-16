@@ -69,11 +69,21 @@ class TestFloeAssetFactory:
     ) -> None:
         """Test that create_definitions returns Dagster Definitions."""
         artifacts = minimal_compiled_artifacts.copy()
-        artifacts["dbt_manifest_path"] = str(sample_manifest_path)
-        artifacts["dbt_project_path"] = str(sample_manifest_path.parent.parent)
 
-        with patch("floe_dagster.assets.Path.exists", return_value=True):
-            definitions = factory.create_definitions(artifacts)
+        # Set up project directory with dbt_project.yml
+        project_dir = sample_manifest_path.parent.parent
+        (project_dir / "dbt_project.yml").write_text("name: test_project\n")
+
+        # Create a valid profiles directory for DbtCliResource
+        profiles_dir = project_dir / ".floe" / "profiles"
+        profiles_dir.mkdir(parents=True)
+        (profiles_dir / "profiles.yml").write_text("test_project:\n  target: dev\n")
+
+        artifacts["dbt_manifest_path"] = str(sample_manifest_path)
+        artifacts["dbt_project_path"] = str(project_dir)
+        artifacts["dbt_profiles_path"] = str(profiles_dir)
+
+        definitions = factory.create_definitions(artifacts)
 
         assert definitions is not None
 
@@ -85,11 +95,21 @@ class TestFloeAssetFactory:
     ) -> None:
         """Test that definitions include DbtCliResource."""
         artifacts = minimal_compiled_artifacts.copy()
-        artifacts["dbt_manifest_path"] = str(sample_manifest_path)
-        artifacts["dbt_project_path"] = str(sample_manifest_path.parent.parent)
 
-        with patch("floe_dagster.assets.Path.exists", return_value=True):
-            definitions = factory.create_definitions(artifacts)
+        # Set up project directory with dbt_project.yml
+        project_dir = sample_manifest_path.parent.parent
+        (project_dir / "dbt_project.yml").write_text("name: test_project\n")
+
+        # Create a valid profiles directory for DbtCliResource
+        profiles_dir = project_dir / ".floe" / "profiles"
+        profiles_dir.mkdir(parents=True)
+        (profiles_dir / "profiles.yml").write_text("test_project:\n  target: dev\n")
+
+        artifacts["dbt_manifest_path"] = str(sample_manifest_path)
+        artifacts["dbt_project_path"] = str(project_dir)
+        artifacts["dbt_profiles_path"] = str(profiles_dir)
+
+        definitions = factory.create_definitions(artifacts)
 
         # Should have dbt resource
         assert definitions is not None

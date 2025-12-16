@@ -3,6 +3,7 @@
 T044: [US1] Implement FloeAssetFactory.create_dbt_assets using @dbt_assets decorator
 T046: [US1] Implement FloeAssetFactory.create_definitions
 T066: [US3] Integrate OpenLineageEmitter into FloeAssetFactory asset execution
+T076: [US4] Integrate TracingManager into FloeAssetFactory asset execution
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from floe_dagster.lineage import (
     OpenLineageConfig,
     OpenLineageEmitter,
 )
+from floe_dagster.observability import TracingConfig, TracingManager
 from floe_dagster.resources import create_dbt_cli_resource
 from floe_dagster.translator import FloeTranslator
 
@@ -85,6 +87,11 @@ class FloeAssetFactory:
         lineage_config = OpenLineageConfig.from_artifacts(artifacts)
         lineage_emitter = OpenLineageEmitter(lineage_config)
 
+        # Configure OpenTelemetry tracing (graceful degradation if not configured)
+        tracing_config = TracingConfig.from_artifacts(artifacts)
+        tracing_manager = TracingManager(tracing_config)
+        tracing_manager.configure()
+
         # Build namespace prefix from compute target
         compute = artifacts.get("compute", {})
         namespace_prefix = cls._build_namespace_prefix(compute)
@@ -98,42 +105,61 @@ class FloeAssetFactory:
 
         @dbt_assets(manifest=manifest_file, dagster_dbt_translator=translator)
         def floe_dbt_assets(context, dbt: DbtCliResource):
-            """Execute dbt models as Dagster assets with lineage tracking."""
-            # Emit START event for the overall dbt run
-            run_id = lineage_emitter.emit_start(
-                job_name="dbt_run",
-                inputs=[],
-                outputs=[],
-            )
-
-            try:
-                # Execute dbt and stream events
-                for event in dbt.cli(["run"], context=context).stream():
-                    yield event
-
-                # Build output datasets from executed models
-                outputs = []
-                models = cls._filter_models(manifest_dict)
-                for model_node in models.values():
-                    dataset = dataset_builder.build_from_dbt_node(model_node)
-                    outputs.append(dataset)
-
-                # Emit COMPLETE event
-                lineage_emitter.emit_complete(
-                    run_id=run_id,
+            """Execute dbt models as Dagster assets with lineage and tracing."""
+            # Start tracing span for the dbt run
+            with tracing_manager.start_span(
+                "dbt_run",
+                attributes={
+                    "dbt.project": artifacts.get("dbt_project_path", ""),
+                    "dbt.target": compute.get("target", "unknown"),
+                },
+            ) as span:
+                # Emit START event for the overall dbt run
+                run_id = lineage_emitter.emit_start(
                     job_name="dbt_run",
                     inputs=[],
-                    outputs=outputs,
+                    outputs=[],
                 )
 
-            except Exception as e:
-                # Emit FAIL event on error
-                lineage_emitter.emit_fail(
-                    run_id=run_id,
-                    job_name="dbt_run",
-                    error_message=str(e),
-                )
-                raise
+                try:
+                    # Execute dbt and stream events
+                    model_count = 0
+                    for event in dbt.cli(["run"], context=context).stream():
+                        model_count += 1
+                        yield event
+
+                    # Record model count as span attribute
+                    span.set_attribute("dbt.models_executed", model_count)
+
+                    # Build output datasets from executed models
+                    outputs = []
+                    models = cls._filter_models(manifest_dict)
+                    for model_node in models.values():
+                        dataset = dataset_builder.build_from_dbt_node(model_node)
+                        outputs.append(dataset)
+
+                    # Emit COMPLETE event
+                    lineage_emitter.emit_complete(
+                        run_id=run_id,
+                        job_name="dbt_run",
+                        inputs=[],
+                        outputs=outputs,
+                    )
+
+                    # Mark span as successful
+                    tracing_manager.set_status_ok(span)
+
+                except Exception as e:
+                    # Record exception on span
+                    tracing_manager.record_exception(span, e)
+
+                    # Emit FAIL event on error
+                    lineage_emitter.emit_fail(
+                        run_id=run_id,
+                        job_name="dbt_run",
+                        error_message=str(e),
+                    )
+                    raise
 
         return floe_dbt_assets
 

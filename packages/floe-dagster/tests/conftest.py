@@ -177,8 +177,11 @@ def sample_dbt_manifest(sample_dbt_manifest_node: dict[str, Any]) -> dict[str, A
                 "schema": "raw",
                 "database": "warehouse",
                 "identifier": "raw_customers",
+                "config": {"enabled": True},
             },
         },
+        "metrics": {},
+        "exposures": {},
         "parent_map": {
             "model.my_project.customers": ["source.my_project.raw.raw_customers"],
         },
