@@ -57,12 +57,13 @@ class PostgreSQLProfileGenerator:
 
         # Build profile configuration
         # CRITICAL: Credentials use env_var template - NEVER hardcode (FR-003)
+        # US5: Environment-prefixed secrets (e.g., POSTGRES_PROD_USER)
         profile: dict[str, Any] = {
             "type": "postgres",
             "host": properties.get("host", ""),
             "port": properties.get("port", self.DEFAULT_PORT),
-            "user": "{{ env_var('POSTGRES_USER') }}",
-            "password": "{{ env_var('POSTGRES_PASSWORD') }}",
+            "user": config.get_secret_env_var("POSTGRES", "USER"),
+            "password": config.get_secret_env_var("POSTGRES", "PASSWORD"),
             "dbname": properties.get("database", ""),
             "threads": config.threads,
         }

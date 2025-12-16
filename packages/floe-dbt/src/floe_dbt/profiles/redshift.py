@@ -57,12 +57,13 @@ class RedshiftProfileGenerator:
 
         # Build profile configuration
         # CRITICAL: Credentials use env_var template - NEVER hardcode (FR-003)
+        # US5: Environment-prefixed secrets (e.g., REDSHIFT_PROD_USER)
         profile: dict[str, Any] = {
             "type": "redshift",
             "host": properties.get("host", ""),
             "port": properties.get("port", self.DEFAULT_PORT),
-            "user": "{{ env_var('REDSHIFT_USER') }}",
-            "password": "{{ env_var('REDSHIFT_PASSWORD') }}",
+            "user": config.get_secret_env_var("REDSHIFT", "USER"),
+            "password": config.get_secret_env_var("REDSHIFT", "PASSWORD"),
             "dbname": properties.get("database", ""),
             "threads": config.threads,
         }

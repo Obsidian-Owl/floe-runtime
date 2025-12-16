@@ -53,11 +53,12 @@ class DatabricksProfileGenerator:
 
         # Build profile configuration
         # CRITICAL: Token uses env_var template - NEVER hardcode (FR-003)
+        # US5: Environment-prefixed secrets (e.g., DATABRICKS_PROD_TOKEN)
         profile: dict[str, Any] = {
             "type": "databricks",
             "host": properties.get("host", ""),
             "http_path": properties.get("http_path", ""),
-            "token": "{{ env_var('DATABRICKS_TOKEN') }}",
+            "token": config.get_secret_env_var("DATABRICKS", "TOKEN"),
             "threads": config.threads,
         }
 

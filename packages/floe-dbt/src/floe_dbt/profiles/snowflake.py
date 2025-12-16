@@ -1,6 +1,7 @@
 """Snowflake profile generator.
 
 T026: [P] [US2] Implement SnowflakeProfileGenerator with env_var templating
+T081: [US5] Add environment-specific secret references
 """
 
 from __future__ import annotations
@@ -15,12 +16,13 @@ class SnowflakeProfileGenerator:
 
     Snowflake is a cloud data warehouse. Credentials are NEVER hardcoded -
     all sensitive values use dbt's env_var() template syntax for security.
+    Supports multi-environment deployments with environment-prefixed secrets.
 
     Profile Fields:
         - type: "snowflake"
         - account: Snowflake account identifier
-        - user: Username (env_var reference)
-        - password: Password (env_var reference)
+        - user: Username (env_var reference with environment prefix)
+        - password: Password (env_var reference with environment prefix)
         - role: Snowflake role
         - warehouse: Virtual warehouse name
         - database: Database name
@@ -29,9 +31,10 @@ class SnowflakeProfileGenerator:
 
     Example:
         >>> generator = SnowflakeProfileGenerator()
+        >>> config = ProfileGeneratorConfig(environment="prod")
         >>> result = generator.generate(artifacts, config)
-        >>> result["dev"]["password"]
-        "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+        >>> result["prod"]["password"]
+        "{{ env_var('SNOWFLAKE_PROD_PASSWORD') }}"
     """
 
     def generate(
@@ -42,10 +45,11 @@ class SnowflakeProfileGenerator:
         """Generate Snowflake profile configuration.
 
         Credentials always use env_var() references per FR-003.
+        Environment prefix is included for multi-environment support.
 
         Args:
             artifacts: CompiledArtifacts containing compute configuration.
-            config: Profile generator configuration.
+            config: Profile generator configuration with environment.
 
         Returns:
             Dictionary with target configuration for profiles.yml.
@@ -55,11 +59,12 @@ class SnowflakeProfileGenerator:
 
         # Build profile configuration
         # CRITICAL: Credentials use env_var template - NEVER hardcode (FR-003)
+        # Environment prefix enables multi-environment secret management
         profile: dict[str, Any] = {
             "type": "snowflake",
             "account": properties.get("account", ""),
-            "user": "{{ env_var('SNOWFLAKE_USER') }}",
-            "password": "{{ env_var('SNOWFLAKE_PASSWORD') }}",
+            "user": config.get_secret_env_var("SNOWFLAKE", "USER"),
+            "password": config.get_secret_env_var("SNOWFLAKE", "PASSWORD"),
             "threads": config.threads,
         }
 

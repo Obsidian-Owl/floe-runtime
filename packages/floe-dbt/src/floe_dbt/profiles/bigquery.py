@@ -69,7 +69,8 @@ class BigQueryProfileGenerator:
             profile["location"] = properties["location"]
 
         # For service-account, reference keyfile via env_var (FR-003)
+        # US5: Environment-prefixed secrets (e.g., BIGQUERY_PROD_KEYFILE)
         if method == "service-account":
-            profile["keyfile"] = "{{ env_var('GOOGLE_APPLICATION_CREDENTIALS') }}"
+            profile["keyfile"] = config.get_secret_env_var("BIGQUERY", "KEYFILE")
 
         return {config.target_name: profile}
