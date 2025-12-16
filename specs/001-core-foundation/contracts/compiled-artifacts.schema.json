@@ -1,0 +1,386 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://floe.dev/schemas/compiled-artifacts.schema.json",
+  "title": "CompiledArtifacts",
+  "description": "Immutable output contract from floe-core compilation, consumed by all runtime packages",
+  "type": "object",
+  "required": ["version", "metadata", "compute", "transforms", "consumption", "governance", "observability"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Contract version (semantic versioning)",
+      "default": "1.0.0",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "metadata": {
+      "$ref": "#/$defs/ArtifactMetadata"
+    },
+    "compute": {
+      "$ref": "#/$defs/ComputeConfig"
+    },
+    "transforms": {
+      "type": "array",
+      "description": "Transform configurations",
+      "items": {
+        "$ref": "#/$defs/TransformConfig"
+      }
+    },
+    "consumption": {
+      "$ref": "#/$defs/ConsumptionConfig"
+    },
+    "governance": {
+      "$ref": "#/$defs/GovernanceConfig"
+    },
+    "observability": {
+      "$ref": "#/$defs/ObservabilityConfig"
+    },
+    "catalog": {
+      "oneOf": [
+        { "$ref": "#/$defs/CatalogConfig" },
+        { "type": "null" }
+      ],
+      "default": null,
+      "description": "Iceberg catalog configuration (optional)"
+    },
+    "dbt_manifest_path": {
+      "type": ["string", "null"],
+      "description": "Absolute path to dbt manifest.json",
+      "default": null
+    },
+    "dbt_project_path": {
+      "type": ["string", "null"],
+      "description": "Absolute path to dbt project directory",
+      "default": null
+    },
+    "dbt_profiles_path": {
+      "type": "string",
+      "description": "Absolute path to dbt profiles directory (required by dagster-dbt)",
+      "default": ".floe/profiles"
+    },
+    "lineage_namespace": {
+      "type": ["string", "null"],
+      "description": "OpenLineage namespace (SaaS enrichment)",
+      "default": null
+    },
+    "environment_context": {
+      "oneOf": [
+        { "$ref": "#/$defs/EnvironmentContext" },
+        { "type": "null" }
+      ],
+      "default": null,
+      "description": "SaaS environment context (optional)"
+    },
+    "column_classifications": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "Extracted column classifications: model_name -> column_name -> classification",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/ColumnClassification"
+            }
+          }
+        },
+        { "type": "null" }
+      ],
+      "default": null
+    }
+  },
+  "$defs": {
+    "ArtifactMetadata": {
+      "type": "object",
+      "description": "Compilation metadata",
+      "required": ["compiled_at", "floe_core_version", "source_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "compiled_at": {
+          "type": "string",
+          "description": "Compilation timestamp (ISO 8601 UTC)",
+          "format": "date-time"
+        },
+        "floe_core_version": {
+          "type": "string",
+          "description": "floe-core package version"
+        },
+        "source_hash": {
+          "type": "string",
+          "description": "SHA-256 hash of source floe.yaml",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "ComputeTarget": {
+      "type": "string",
+      "enum": ["duckdb", "snowflake", "bigquery", "redshift", "databricks", "postgres", "spark"],
+      "description": "Supported compute targets"
+    },
+    "ComputeConfig": {
+      "type": "object",
+      "description": "Compute target configuration",
+      "required": ["target"],
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/ComputeTarget"
+        },
+        "connection_secret_ref": {
+          "type": ["string", "null"],
+          "default": null
+        },
+        "properties": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": true
+        }
+      }
+    },
+    "TransformConfig": {
+      "type": "object",
+      "description": "Transformation step configuration",
+      "required": ["type", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["dbt"]
+        },
+        "path": {
+          "type": "string"
+        },
+        "target": {
+          "type": ["string", "null"],
+          "default": null
+        }
+      }
+    },
+    "ConsumptionConfig": {
+      "type": "object",
+      "description": "Cube semantic layer configuration",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "port": {
+          "type": "integer",
+          "default": 4000
+        },
+        "api_secret_ref": {
+          "type": ["string", "null"],
+          "default": null
+        },
+        "database_type": {
+          "type": ["string", "null"],
+          "description": "Database driver type (postgres, snowflake, bigquery, duckdb, etc.)",
+          "default": null
+        },
+        "dev_mode": {
+          "type": "boolean",
+          "description": "Enable Cube Playground in development",
+          "default": false
+        },
+        "pre_aggregations": {
+          "$ref": "#/$defs/PreAggregationConfig",
+          "default": {}
+        },
+        "security": {
+          "$ref": "#/$defs/CubeSecurityConfig",
+          "default": {}
+        }
+      }
+    },
+    "PreAggregationConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "refresh_schedule": {
+          "type": "string",
+          "default": "*/30 * * * *"
+        },
+        "timezone": {
+          "type": "string",
+          "default": "UTC"
+        }
+      }
+    },
+    "CubeSecurityConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "row_level": {
+          "type": "boolean",
+          "default": true
+        },
+        "tenant_column": {
+          "type": "string",
+          "default": "tenant_id"
+        }
+      }
+    },
+    "GovernanceConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "classification_source": {
+          "type": "string",
+          "enum": ["dbt_meta", "external"],
+          "default": "dbt_meta"
+        },
+        "policies": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": true
+        },
+        "emit_lineage": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "ObservabilityConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "traces": {
+          "type": "boolean",
+          "default": true
+        },
+        "metrics": {
+          "type": "boolean",
+          "default": true
+        },
+        "lineage": {
+          "type": "boolean",
+          "default": true
+        },
+        "otlp_endpoint": {
+          "type": ["string", "null"],
+          "format": "uri",
+          "default": null
+        },
+        "lineage_endpoint": {
+          "type": ["string", "null"],
+          "format": "uri",
+          "default": null
+        },
+        "attributes": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "CatalogConfig": {
+      "type": "object",
+      "required": ["type", "uri"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["polaris", "glue", "nessie"]
+        },
+        "uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "credential_secret_ref": {
+          "type": ["string", "null"],
+          "default": null
+        },
+        "warehouse": {
+          "type": ["string", "null"],
+          "default": null
+        },
+        "scope": {
+          "type": ["string", "null"],
+          "description": "OAuth2 scope for Polaris authentication (e.g., 'PRINCIPAL_ROLE:ALL')",
+          "default": null
+        },
+        "token_refresh_enabled": {
+          "type": ["boolean", "null"],
+          "description": "Enable OAuth2 token refresh for long-lived connections",
+          "default": null
+        },
+        "access_delegation": {
+          "type": ["string", "null"],
+          "description": "Iceberg access delegation header (e.g., 'vended-credentials')",
+          "default": null
+        },
+        "properties": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": true
+        }
+      }
+    },
+    "EnvironmentContext": {
+      "type": "object",
+      "description": "SaaS environment context (optional enrichment)",
+      "required": ["tenant_id", "tenant_slug", "project_id", "project_slug", "environment_id", "environment_type", "governance_category"],
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Tenant identifier"
+        },
+        "tenant_slug": {
+          "type": "string",
+          "description": "Human-readable tenant slug"
+        },
+        "project_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Project identifier"
+        },
+        "project_slug": {
+          "type": "string",
+          "description": "Human-readable project slug"
+        },
+        "environment_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Environment identifier"
+        },
+        "environment_type": {
+          "type": "string",
+          "enum": ["development", "preview", "staging", "production"],
+          "description": "Environment type"
+        },
+        "governance_category": {
+          "type": "string",
+          "enum": ["production", "non_production"],
+          "description": "Governance category for policy application"
+        }
+      }
+    },
+    "ColumnClassification": {
+      "type": "object",
+      "description": "Classification metadata for a column",
+      "required": ["classification"],
+      "additionalProperties": false,
+      "properties": {
+        "classification": {
+          "type": "string",
+          "description": "Classification type (e.g., 'pii', 'confidential', 'identifier')"
+        },
+        "pii_type": {
+          "type": ["string", "null"],
+          "description": "Specific PII type (e.g., 'email', 'phone', 'ssn')",
+          "default": null
+        },
+        "sensitivity": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "description": "Sensitivity level",
+          "default": "medium"
+        }
+      }
+    }
+  }
+}

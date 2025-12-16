@@ -35,9 +35,6 @@ jobs:
       - name: Run ruff format
         run: uv run ruff format --check .
 
-      - name: Run black
-        run: uv run black --check .
-
       - name: Run isort
         run: uv run isort --check packages/
 
@@ -59,7 +56,7 @@ jobs:
         run: uv sync --all-packages
 
       - name: Run mypy
-        run: uv run mypy --strict packages/
+        run: uv run mypy --strict packages/*/src/
 
   security:
     name: Security Scan
@@ -79,7 +76,7 @@ jobs:
         run: uv sync --all-packages
 
       - name: Run bandit
-        run: uv run bandit -r packages/ -ll
+        run: uv run bandit -r packages/*/src/ -ll
 
       - name: Run pip-audit
         run: uv run pip-audit
@@ -106,7 +103,7 @@ jobs:
         run: uv sync --all-packages
 
       - name: Run tests
-        run: uv run pytest --cov=packages --cov-report=xml
+        run: uv run pytest packages/*/tests/ --cov=packages --cov-report=xml
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4

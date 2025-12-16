@@ -19,12 +19,26 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
 ]
 dependencies = [
     "pydantic>=2.10",
     "pydantic-settings>=2.6",
     "pyyaml>=6.0",
     "structlog>=24.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.0",
+    "hypothesis>=6.0",
+    "mypy>=1.0",
+    "black>=24.0",
+    "isort>=5.0",
+    "ruff>=0.1",
+    "bandit>=1.7",
+    "types-PyYAML>=6.0",
 ]
 
 [project.urls]
@@ -35,5 +49,49 @@ Repository = "https://github.com/your-org/floe-runtime"
 [tool.hatch.build.targets.wheel]
 packages = ["src/floe_core"]
 
-[tool.uv.sources]
-# No workspace dependencies for floe-core (it's the base package)
+# Constitution Principle VI: Quality Standards - Black formatting (100 char)
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311", "py312"]
+
+# Constitution Principle VI: Quality Standards - isort (Black profile)
+[tool.isort]
+profile = "black"
+line_length = 100
+
+# Constitution Principle VI: Quality Standards - ruff (E, F, W, I, UP, B, SIM, C4)
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4"]
+
+# Constitution Principle II: Type Safety - mypy --strict
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+# Constitution Principle VI: Quality Standards - >80% coverage
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --cov=src/floe_core --cov-report=term-missing --cov-fail-under=80"
+
+[tool.coverage.run]
+source = ["src/floe_core"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
+
+[dependency-groups]
+dev = [
+    "types-pyyaml>=6.0.12.20250915",
+]
