@@ -18,9 +18,17 @@ from typing import Any
 import pytest
 import yaml
 
-# Skip all integration tests if dependencies not available
+# Check if dbt-core is available
+try:
+    import dbt.version  # noqa: F401
+
+    HAS_DBT_CORE = True
+except ImportError:
+    HAS_DBT_CORE = False
+
+# Skip all integration tests if dbt not available
 pytestmark = pytest.mark.skipif(
-    subprocess.run(["dbt", "--version"], capture_output=True).returncode != 0,
+    not HAS_DBT_CORE,
     reason="dbt-core not installed",
 )
 
@@ -56,7 +64,7 @@ def dbt_project(tmp_path: Path) -> Path:
                 "description": "A test model",
                 "meta": {
                     "floe": {
-                        "owner": "data-team",
+                        "owner": "team:data-team",  # Dagster requires 'team:' prefix
                     }
                 },
                 "columns": [
@@ -149,13 +157,6 @@ def manifest_json(dbt_project: Path, profiles_dir: Path) -> Path:
 class TestDbtAssetExecution:
     """Integration tests for dbt asset execution."""
 
-    @pytest.mark.skipif(
-        subprocess.run(
-            ["python", "-c", "import dbt.adapters.duckdb"], capture_output=True
-        ).returncode
-        != 0,
-        reason="dbt-duckdb adapter not installed",
-    )
     def test_create_dbt_assets_from_manifest(
         self,
         compiled_artifacts: dict[str, Any],
@@ -173,13 +174,6 @@ class TestDbtAssetExecution:
 
         assert assets is not None
 
-    @pytest.mark.skipif(
-        subprocess.run(
-            ["python", "-c", "import dbt.adapters.duckdb"], capture_output=True
-        ).returncode
-        != 0,
-        reason="dbt-duckdb adapter not installed",
-    )
     def test_create_definitions_from_manifest(
         self,
         compiled_artifacts: dict[str, Any],
@@ -239,7 +233,7 @@ class TestDbtAssetExecution:
                 # Test owners
                 owners = translator.get_owners(model_node)
                 if owners:
-                    assert "data-team" in owners
+                    assert "team:data-team" in owners
 
 
 class TestDbtAssetExecutionEdgeCases:

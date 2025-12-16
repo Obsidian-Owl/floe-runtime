@@ -22,21 +22,23 @@ class TestCoreToDbtContract:
         from floe_dbt.profiles.duckdb import DuckDBProfileGenerator
 
         # Create CompiledArtifacts
-        artifacts = CompiledArtifacts.model_validate({
-            "metadata": {
-                "compiled_at": datetime.now(timezone.utc).isoformat(),
-                "floe_core_version": "0.1.0",
-                "source_hash": "abc123",
-            },
-            "compute": {
-                "target": "duckdb",
-                "properties": {"path": ":memory:"},
-            },
-            "transforms": [{"type": "dbt", "path": "./dbt"}],
-            "consumption": {},
-            "governance": {},
-            "observability": {},
-        })
+        artifacts = CompiledArtifacts.model_validate(
+            {
+                "metadata": {
+                    "compiled_at": datetime.now(timezone.utc).isoformat(),
+                    "floe_core_version": "0.1.0",
+                    "source_hash": "abc123",
+                },
+                "compute": {
+                    "target": "duckdb",
+                    "properties": {"path": ":memory:"},
+                },
+                "transforms": [{"type": "dbt", "path": "./dbt"}],
+                "consumption": {},
+                "governance": {},
+                "observability": {},
+            }
+        )
 
         # Convert to dict format expected by profile generators
         artifacts_dict = artifacts.model_dump(mode="json")
@@ -60,27 +62,29 @@ class TestCoreToDbtContract:
         from floe_dbt.profiles.base import ProfileGeneratorConfig
         from floe_dbt.profiles.snowflake import SnowflakeProfileGenerator
 
-        artifacts = CompiledArtifacts.model_validate({
-            "metadata": {
-                "compiled_at": datetime.now(timezone.utc).isoformat(),
-                "floe_core_version": "0.1.0",
-                "source_hash": "abc123",
-            },
-            "compute": {
-                "target": "snowflake",
-                "properties": {
-                    "account": "xy12345.us-east-1",
-                    "warehouse": "COMPUTE_WH",
-                    "database": "ANALYTICS",
-                    "schema": "PUBLIC",
-                    "role": "TRANSFORMER",
+        artifacts = CompiledArtifacts.model_validate(
+            {
+                "metadata": {
+                    "compiled_at": datetime.now(timezone.utc).isoformat(),
+                    "floe_core_version": "0.1.0",
+                    "source_hash": "abc123",
                 },
-            },
-            "transforms": [{"type": "dbt", "path": "./dbt"}],
-            "consumption": {},
-            "governance": {},
-            "observability": {},
-        })
+                "compute": {
+                    "target": "snowflake",
+                    "properties": {
+                        "account": "xy12345.us-east-1",
+                        "warehouse": "COMPUTE_WH",
+                        "database": "ANALYTICS",
+                        "schema": "PUBLIC",
+                        "role": "TRANSFORMER",
+                    },
+                },
+                "transforms": [{"type": "dbt", "path": "./dbt"}],
+                "consumption": {},
+                "governance": {},
+                "observability": {},
+            }
+        )
 
         artifacts_dict = artifacts.model_dump(mode="json")
 
@@ -107,18 +111,20 @@ class TestCompiledArtifactsSerializationContract:
         """Test CompiledArtifacts survives JSON round-trip for IPC."""
         from floe_core.compiler import CompiledArtifacts
 
-        original = CompiledArtifacts.model_validate({
-            "metadata": {
-                "compiled_at": datetime.now(timezone.utc).isoformat(),
-                "floe_core_version": "0.1.0",
-                "source_hash": "abc123",
-            },
-            "compute": {"target": "duckdb"},
-            "transforms": [{"type": "dbt", "path": "./dbt"}],
-            "consumption": {},
-            "governance": {},
-            "observability": {},
-        })
+        original = CompiledArtifacts.model_validate(
+            {
+                "metadata": {
+                    "compiled_at": datetime.now(timezone.utc).isoformat(),
+                    "floe_core_version": "0.1.0",
+                    "source_hash": "abc123",
+                },
+                "compute": {"target": "duckdb"},
+                "transforms": [{"type": "dbt", "path": "./dbt"}],
+                "consumption": {},
+                "governance": {},
+                "observability": {},
+            }
+        )
 
         # Serialize to JSON (as would happen in file/IPC)
         json_str = original.model_dump_json()
@@ -134,21 +140,23 @@ class TestCompiledArtifactsSerializationContract:
         """Test model_dump(mode='json') produces generator-compatible dict."""
         from floe_core.compiler import CompiledArtifacts
 
-        artifacts = CompiledArtifacts.model_validate({
-            "metadata": {
-                "compiled_at": datetime.now(timezone.utc).isoformat(),
-                "floe_core_version": "0.1.0",
-                "source_hash": "abc123",
-            },
-            "compute": {
-                "target": "duckdb",
-                "properties": {"path": "/data/warehouse.db"},
-            },
-            "transforms": [{"type": "dbt", "path": "./dbt"}],
-            "consumption": {},
-            "governance": {},
-            "observability": {},
-        })
+        artifacts = CompiledArtifacts.model_validate(
+            {
+                "metadata": {
+                    "compiled_at": datetime.now(timezone.utc).isoformat(),
+                    "floe_core_version": "0.1.0",
+                    "source_hash": "abc123",
+                },
+                "compute": {
+                    "target": "duckdb",
+                    "properties": {"path": "/data/warehouse.db"},
+                },
+                "transforms": [{"type": "dbt", "path": "./dbt"}],
+                "consumption": {},
+                "governance": {},
+                "observability": {},
+            }
+        )
 
         # This is how profile generators receive artifacts
         artifacts_dict = artifacts.model_dump(mode="json")
@@ -257,4 +265,4 @@ class TestProfileGeneratorProtocolContract:
 
         # Should have artifacts and config parameters
         assert len(params) >= 2
-        assert "dict" in str(sig.return_annotation) or sig.return_annotation == dict
+        assert "dict" in str(sig.return_annotation) or sig.return_annotation is dict

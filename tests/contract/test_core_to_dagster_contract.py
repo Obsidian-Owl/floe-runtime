@@ -19,24 +19,26 @@ class TestCoreToDagsterContract:
         """Test transforms config provides dbt project info for Dagster."""
         from floe_core.compiler import CompiledArtifacts
 
-        artifacts = CompiledArtifacts.model_validate({
-            "metadata": {
-                "compiled_at": datetime.now(timezone.utc).isoformat(),
-                "floe_core_version": "0.1.0",
-                "source_hash": "abc123",
-            },
-            "compute": {"target": "duckdb"},
-            "transforms": [
-                {
-                    "type": "dbt",
-                    "path": "./transforms/dbt",
-                    "target": "dev",  # target is a direct field, not nested config
-                }
-            ],
-            "consumption": {},
-            "governance": {},
-            "observability": {},
-        })
+        artifacts = CompiledArtifacts.model_validate(
+            {
+                "metadata": {
+                    "compiled_at": datetime.now(timezone.utc).isoformat(),
+                    "floe_core_version": "0.1.0",
+                    "source_hash": "abc123",
+                },
+                "compute": {"target": "duckdb"},
+                "transforms": [
+                    {
+                        "type": "dbt",
+                        "path": "./transforms/dbt",
+                        "target": "dev",  # target is a direct field, not nested config
+                    }
+                ],
+                "consumption": {},
+                "governance": {},
+                "observability": {},
+            }
+        )
 
         # Dagster asset factory needs this info
         assert len(artifacts.transforms) > 0
@@ -48,24 +50,26 @@ class TestCoreToDagsterContract:
         """Test observability config provides OTel/OpenLineage settings."""
         from floe_core.compiler import CompiledArtifacts
 
-        artifacts = CompiledArtifacts.model_validate({
-            "metadata": {
-                "compiled_at": datetime.now(timezone.utc).isoformat(),
-                "floe_core_version": "0.1.0",
-                "source_hash": "abc123",
-            },
-            "compute": {"target": "duckdb"},
-            "transforms": [{"type": "dbt", "path": "./dbt"}],
-            "consumption": {},
-            "governance": {},
-            "observability": {
-                "traces": True,
-                "metrics": True,
-                "lineage": True,
-                "otlp_endpoint": "http://localhost:4317",
-                "lineage_endpoint": "http://localhost:5000",
-            },
-        })
+        artifacts = CompiledArtifacts.model_validate(
+            {
+                "metadata": {
+                    "compiled_at": datetime.now(timezone.utc).isoformat(),
+                    "floe_core_version": "0.1.0",
+                    "source_hash": "abc123",
+                },
+                "compute": {"target": "duckdb"},
+                "transforms": [{"type": "dbt", "path": "./dbt"}],
+                "consumption": {},
+                "governance": {},
+                "observability": {
+                    "traces": True,
+                    "metrics": True,
+                    "lineage": True,
+                    "otlp_endpoint": "http://localhost:4317",
+                    "lineage_endpoint": "http://localhost:5000",
+                },
+            }
+        )
 
         # Dagster needs these for observability integration
         assert artifacts.observability.traces is True
@@ -77,35 +81,39 @@ class TestCoreToDagsterContract:
         from floe_core.compiler import CompiledArtifacts
 
         # With lineage namespace
-        artifacts_with_ns = CompiledArtifacts.model_validate({
-            "metadata": {
-                "compiled_at": datetime.now(timezone.utc).isoformat(),
-                "floe_core_version": "0.1.0",
-                "source_hash": "abc123",
-            },
-            "compute": {"target": "duckdb"},
-            "transforms": [{"type": "dbt", "path": "./dbt"}],
-            "consumption": {},
-            "governance": {},
-            "observability": {},
-            "lineage_namespace": "prod.analytics",
-        })
+        artifacts_with_ns = CompiledArtifacts.model_validate(
+            {
+                "metadata": {
+                    "compiled_at": datetime.now(timezone.utc).isoformat(),
+                    "floe_core_version": "0.1.0",
+                    "source_hash": "abc123",
+                },
+                "compute": {"target": "duckdb"},
+                "transforms": [{"type": "dbt", "path": "./dbt"}],
+                "consumption": {},
+                "governance": {},
+                "observability": {},
+                "lineage_namespace": "prod.analytics",
+            }
+        )
 
         assert artifacts_with_ns.lineage_namespace == "prod.analytics"
 
         # Without lineage namespace (optional)
-        artifacts_without_ns = CompiledArtifacts.model_validate({
-            "metadata": {
-                "compiled_at": datetime.now(timezone.utc).isoformat(),
-                "floe_core_version": "0.1.0",
-                "source_hash": "abc123",
-            },
-            "compute": {"target": "duckdb"},
-            "transforms": [{"type": "dbt", "path": "./dbt"}],
-            "consumption": {},
-            "governance": {},
-            "observability": {},
-        })
+        artifacts_without_ns = CompiledArtifacts.model_validate(
+            {
+                "metadata": {
+                    "compiled_at": datetime.now(timezone.utc).isoformat(),
+                    "floe_core_version": "0.1.0",
+                    "source_hash": "abc123",
+                },
+                "compute": {"target": "duckdb"},
+                "transforms": [{"type": "dbt", "path": "./dbt"}],
+                "consumption": {},
+                "governance": {},
+                "observability": {},
+            }
+        )
 
         assert artifacts_without_ns.lineage_namespace is None
 
@@ -118,18 +126,20 @@ class TestDagsterAssetFactoryContract:
         """Test CompiledArtifacts has structure needed for asset creation."""
         from floe_core.compiler import CompiledArtifacts
 
-        artifacts = CompiledArtifacts.model_validate({
-            "metadata": {
-                "compiled_at": datetime.now(timezone.utc).isoformat(),
-                "floe_core_version": "0.1.0",
-                "source_hash": "abc123",
-            },
-            "compute": {"target": "duckdb"},
-            "transforms": [{"type": "dbt", "path": "./dbt"}],
-            "consumption": {},
-            "governance": {},
-            "observability": {},
-        })
+        artifacts = CompiledArtifacts.model_validate(
+            {
+                "metadata": {
+                    "compiled_at": datetime.now(timezone.utc).isoformat(),
+                    "floe_core_version": "0.1.0",
+                    "source_hash": "abc123",
+                },
+                "compute": {"target": "duckdb"},
+                "transforms": [{"type": "dbt", "path": "./dbt"}],
+                "consumption": {},
+                "governance": {},
+                "observability": {},
+            }
+        )
 
         # Convert to dict for Dagster asset factory consumption
         artifacts_dict = artifacts.model_dump(mode="json")
@@ -203,18 +213,20 @@ class TestEnvironmentContextContract:
         from floe_core.compiler import CompiledArtifacts
 
         # Without environment context (standalone mode)
-        artifacts = CompiledArtifacts.model_validate({
-            "metadata": {
-                "compiled_at": datetime.now(timezone.utc).isoformat(),
-                "floe_core_version": "0.1.0",
-                "source_hash": "abc123",
-            },
-            "compute": {"target": "duckdb"},
-            "transforms": [{"type": "dbt", "path": "./dbt"}],
-            "consumption": {},
-            "governance": {},
-            "observability": {},
-        })
+        artifacts = CompiledArtifacts.model_validate(
+            {
+                "metadata": {
+                    "compiled_at": datetime.now(timezone.utc).isoformat(),
+                    "floe_core_version": "0.1.0",
+                    "source_hash": "abc123",
+                },
+                "compute": {"target": "duckdb"},
+                "transforms": [{"type": "dbt", "path": "./dbt"}],
+                "consumption": {},
+                "governance": {},
+                "observability": {},
+            }
+        )
 
         assert artifacts.environment_context is None
 

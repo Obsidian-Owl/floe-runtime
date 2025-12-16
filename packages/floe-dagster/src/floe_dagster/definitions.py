@@ -43,8 +43,7 @@ def load_definitions_from_artifacts(
     path = Path(artifacts_path)
     if not path.exists():
         raise FileNotFoundError(
-            f"CompiledArtifacts not found at {artifacts_path}. "
-            f"Run 'floe compile' to generate it."
+            f"CompiledArtifacts not found at {artifacts_path}. Run 'floe compile' to generate it."
         )
 
     with open(path) as f:

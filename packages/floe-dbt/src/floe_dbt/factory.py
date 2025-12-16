@@ -5,7 +5,7 @@ T032: [US2] Implement ProfileFactory with target registry
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from floe_dbt.profiles.base import ProfileGenerator
 from floe_dbt.profiles.bigquery import BigQueryProfileGenerator
@@ -67,7 +67,7 @@ class ProfileFactory:
         if target_lower not in cls._GENERATORS:
             supported = ", ".join(sorted(cls._GENERATORS.keys()))
             raise ValueError(
-                f"Unsupported compute target: '{target}'. " f"Supported targets: {supported}"
+                f"Unsupported compute target: '{target}'. Supported targets: {supported}"
             )
 
         generator_class = cls._GENERATORS[target_lower]

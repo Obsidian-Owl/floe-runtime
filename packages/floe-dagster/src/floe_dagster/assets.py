@@ -76,8 +76,7 @@ class FloeAssetFactory:
         manifest_file = Path(manifest_path)
         if not manifest_file.exists():
             raise FileNotFoundError(
-                f"dbt manifest.json not found at {manifest_path}. "
-                f"Run 'dbt compile' to generate it."
+                f"dbt manifest.json not found at {manifest_path}. Run 'dbt compile' to generate it."
             )
 
         # Create translator for metadata extraction

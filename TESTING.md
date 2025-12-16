@@ -5,7 +5,10 @@ This document describes the testing strategy, patterns, and workflows for floe-r
 ## Quick Start
 
 ```bash
-# Run all unit tests for a package
+# Run ALL unit tests across all packages (669 tests)
+uv run pytest packages/floe-core/tests/ packages/floe-dbt/tests/unit/ packages/floe-dagster/tests/unit/ tests/contract/ -v
+
+# Run all unit tests for a single package
 uv run pytest packages/floe-core/tests/ -v
 
 # Run adapter profile tests
@@ -17,6 +20,25 @@ uv run pytest -m "not slow and not integration" -v
 # Run tests for a specific adapter
 uv run pytest -k "snowflake" -v
 ```
+
+## Important: No `__init__.py` in Test Directories
+
+**CRITICAL**: Test directories (`packages/*/tests/`) must NOT contain `__init__.py` files.
+
+pytest uses `--import-mode=importlib` which causes namespace collisions when multiple
+packages have `tests/__init__.py` files (all resolve to `tests.conftest` module name).
+
+```
+# CORRECT - No __init__.py in test directories
+packages/floe-core/tests/conftest.py     # OK - namespace package
+packages/floe-dbt/tests/conftest.py      # OK - namespace package
+
+# WRONG - __init__.py causes collision
+packages/floe-core/tests/__init__.py     # BAD - causes "tests.conftest" collision
+```
+
+This is why `floe-core` tests work correctly (no `__init__.py`) while other packages
+previously had issues.
 
 ## Test Structure
 
@@ -287,7 +309,36 @@ def test_requires_dbt():
 | Snowflake | Mock adapter | Skip (no creds) | Skip |
 | PostgreSQL | Mock adapter | Testcontainer | Real |
 | OpenLineage | Mock emit() | Local HTTP | Marquez |
-| OpenTelemetry | Mock tracer | InMemory | Jaeger |
+| OpenTelemetry | InMemorySpanExporter | InMemory | Jaeger |
+
+### OpenTelemetry Testing
+
+Use the `in_memory_span_exporter` fixture to verify spans without requiring an external collector:
+
+```python
+def test_tracing_creates_spans(in_memory_span_exporter):
+    """Test that operations create correct OTel spans."""
+    exporter, provider = in_memory_span_exporter
+    tracer = provider.get_tracer("test")
+
+    with tracer.start_as_current_span("transform") as span:
+        span.set_attribute("model", "customers")
+        span.set_attribute("status", "success")
+
+    # Verify spans
+    spans = exporter.get_finished_spans()
+    assert len(spans) == 1
+    assert spans[0].name == "transform"
+    assert spans[0].attributes["model"] == "customers"
+
+    exporter.clear()  # Clean up for next test
+```
+
+This approach:
+- Requires no Docker or external collector
+- Verifies span names, attributes, and parent/child relationships
+- Runs fast in CI/CD
+- Uses the built-in `InMemorySpanExporter` from `opentelemetry-sdk`
 
 ## CI/CD Pipeline
 
@@ -329,16 +380,6 @@ Tests run in stages:
 - **Contract tests**: Validate API contracts between packages
 
 ## Troubleshooting
-
-### conftest Conflicts
-
-When running tests across packages, you may encounter conftest conflicts:
-
-```bash
-# Run packages separately
-uv run pytest packages/floe-core/tests/ -v
-uv run pytest packages/floe-dbt/tests/ -v
-```
 
 ### Missing Adapters
 

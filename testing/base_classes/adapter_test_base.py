@@ -189,8 +189,7 @@ class BaseProfileGeneratorTests(ABC):
 
         missing_fields = self.required_fields - set(profile.keys())
         assert not missing_fields, (
-            f"Missing required fields: {missing_fields}. "
-            f"Profile has: {set(profile.keys())}"
+            f"Missing required fields: {missing_fields}. Profile has: {set(profile.keys())}"
         )
 
     def test_generate_uses_config_threads(
@@ -207,9 +206,7 @@ class BaseProfileGeneratorTests(ABC):
         result = generator.generate(artifacts, config)
         assert config.target_name is not None
         profile = result[config.target_name]
-        assert profile["threads"] == 8, (
-            f"Expected threads=8, got threads={profile.get('threads')}"
-        )
+        assert profile["threads"] == 8, f"Expected threads=8, got threads={profile.get('threads')}"
 
     def test_generate_custom_target_name(
         self,
@@ -287,8 +284,7 @@ class BaseCredentialProfileGeneratorTests(BaseProfileGeneratorTests):
             if field in profile:
                 value = str(profile[field])
                 assert "env_var" in value or field.upper() in value, (
-                    f"Credential field '{field}' should use env_var() template. "
-                    f"Got: {value}"
+                    f"Credential field '{field}' should use env_var() template. Got: {value}"
                 )
 
     def test_never_hardcodes_credentials(

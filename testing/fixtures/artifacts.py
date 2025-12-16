@@ -181,9 +181,7 @@ def make_compiled_artifacts(
         "version": "1.0.0",
         "metadata": metadata or base_metadata(),
         "compute": compute,
-        "transforms": [
-            {"type": "dbt", "project_dir": ".", "profiles_dir": dbt_profiles_path}
-        ],
+        "transforms": [{"type": "dbt", "project_dir": ".", "profiles_dir": dbt_profiles_path}],
         "consumption": {"enabled": False},
         "governance": {"enabled": False},
         "observability": observability,

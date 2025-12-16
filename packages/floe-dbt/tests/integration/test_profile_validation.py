@@ -19,9 +19,17 @@ from typing import Any
 import pytest
 import yaml
 
+# Check if dbt-core is available
+try:
+    import dbt.version  # noqa: F401
+
+    HAS_DBT_CORE = True
+except ImportError:
+    HAS_DBT_CORE = False
+
 # Skip all integration tests if dbt not available
 pytestmark = pytest.mark.skipif(
-    subprocess.run(["dbt", "--version"], capture_output=True).returncode != 0,
+    not HAS_DBT_CORE,
     reason="dbt-core not installed",
 )
 
@@ -78,13 +86,6 @@ class TestDuckDBProfileValidation:
         profiles_path.write_text(yaml.safe_dump(profile))
         return profiles_path
 
-    @pytest.mark.skipif(
-        subprocess.run(
-            ["python", "-c", "import dbt.adapters.duckdb"], capture_output=True
-        ).returncode
-        != 0,
-        reason="dbt-duckdb adapter not installed",
-    )
     def test_dbt_debug_succeeds(
         self,
         dbt_project_dir: Path,
@@ -128,13 +129,6 @@ class TestProfileValidationWithFactory:
 
         return ProfileWriter()
 
-    @pytest.mark.skipif(
-        subprocess.run(
-            ["python", "-c", "import dbt.adapters.duckdb"], capture_output=True
-        ).returncode
-        != 0,
-        reason="dbt-duckdb adapter not installed",
-    )
     def test_generated_duckdb_profile_validates(
         self,
         factory: Any,

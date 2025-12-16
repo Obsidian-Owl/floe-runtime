@@ -124,7 +124,4 @@ class TestDatabricksProfileGenerator(BaseCredentialProfileGeneratorTests):
 
         result = generator.generate(artifacts, config)
         assert config.target_name is not None
-        assert (
-            result[config.target_name]["http_path"]
-            == "/sql/protocolv1/o/123456789/0123-456-abc"
-        )
+        assert result[config.target_name]["http_path"] == "/sql/protocolv1/o/123456789/0123-456-abc"

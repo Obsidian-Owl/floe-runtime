@@ -59,9 +59,7 @@ class TestFloeTranslator:
         """Test that metadata includes description."""
         metadata = translator.get_metadata(sample_dbt_manifest_node)
 
-        assert "description" in metadata or any(
-            "description" in str(k).lower() for k in metadata.keys()
-        )
+        assert "description" in metadata or any("description" in str(k).lower() for k in metadata)
 
     def test_get_metadata_includes_tags(
         self,
@@ -72,7 +70,7 @@ class TestFloeTranslator:
         metadata = translator.get_metadata(sample_dbt_manifest_node)
 
         # Tags should be in metadata
-        assert "tags" in metadata or any("tag" in str(k).lower() for k in metadata.keys())
+        assert "tags" in metadata or any("tag" in str(k).lower() for k in metadata)
 
     def test_get_metadata_includes_owner(
         self,
@@ -83,7 +81,7 @@ class TestFloeTranslator:
         metadata = translator.get_metadata(sample_dbt_manifest_node)
 
         # Owner should come from meta.floe.owner
-        assert "owner" in metadata or any("owner" in str(k).lower() for k in metadata.keys())
+        assert "owner" in metadata or any("owner" in str(k).lower() for k in metadata)
 
     def test_get_description_from_node(
         self,

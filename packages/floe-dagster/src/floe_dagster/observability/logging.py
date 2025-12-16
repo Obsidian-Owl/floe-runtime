@@ -65,34 +65,35 @@ class JSONFormatter(logging.Formatter):
         log_data["span_id"] = trace_context.get("span_id", "")
 
         # Add extra fields from record
+        # Standard LogRecord attributes to exclude
+        _standard_attrs = {
+            "name",
+            "msg",
+            "args",
+            "created",
+            "filename",
+            "funcName",
+            "levelname",
+            "levelno",
+            "lineno",
+            "module",
+            "msecs",
+            "pathname",
+            "process",
+            "processName",
+            "relativeCreated",
+            "stack_info",
+            "exc_info",
+            "exc_text",
+            "thread",
+            "threadName",
+            "message",
+        }
         if hasattr(record, "__dict__"):
             for key, value in record.__dict__.items():
-                if key not in (
-                    "name",
-                    "msg",
-                    "args",
-                    "created",
-                    "filename",
-                    "funcName",
-                    "levelname",
-                    "levelno",
-                    "lineno",
-                    "module",
-                    "msecs",
-                    "pathname",
-                    "process",
-                    "processName",
-                    "relativeCreated",
-                    "stack_info",
-                    "exc_info",
-                    "exc_text",
-                    "thread",
-                    "threadName",
-                    "message",
-                ):
-                    # Include custom extra fields
-                    if not key.startswith("_") and value is not None:
-                        log_data[key] = value
+                # Include custom extra fields (not standard attrs, not private, not None)
+                if key not in _standard_attrs and not key.startswith("_") and value is not None:
+                    log_data[key] = value
 
         # Add exception info if present
         if record.exc_info:

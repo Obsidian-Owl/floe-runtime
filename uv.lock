@@ -1406,6 +1406,7 @@ version = "0.1.0"
 source = { editable = "packages/floe-dbt" }
 dependencies = [
     { name = "dbt-core" },
+    { name = "dbt-duckdb" },
     { name = "floe-core" },
     { name = "pyyaml" },
 ]
@@ -1422,9 +1423,6 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
 ]
-duckdb = [
-    { name = "dbt-duckdb" },
-]
 postgres = [
     { name = "dbt-postgres" },
 ]
@@ -1438,9 +1436,9 @@ snowflake = [
 [package.metadata]
 requires-dist = [
     { name = "dbt-bigquery", marker = "extra == 'bigquery'", specifier = ">=1.9" },
-    { name = "dbt-core", specifier = ">=1.9" },
+    { name = "dbt-core", specifier = ">=1.10" },
     { name = "dbt-databricks", marker = "extra == 'databricks'", specifier = ">=1.9" },
-    { name = "dbt-duckdb", marker = "extra == 'duckdb'", specifier = ">=1.9" },
+    { name = "dbt-duckdb", specifier = ">=1.10" },
     { name = "dbt-postgres", marker = "extra == 'postgres'", specifier = ">=1.9" },
     { name = "dbt-redshift", marker = "extra == 'redshift'", specifier = ">=1.9" },
     { name = "dbt-snowflake", marker = "extra == 'snowflake'", specifier = ">=1.9" },
@@ -1450,7 +1448,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
     { name = "pyyaml", specifier = ">=6.0" },
 ]
-provides-extras = ["duckdb", "snowflake", "bigquery", "postgres", "redshift", "databricks", "dev"]
+provides-extras = ["snowflake", "bigquery", "postgres", "redshift", "databricks", "dev"]
 
 [[package]]
 name = "floe-iceberg"

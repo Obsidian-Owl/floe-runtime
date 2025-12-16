@@ -67,15 +67,13 @@ class TestTracingManager:
 
         manager = TracingManager(mock_config)
 
-        with patch("floe_dagster.observability.tracing.BatchSpanProcessor") as mock_batch:
-            with patch("floe_dagster.observability.tracing.TracerProvider"):
-                # OTLPSpanExporter is imported dynamically inside configure()
-                with patch(
-                    "opentelemetry.exporter.otlp.proto.grpc.trace_exporter.OTLPSpanExporter"
-                ):
-                    manager.configure()
-
-                    mock_batch.assert_called_once()
+        with (
+            patch("floe_dagster.observability.tracing.BatchSpanProcessor") as mock_batch,
+            patch("floe_dagster.observability.tracing.TracerProvider"),
+            patch("opentelemetry.exporter.otlp.proto.grpc.trace_exporter.OTLPSpanExporter"),
+        ):
+            manager.configure()
+            mock_batch.assert_called_once()
 
     def test_configure_uses_simple_processor_when_disabled(self) -> None:
         """Test configure uses SimpleSpanProcessor when batch_export=False."""
@@ -88,15 +86,13 @@ class TestTracingManager:
         )
         manager = TracingManager(config)
 
-        with patch("floe_dagster.observability.tracing.SimpleSpanProcessor") as mock_simple:
-            with patch("floe_dagster.observability.tracing.TracerProvider"):
-                # OTLPSpanExporter is imported dynamically inside configure()
-                with patch(
-                    "opentelemetry.exporter.otlp.proto.grpc.trace_exporter.OTLPSpanExporter"
-                ):
-                    manager.configure()
-
-                    mock_simple.assert_called_once()
+        with (
+            patch("floe_dagster.observability.tracing.SimpleSpanProcessor") as mock_simple,
+            patch("floe_dagster.observability.tracing.TracerProvider"),
+            patch("opentelemetry.exporter.otlp.proto.grpc.trace_exporter.OTLPSpanExporter"),
+        ):
+            manager.configure()
+            mock_simple.assert_called_once()
 
     def test_configure_disabled_uses_noop_provider(self, disabled_config: Any) -> None:
         """Test configure uses NoOpTracerProvider when disabled."""
@@ -166,11 +162,13 @@ class TestTracingManager:
         manager = TracingManager(mock_config)
         manager.configure()
 
-        with manager.start_span("parent_operation") as parent_span:
-            with manager.start_span("child_operation") as child_span:
-                # Child span should be nested under parent
-                assert child_span is not None
-                assert parent_span is not None
+        with (
+            manager.start_span("parent_operation") as parent_span,
+            manager.start_span("child_operation") as child_span,
+        ):
+            # Child span should be nested under parent (context managers execute in order)
+            assert child_span is not None
+            assert parent_span is not None
 
     def test_record_exception(self, mock_config: Any) -> None:
         """Test recording exception on span."""

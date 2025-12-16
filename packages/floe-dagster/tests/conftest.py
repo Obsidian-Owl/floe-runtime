@@ -220,6 +220,43 @@ def mock_tracer() -> MagicMock:
     return tracer
 
 
+@pytest.fixture
+def in_memory_span_exporter() -> Any:
+    """In-memory span exporter for verifying OTel spans in tests.
+
+    This provides a real OTel tracing setup that captures spans in memory,
+    allowing tests to verify span names, attributes, and relationships
+    without requiring an external collector.
+
+    Usage:
+        def test_tracing(in_memory_span_exporter):
+            exporter, provider = in_memory_span_exporter
+            tracer = provider.get_tracer("test")
+
+            with tracer.start_as_current_span("operation") as span:
+                span.set_attribute("key", "value")
+
+            spans = exporter.get_finished_spans()
+            assert len(spans) == 1
+            assert spans[0].name == "operation"
+
+            exporter.clear()  # Clean up for next test
+    """
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+
+    yield exporter, provider
+
+    # Cleanup
+    exporter.shutdown()
+    provider.shutdown()
+
+
 def make_dbt_manifest_node(
     name: str,
     schema: str = "analytics",
