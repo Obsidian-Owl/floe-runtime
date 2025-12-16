@@ -9,7 +9,6 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
-
 from floe_cli.commands.init import init
 
 
@@ -210,10 +209,8 @@ class TestInitEdgeCases:
         existing_readme = "# My Existing README\n"
         Path("README.md").write_text(existing_readme)
 
-        result = isolated_runner.invoke(init)
-        # Should fail because floe.yaml exists check comes first
-        # Actually, since floe.yaml doesn't exist yet, it should create floe.yaml
-        # and NOT overwrite README.md (per the init implementation)
+        _result = isolated_runner.invoke(init)
+        # Should create floe.yaml but preserve README.md (without --force)
 
         # This depends on implementation - readme might be preserved
         readme_content = Path("README.md").read_text()

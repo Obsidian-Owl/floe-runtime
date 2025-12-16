@@ -5,9 +5,7 @@ T040: Unit tests for dev command stub
 
 from __future__ import annotations
 
-import pytest
 from click.testing import CliRunner
-
 from floe_cli.commands.dev import dev
 
 

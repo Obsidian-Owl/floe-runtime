@@ -5,9 +5,7 @@ T037: Unit tests for run command stub
 
 from __future__ import annotations
 
-import pytest
 from click.testing import CliRunner
-
 from floe_cli.commands.run import run
 
 

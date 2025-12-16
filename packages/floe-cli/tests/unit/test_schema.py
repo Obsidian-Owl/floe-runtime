@@ -8,10 +8,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 from click.testing import CliRunner
-
-from floe_cli.commands.schema import schema, export_schema
+from floe_cli.commands.schema import export_schema, schema
 
 
 class TestSchemaGroup:

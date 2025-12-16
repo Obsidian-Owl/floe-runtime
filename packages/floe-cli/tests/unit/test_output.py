@@ -5,11 +5,9 @@ T009: Create test_output.py - Unit tests for output utilities
 
 from __future__ import annotations
 
-import io
 from unittest.mock import patch
 
 import pytest
-
 from floe_cli import output
 
 

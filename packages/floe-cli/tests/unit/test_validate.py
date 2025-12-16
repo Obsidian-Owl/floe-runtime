@@ -7,9 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from click.testing import CliRunner
-
 from floe_cli.commands.validate import validate
 
 
@@ -70,9 +68,10 @@ name: test2
 version: "1.0.0"
 """
         )
-        result = cli_runner.invoke(validate, ["--file", str(dup_yaml)])
+        _result = cli_runner.invoke(validate, ["--file", str(dup_yaml)])
         # Should either fail validation or use last value
         # Behavior depends on YAML parser settings
+        # Result intentionally unused - we just verify no crash
 
 
 class TestValidateSchemaErrors:
@@ -119,9 +118,10 @@ compute:
   target: duckdb
 """
         )
-        result = cli_runner.invoke(validate, ["--file", str(bad_type)])
+        _result = cli_runner.invoke(validate, ["--file", str(bad_type)])
         # May succeed if Pydantic coerces the integer to string
         # or fail if strict mode is on
+        # Result intentionally unused - we just verify no crash
 
 
 class TestValidateEdgeCases:

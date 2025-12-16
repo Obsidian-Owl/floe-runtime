@@ -8,7 +8,6 @@ from __future__ import annotations
 import time
 
 from click.testing import CliRunner
-
 from floe_cli.main import cli
 
 
