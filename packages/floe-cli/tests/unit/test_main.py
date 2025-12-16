@@ -6,6 +6,7 @@ T011: Create test_main.py - Test --help output format
 from __future__ import annotations
 
 from click.testing import CliRunner
+
 from floe_cli.main import cli
 
 

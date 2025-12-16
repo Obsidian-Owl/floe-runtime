@@ -6,6 +6,9 @@ T010: Create test_errors.py - Unit tests for error handling
 from __future__ import annotations
 
 import pytest
+from pydantic import BaseModel
+from pydantic import ValidationError as PydanticValidationError
+
 from floe_cli.errors import (
     EXIT_SYSTEM_ERROR,
     EXIT_USER_ERROR,
@@ -15,8 +18,6 @@ from floe_cli.errors import (
     handle_permission_error,
     handle_validation_error,
 )
-from pydantic import BaseModel
-from pydantic import ValidationError as PydanticValidationError
 
 
 class TestCLIError:
