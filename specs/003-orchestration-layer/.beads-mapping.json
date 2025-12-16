@@ -1,0 +1,652 @@
+{
+  "feature": "003-orchestration-layer",
+  "created_at": "2025-12-16T08:06:16.282962+00:00",
+  "last_sync": "2025-12-16T08:06:16.282963+00:00",
+  "total_tasks": 92,
+  "mappings": {
+    "T001": {
+      "bead_id": "floe-runtime-0ja",
+      "status": "open",
+      "title": "T001: Create floe-dbt package directory structure",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282885+00:00"
+    },
+    "T002": {
+      "bead_id": "floe-runtime-5nh",
+      "status": "open",
+      "title": "T002: Create floe-dagster package directory structure",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282883+00:00"
+    },
+    "T003": {
+      "bead_id": "floe-runtime-5gb",
+      "status": "open",
+      "title": "T003: Initialize floe-dbt pyproject.toml",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282882+00:00"
+    },
+    "T004": {
+      "bead_id": "floe-runtime-u8h",
+      "status": "open",
+      "title": "T004: Initialize floe-dagster pyproject.toml",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282880+00:00"
+    },
+    "T005": {
+      "bead_id": "floe-runtime-z3a",
+      "status": "open",
+      "title": "T005: Create floe-dbt __init__.py",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282879+00:00"
+    },
+    "T006": {
+      "bead_id": "floe-runtime-kem",
+      "status": "open",
+      "title": "T006: Create floe-dagster __init__.py",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282877+00:00"
+    },
+    "T007": {
+      "bead_id": "floe-runtime-at0",
+      "status": "open",
+      "title": "T007: Configure workspace root pyproject.toml",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282875+00:00"
+    },
+    "T008": {
+      "bead_id": "floe-runtime-ltvf",
+      "status": "open",
+      "title": "T008: Create ProfileGenerator Protocol",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282835+00:00"
+    },
+    "T009": {
+      "bead_id": "floe-runtime-zfss",
+      "status": "open",
+      "title": "T009: Create ProfileGeneratorConfig model",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282833+00:00"
+    },
+    "T010": {
+      "bead_id": "floe-runtime-bawa",
+      "status": "open",
+      "title": "T010: Create profiles subpackage __init__.py",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282832+00:00"
+    },
+    "T011": {
+      "bead_id": "floe-runtime-umed",
+      "status": "open",
+      "title": "T011: Create lineage subpackage __init__.py",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282830+00:00"
+    },
+    "T012": {
+      "bead_id": "floe-runtime-076v",
+      "status": "open",
+      "title": "T012: Create observability subpackage __init__.py",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282828+00:00"
+    },
+    "T013": {
+      "bead_id": "floe-runtime-izg8",
+      "status": "open",
+      "title": "T013: Create test fixtures for CompiledArtifacts",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282827+00:00"
+    },
+    "T014": {
+      "bead_id": "floe-runtime-zogv",
+      "status": "open",
+      "title": "T014: Create test fixtures for Dagster testing",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282825+00:00"
+    },
+    "T015": {
+      "bead_id": "floe-runtime-dj9",
+      "status": "open",
+      "title": "T015: Unit tests for DuckDBProfileGenerator",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282874+00:00"
+    },
+    "T016": {
+      "bead_id": "floe-runtime-jcy",
+      "status": "open",
+      "title": "T016: Unit tests for SnowflakeProfileGenerator",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282872+00:00"
+    },
+    "T017": {
+      "bead_id": "floe-runtime-jbq",
+      "status": "open",
+      "title": "T017: Unit tests for BigQueryProfileGenerator",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282871+00:00"
+    },
+    "T018": {
+      "bead_id": "floe-runtime-hxb",
+      "status": "open",
+      "title": "T018: Unit tests for RedshiftProfileGenerator",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282868+00:00"
+    },
+    "T019": {
+      "bead_id": "floe-runtime-un1",
+      "status": "open",
+      "title": "T019: Unit tests for DatabricksProfileGenerator",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282866+00:00"
+    },
+    "T020": {
+      "bead_id": "floe-runtime-saw",
+      "status": "open",
+      "title": "T020: Unit tests for PostgreSQLProfileGenerator",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282865+00:00"
+    },
+    "T021": {
+      "bead_id": "floe-runtime-mqv",
+      "status": "open",
+      "title": "T021: Unit tests for SparkProfileGenerator",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282864+00:00"
+    },
+    "T022": {
+      "bead_id": "floe-runtime-drp",
+      "status": "open",
+      "title": "T022: Unit tests for ProfileFactory",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282862+00:00"
+    },
+    "T023": {
+      "bead_id": "floe-runtime-ap9",
+      "status": "open",
+      "title": "T023: Unit tests for ProfileWriter",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282859+00:00"
+    },
+    "T024": {
+      "bead_id": "floe-runtime-9uk",
+      "status": "open",
+      "title": "T024: Integration test for profile validation",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282856+00:00"
+    },
+    "T025": {
+      "bead_id": "floe-runtime-llkl",
+      "status": "open",
+      "title": "T025: Implement DuckDBProfileGenerator",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282823+00:00"
+    },
+    "T026": {
+      "bead_id": "floe-runtime-w2au",
+      "status": "open",
+      "title": "T026: Implement SnowflakeProfileGenerator",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282822+00:00"
+    },
+    "T027": {
+      "bead_id": "floe-runtime-gyml",
+      "status": "open",
+      "title": "T027: Implement BigQueryProfileGenerator",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282820+00:00"
+    },
+    "T028": {
+      "bead_id": "floe-runtime-1pcw",
+      "status": "open",
+      "title": "T028: Implement RedshiftProfileGenerator",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282819+00:00"
+    },
+    "T029": {
+      "bead_id": "floe-runtime-frwr",
+      "status": "open",
+      "title": "T029: Implement DatabricksProfileGenerator",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282817+00:00"
+    },
+    "T030": {
+      "bead_id": "floe-runtime-yk8c",
+      "status": "open",
+      "title": "T030: Implement PostgreSQLProfileGenerator",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282815+00:00"
+    },
+    "T031": {
+      "bead_id": "floe-runtime-nlp7",
+      "status": "open",
+      "title": "T031: Implement SparkProfileGenerator",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282813+00:00"
+    },
+    "T032": {
+      "bead_id": "floe-runtime-zbcn",
+      "status": "open",
+      "title": "T032: Implement ProfileFactory",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282811+00:00"
+    },
+    "T033": {
+      "bead_id": "floe-runtime-3yzd",
+      "status": "open",
+      "title": "T033: Implement ProfileWriter",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282809+00:00"
+    },
+    "T034": {
+      "bead_id": "floe-runtime-oeif",
+      "status": "open",
+      "title": "T034: Update profiles __init__.py exports",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282804+00:00"
+    },
+    "T035": {
+      "bead_id": "floe-runtime-0vzp",
+      "status": "open",
+      "title": "T035: Update floe-dbt public API",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282645+00:00"
+    },
+    "T036": {
+      "bead_id": "floe-runtime-1cc",
+      "status": "open",
+      "title": "T036: Unit tests for FloeTranslator",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282860+00:00"
+    },
+    "T037": {
+      "bead_id": "floe-runtime-h4g",
+      "status": "open",
+      "title": "T037: Unit tests for FloeAssetFactory",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282857+00:00"
+    },
+    "T038": {
+      "bead_id": "floe-runtime-3f1",
+      "status": "open",
+      "title": "T038: Unit tests for DbtModelMetadata",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282854+00:00"
+    },
+    "T039": {
+      "bead_id": "floe-runtime-0ro",
+      "status": "open",
+      "title": "T039: Integration test for dbt asset execution",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282853+00:00"
+    },
+    "T040": {
+      "bead_id": "floe-runtime-sjb",
+      "status": "open",
+      "title": "T040: Create DbtModelMetadata model",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282849+00:00"
+    },
+    "T041": {
+      "bead_id": "floe-runtime-lf1",
+      "status": "open",
+      "title": "T041: Create ColumnMetadata model",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282848+00:00"
+    },
+    "T042": {
+      "bead_id": "floe-runtime-d4k",
+      "status": "open",
+      "title": "T042: Create AssetMaterializationResult model",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282846+00:00"
+    },
+    "T043": {
+      "bead_id": "floe-runtime-0eq",
+      "status": "open",
+      "title": "T043: Implement FloeTranslator",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282845+00:00"
+    },
+    "T044": {
+      "bead_id": "floe-runtime-hoc",
+      "status": "open",
+      "title": "T044: Implement FloeAssetFactory.create_dbt_assets",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282843+00:00"
+    },
+    "T045": {
+      "bead_id": "floe-runtime-l4l",
+      "status": "open",
+      "title": "T045: Implement DbtCliResource configuration",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282841+00:00"
+    },
+    "T046": {
+      "bead_id": "floe-runtime-nyk5",
+      "status": "open",
+      "title": "T046: Implement FloeAssetFactory.create_definitions",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282839+00:00"
+    },
+    "T047": {
+      "bead_id": "floe-runtime-yncs",
+      "status": "open",
+      "title": "T047: Create Dagster definitions entry point",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282838+00:00"
+    },
+    "T048": {
+      "bead_id": "floe-runtime-on1j",
+      "status": "open",
+      "title": "T048: Update floe-dagster public API",
+      "priority": 1,
+      "created_at": "2025-12-16T08:06:16.282836+00:00"
+    },
+    "T049": {
+      "bead_id": "floe-runtime-9y2",
+      "status": "open",
+      "title": "T049: Unit tests for LineageEvent model",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282931+00:00"
+    },
+    "T050": {
+      "bead_id": "floe-runtime-mup",
+      "status": "open",
+      "title": "T050: Unit tests for LineageDataset model",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282930+00:00"
+    },
+    "T051": {
+      "bead_id": "floe-runtime-09y",
+      "status": "open",
+      "title": "T051: Unit tests for OpenLineageConfig model",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282928+00:00"
+    },
+    "T052": {
+      "bead_id": "floe-runtime-hfq",
+      "status": "open",
+      "title": "T052: Unit tests for OpenLineageEmitter",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282927+00:00"
+    },
+    "T053": {
+      "bead_id": "floe-runtime-38r",
+      "status": "open",
+      "title": "T053: Unit tests for LineageDatasetBuilder",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282925+00:00"
+    },
+    "T054": {
+      "bead_id": "floe-runtime-3r6",
+      "status": "open",
+      "title": "T054: Unit tests for ColumnClassification facet",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282924+00:00"
+    },
+    "T055": {
+      "bead_id": "floe-runtime-oksw",
+      "status": "open",
+      "title": "T055: Create OpenLineageConfig model",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282907+00:00"
+    },
+    "T056": {
+      "bead_id": "floe-runtime-idk4",
+      "status": "open",
+      "title": "T056: Create LineageEventType enum",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282906+00:00"
+    },
+    "T057": {
+      "bead_id": "floe-runtime-r54w",
+      "status": "open",
+      "title": "T057: Create LineageDataset model",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282904+00:00"
+    },
+    "T058": {
+      "bead_id": "floe-runtime-zjf1",
+      "status": "open",
+      "title": "T058: Create LineageEvent model",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282903+00:00"
+    },
+    "T059": {
+      "bead_id": "floe-runtime-tfin",
+      "status": "open",
+      "title": "T059: Create ColumnClassification model",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282901+00:00"
+    },
+    "T060": {
+      "bead_id": "floe-runtime-y7oo",
+      "status": "open",
+      "title": "T060: Implement LineageDatasetBuilder.build_from_dbt_node",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282900+00:00"
+    },
+    "T061": {
+      "bead_id": "floe-runtime-5x04",
+      "status": "open",
+      "title": "T061: Implement LineageDatasetBuilder.build_classification_facet",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282898+00:00"
+    },
+    "T062": {
+      "bead_id": "floe-runtime-jmb1",
+      "status": "open",
+      "title": "T062: Implement OpenLineageEmitter.emit_start",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282896+00:00"
+    },
+    "T063": {
+      "bead_id": "floe-runtime-01vu",
+      "status": "open",
+      "title": "T063: Implement OpenLineageEmitter.emit_complete",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282895+00:00"
+    },
+    "T064": {
+      "bead_id": "floe-runtime-3rwa",
+      "status": "open",
+      "title": "T064: Implement OpenLineageEmitter.emit_fail",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282892+00:00"
+    },
+    "T065": {
+      "bead_id": "floe-runtime-dpxr",
+      "status": "open",
+      "title": "T065: Implement graceful degradation for lineage",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282890+00:00"
+    },
+    "T066": {
+      "bead_id": "floe-runtime-owy0",
+      "status": "open",
+      "title": "T066: Integrate OpenLineageEmitter into assets",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282888+00:00"
+    },
+    "T067": {
+      "bead_id": "floe-runtime-yruv",
+      "status": "open",
+      "title": "T067: Update lineage __init__.py exports",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282886+00:00"
+    },
+    "T068": {
+      "bead_id": "floe-runtime-1ah",
+      "status": "open",
+      "title": "T068: Unit tests for TracingConfig model",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282922+00:00"
+    },
+    "T069": {
+      "bead_id": "floe-runtime-540",
+      "status": "open",
+      "title": "T069: Unit tests for TracingManager",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282921+00:00"
+    },
+    "T070": {
+      "bead_id": "floe-runtime-e5s",
+      "status": "open",
+      "title": "T070: Unit tests for structured logging",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282919+00:00"
+    },
+    "T071": {
+      "bead_id": "floe-runtime-pxs",
+      "status": "open",
+      "title": "T071: Create TracingConfig model",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282918+00:00"
+    },
+    "T072": {
+      "bead_id": "floe-runtime-60z",
+      "status": "open",
+      "title": "T072: Implement TracingManager.configure",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282916+00:00"
+    },
+    "T073": {
+      "bead_id": "floe-runtime-ajp",
+      "status": "open",
+      "title": "T073: Implement TracingManager.start_span",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282915+00:00"
+    },
+    "T074": {
+      "bead_id": "floe-runtime-yvz",
+      "status": "open",
+      "title": "T074: Implement NoOpTracerProvider",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282913+00:00"
+    },
+    "T075": {
+      "bead_id": "floe-runtime-i5q",
+      "status": "open",
+      "title": "T075: Implement structured logging with trace injection",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282912+00:00"
+    },
+    "T076": {
+      "bead_id": "floe-runtime-79u",
+      "status": "open",
+      "title": "T076: Integrate TracingManager into assets",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282910+00:00"
+    },
+    "T077": {
+      "bead_id": "floe-runtime-317",
+      "status": "open",
+      "title": "T077: Update observability __init__.py exports",
+      "priority": 2,
+      "created_at": "2025-12-16T08:06:16.282909+00:00"
+    },
+    "T078": {
+      "bead_id": "floe-runtime-wven",
+      "status": "open",
+      "title": "T078: Unit tests for multi-environment profiles",
+      "priority": 3,
+      "created_at": "2025-12-16T08:06:16.282956+00:00"
+    },
+    "T079": {
+      "bead_id": "floe-runtime-8yvd",
+      "status": "open",
+      "title": "T079: Integration test for dev/prod switching",
+      "priority": 3,
+      "created_at": "2025-12-16T08:06:16.282955+00:00"
+    },
+    "T080": {
+      "bead_id": "floe-runtime-uogg",
+      "status": "open",
+      "title": "T080: Add environment-aware target name generation",
+      "priority": 3,
+      "created_at": "2025-12-16T08:06:16.282953+00:00"
+    },
+    "T081": {
+      "bead_id": "floe-runtime-2vh9",
+      "status": "open",
+      "title": "T081: Add environment-specific secret references",
+      "priority": 3,
+      "created_at": "2025-12-16T08:06:16.282952+00:00"
+    },
+    "T082": {
+      "bead_id": "floe-runtime-5ozh",
+      "status": "open",
+      "title": "T082: Document environment variable conventions",
+      "priority": 3,
+      "created_at": "2025-12-16T08:06:16.282950+00:00"
+    },
+    "T083": {
+      "bead_id": "floe-runtime-nig7",
+      "status": "open",
+      "title": "T083: Validate profile generators against schema",
+      "priority": 3,
+      "created_at": "2025-12-16T08:06:16.282948+00:00"
+    },
+    "T084": {
+      "bead_id": "floe-runtime-sxb3",
+      "status": "open",
+      "title": "T084: Validate OpenLineage events against schema",
+      "priority": 3,
+      "created_at": "2025-12-16T08:06:16.282945+00:00"
+    },
+    "T085": {
+      "bead_id": "floe-runtime-1glt",
+      "status": "open",
+      "title": "T085: Add comprehensive docstrings",
+      "priority": 3,
+      "created_at": "2025-12-16T08:06:16.282944+00:00"
+    },
+    "T086": {
+      "bead_id": "floe-runtime-708n",
+      "status": "open",
+      "title": "T086: Run ruff and black formatting",
+      "priority": 3,
+      "created_at": "2025-12-16T08:06:16.282942+00:00"
+    },
+    "T087": {
+      "bead_id": "floe-runtime-m5t5",
+      "status": "open",
+      "title": "T087: Run mypy --strict",
+      "priority": 3,
+      "created_at": "2025-12-16T08:06:16.282940+00:00"
+    },
+    "T088": {
+      "bead_id": "floe-runtime-qv6m",
+      "status": "open",
+      "title": "T088: Run bandit security scan",
+      "priority": 3,
+      "created_at": "2025-12-16T08:06:16.282939+00:00"
+    },
+    "T089": {
+      "bead_id": "floe-runtime-6ldl",
+      "status": "open",
+      "title": "T089: Validate quickstart.md workflow",
+      "priority": 3,
+      "created_at": "2025-12-16T08:06:16.282937+00:00"
+    },
+    "T090": {
+      "bead_id": "floe-runtime-8nxq",
+      "status": "open",
+      "title": "T090: Update floe-cli run.py stub",
+      "priority": 3,
+      "created_at": "2025-12-16T08:06:16.282936+00:00"
+    },
+    "T091": {
+      "bead_id": "floe-runtime-1hsr",
+      "status": "open",
+      "title": "T091: Update floe-cli dev.py stub",
+      "priority": 3,
+      "created_at": "2025-12-16T08:06:16.282934+00:00"
+    },
+    "T092": {
+      "bead_id": "floe-runtime-m124",
+      "status": "open",
+      "title": "T092: Verify 80% test coverage",
+      "priority": 3,
+      "created_at": "2025-12-16T08:06:16.282933+00:00"
+    }
+  }
+}

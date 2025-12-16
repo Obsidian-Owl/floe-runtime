@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://floe.dev/spec/contracts/openlineage-event.schema.json",
+  "title": "FloeOpenLineageEvent",
+  "description": "OpenLineage RunEvent schema for floe-dagster emission",
+  "type": "object",
+  "required": ["eventType", "eventTime", "run", "job", "producer"],
+  "additionalProperties": false,
+  "properties": {
+    "eventType": {
+      "type": "string",
+      "enum": ["START", "RUNNING", "COMPLETE", "FAIL", "ABORT"],
+      "description": "The type of run event"
+    },
+    "eventTime": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when the event occurred"
+    },
+    "run": {
+      "type": "object",
+      "required": ["runId"],
+      "additionalProperties": false,
+      "properties": {
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique identifier for this run"
+        },
+        "facets": {
+          "type": "object",
+          "description": "Run-level facets (e.g., parent run)"
+        }
+      }
+    },
+    "job": {
+      "type": "object",
+      "required": ["namespace", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Job namespace (e.g., 'floe' or 'dbt')"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Job name (typically dbt model name)"
+        },
+        "facets": {
+          "type": "object",
+          "description": "Job-level facets"
+        }
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Dataset"
+      },
+      "description": "Input datasets consumed by this run"
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Dataset"
+      },
+      "description": "Output datasets produced by this run"
+    },
+    "producer": {
+      "type": "string",
+      "default": "floe-dagster",
+      "description": "Producer identifier"
+    }
+  },
+  "$defs": {
+    "Dataset": {
+      "type": "object",
+      "required": ["namespace", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Dataset namespace (e.g., 'snowflake://account')"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Dataset name (e.g., 'database.schema.table')"
+        },
+        "facets": {
+          "type": "object",
+          "properties": {
+            "schema": {
+              "$ref": "#/$defs/SchemaFacet"
+            },
+            "dataSource": {
+              "$ref": "#/$defs/DataSourceFacet"
+            },
+            "columnClassifications": {
+              "$ref": "#/$defs/ColumnClassificationFacet"
+            },
+            "outputStatistics": {
+              "$ref": "#/$defs/OutputStatisticsFacet"
+            }
+          },
+          "additionalProperties": true
+        }
+      }
+    },
+    "SchemaFacet": {
+      "type": "object",
+      "required": ["_producer", "_schemaURL", "fields"],
+      "properties": {
+        "_producer": {
+          "type": "string"
+        },
+        "_schemaURL": {
+          "type": "string",
+          "format": "uri"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "DataSourceFacet": {
+      "type": "object",
+      "required": ["_producer", "_schemaURL", "name", "uri"],
+      "properties": {
+        "_producer": {
+          "type": "string"
+        },
+        "_schemaURL": {
+          "type": "string",
+          "format": "uri"
+        },
+        "name": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        }
+      }
+    },
+    "ColumnClassificationFacet": {
+      "type": "object",
+      "required": ["_producer", "_schemaURL", "classifications"],
+      "description": "Floe custom facet for column-level classifications",
+      "properties": {
+        "_producer": {
+          "type": "string",
+          "default": "floe-dagster"
+        },
+        "_schemaURL": {
+          "type": "string",
+          "format": "uri",
+          "default": "https://floe.dev/spec/facets/1-0-0/ColumnClassificationFacet.json"
+        },
+        "classifications": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "classification": {
+                "type": "string",
+                "enum": ["pii", "internal", "public", "confidential"]
+              },
+              "pii_type": {
+                "type": "string",
+                "enum": ["email", "phone", "ssn", "address", "name", "dob", "other"]
+              },
+              "sensitivity": {
+                "type": "string",
+                "enum": ["high", "medium", "low"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "OutputStatisticsFacet": {
+      "type": "object",
+      "required": ["_producer", "_schemaURL"],
+      "properties": {
+        "_producer": {
+          "type": "string"
+        },
+        "_schemaURL": {
+          "type": "string",
+          "format": "uri"
+        },
+        "rowCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
