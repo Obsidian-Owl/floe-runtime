@@ -45,9 +45,7 @@ class TestInitNameOption:
         content = Path("floe.yaml").read_text()
         assert "my-pipeline" in content
 
-    def test_init_default_name_uses_directory(
-        self, isolated_runner: CliRunner
-    ) -> None:
+    def test_init_default_name_uses_directory(self, isolated_runner: CliRunner) -> None:
         """Test init uses directory name as default."""
         result = isolated_runner.invoke(init)
         assert result.exit_code == 0
@@ -82,9 +80,7 @@ class TestInitTargetOption:
         "target",
         ["duckdb", "snowflake", "bigquery", "redshift", "databricks", "postgres", "spark"],
     )
-    def test_init_with_valid_target(
-        self, isolated_runner: CliRunner, target: str
-    ) -> None:
+    def test_init_with_valid_target(self, isolated_runner: CliRunner, target: str) -> None:
         """Test init with valid --target option."""
         result = isolated_runner.invoke(init, ["--target", target])
         assert result.exit_code == 0
@@ -92,9 +88,7 @@ class TestInitTargetOption:
         content = Path("floe.yaml").read_text()
         assert f"target: {target}" in content
 
-    def test_init_default_target_is_duckdb(
-        self, isolated_runner: CliRunner
-    ) -> None:
+    def test_init_default_target_is_duckdb(self, isolated_runner: CliRunner) -> None:
         """Test init defaults to duckdb target."""
         result = isolated_runner.invoke(init)
         assert result.exit_code == 0
@@ -102,9 +96,7 @@ class TestInitTargetOption:
         content = Path("floe.yaml").read_text()
         assert "target: duckdb" in content
 
-    def test_init_duckdb_has_memory_path(
-        self, isolated_runner: CliRunner
-    ) -> None:
+    def test_init_duckdb_has_memory_path(self, isolated_runner: CliRunner) -> None:
         """Test init with duckdb includes :memory: path."""
         result = isolated_runner.invoke(init, ["--target", "duckdb"])
         assert result.exit_code == 0
@@ -162,9 +154,7 @@ class TestInitFileContents:
         data = yaml.safe_load(content)
         assert isinstance(data, dict)
 
-    def test_floe_yaml_has_required_sections(
-        self, isolated_runner: CliRunner
-    ) -> None:
+    def test_floe_yaml_has_required_sections(self, isolated_runner: CliRunner) -> None:
         """Test generated floe.yaml has required sections."""
         import yaml
 
@@ -178,9 +168,7 @@ class TestInitFileContents:
         assert "version" in data
         assert "compute" in data
 
-    def test_floe_yaml_has_schema_comment(
-        self, isolated_runner: CliRunner
-    ) -> None:
+    def test_floe_yaml_has_schema_comment(self, isolated_runner: CliRunner) -> None:
         """Test generated floe.yaml has schema comment for IDE."""
         result = isolated_runner.invoke(init)
         assert result.exit_code == 0
@@ -202,9 +190,7 @@ class TestInitFileContents:
 class TestInitEdgeCases:
     """Tests for edge cases."""
 
-    def test_init_preserves_existing_readme(
-        self, isolated_runner: CliRunner
-    ) -> None:
+    def test_init_preserves_existing_readme(self, isolated_runner: CliRunner) -> None:
         """Test init doesn't overwrite existing README.md (without --force)."""
         existing_readme = "# My Existing README\n"
         Path("README.md").write_text(existing_readme)

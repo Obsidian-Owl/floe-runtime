@@ -25,38 +25,26 @@ class TestSchemaGroup:
 class TestSchemaExport:
     """Tests for schema export command."""
 
-    def test_export_creates_file(
-        self, cli_runner: CliRunner, tmp_path: Path
-    ) -> None:
+    def test_export_creates_file(self, cli_runner: CliRunner, tmp_path: Path) -> None:
         """Test schema export creates JSON file."""
         output_file = tmp_path / "schema.json"
-        result = cli_runner.invoke(
-            export_schema, ["--output", str(output_file)]
-        )
+        result = cli_runner.invoke(export_schema, ["--output", str(output_file)])
         assert result.exit_code == 0
         assert output_file.exists()
 
-    def test_export_creates_valid_json(
-        self, cli_runner: CliRunner, tmp_path: Path
-    ) -> None:
+    def test_export_creates_valid_json(self, cli_runner: CliRunner, tmp_path: Path) -> None:
         """Test exported schema is valid JSON."""
         output_file = tmp_path / "schema.json"
-        result = cli_runner.invoke(
-            export_schema, ["--output", str(output_file)]
-        )
+        result = cli_runner.invoke(export_schema, ["--output", str(output_file)])
         assert result.exit_code == 0
 
         content = json.loads(output_file.read_text())
         assert isinstance(content, dict)
 
-    def test_export_creates_json_schema(
-        self, cli_runner: CliRunner, tmp_path: Path
-    ) -> None:
+    def test_export_creates_json_schema(self, cli_runner: CliRunner, tmp_path: Path) -> None:
         """Test exported schema is a valid JSON Schema."""
         output_file = tmp_path / "schema.json"
-        result = cli_runner.invoke(
-            export_schema, ["--output", str(output_file)]
-        )
+        result = cli_runner.invoke(export_schema, ["--output", str(output_file)])
         assert result.exit_code == 0
 
         content = json.loads(output_file.read_text())
@@ -70,9 +58,7 @@ class TestSchemaExport:
     ) -> None:
         """Test export creates nested directories."""
         output_file = tmp_path / "nested" / "dir" / "schema.json"
-        result = cli_runner.invoke(
-            export_schema, ["--output", str(output_file)]
-        )
+        result = cli_runner.invoke(export_schema, ["--output", str(output_file)])
         assert result.exit_code == 0
         assert output_file.exists()
 
@@ -85,16 +71,12 @@ class TestSchemaExport:
         default_path = Path("schemas/floe.schema.json")
         assert default_path.exists()
 
-    def test_export_overwrites_existing(
-        self, cli_runner: CliRunner, tmp_path: Path
-    ) -> None:
+    def test_export_overwrites_existing(self, cli_runner: CliRunner, tmp_path: Path) -> None:
         """Test export overwrites existing file."""
         output_file = tmp_path / "schema.json"
         output_file.write_text('{"old": "data"}')
 
-        result = cli_runner.invoke(
-            export_schema, ["--output", str(output_file)]
-        )
+        result = cli_runner.invoke(export_schema, ["--output", str(output_file)])
         assert result.exit_code == 0
 
         content = json.loads(output_file.read_text())
@@ -105,27 +87,19 @@ class TestSchemaExport:
 class TestSchemaContent:
     """Tests for schema content quality."""
 
-    def test_schema_has_id(
-        self, cli_runner: CliRunner, tmp_path: Path
-    ) -> None:
+    def test_schema_has_id(self, cli_runner: CliRunner, tmp_path: Path) -> None:
         """Test schema has $id field."""
         output_file = tmp_path / "schema.json"
-        result = cli_runner.invoke(
-            export_schema, ["--output", str(output_file)]
-        )
+        result = cli_runner.invoke(export_schema, ["--output", str(output_file)])
         assert result.exit_code == 0
 
         content = json.loads(output_file.read_text())
         assert "$id" in content
 
-    def test_schema_has_title(
-        self, cli_runner: CliRunner, tmp_path: Path
-    ) -> None:
+    def test_schema_has_title(self, cli_runner: CliRunner, tmp_path: Path) -> None:
         """Test schema has title or describes FloeSpec."""
         output_file = tmp_path / "schema.json"
-        result = cli_runner.invoke(
-            export_schema, ["--output", str(output_file)]
-        )
+        result = cli_runner.invoke(export_schema, ["--output", str(output_file)])
         assert result.exit_code == 0
 
         content = json.loads(output_file.read_text())
@@ -134,14 +108,10 @@ class TestSchemaContent:
         has_floe_ref = "FloeSpec" in str(content)
         assert has_title or has_floe_ref
 
-    def test_schema_has_required_fields(
-        self, cli_runner: CliRunner, tmp_path: Path
-    ) -> None:
+    def test_schema_has_required_fields(self, cli_runner: CliRunner, tmp_path: Path) -> None:
         """Test schema defines required fields."""
         output_file = tmp_path / "schema.json"
-        result = cli_runner.invoke(
-            export_schema, ["--output", str(output_file)]
-        )
+        result = cli_runner.invoke(export_schema, ["--output", str(output_file)])
         assert result.exit_code == 0
 
         content = json.loads(output_file.read_text())
@@ -151,14 +121,10 @@ class TestSchemaContent:
         has_defs = "$defs" in content
         assert has_required or has_properties or has_defs
 
-    def test_schema_formatted_nicely(
-        self, cli_runner: CliRunner, tmp_path: Path
-    ) -> None:
+    def test_schema_formatted_nicely(self, cli_runner: CliRunner, tmp_path: Path) -> None:
         """Test schema JSON is formatted with indentation."""
         output_file = tmp_path / "schema.json"
-        result = cli_runner.invoke(
-            export_schema, ["--output", str(output_file)]
-        )
+        result = cli_runner.invoke(export_schema, ["--output", str(output_file)])
         assert result.exit_code == 0
 
         content = output_file.read_text()

@@ -12,18 +12,14 @@ from floe_cli.commands.run import run
 class TestRunStub:
     """Tests for run command stub."""
 
-    def test_run_shows_not_installed_error(
-        self, cli_runner: CliRunner
-    ) -> None:
+    def test_run_shows_not_installed_error(self, cli_runner: CliRunner) -> None:
         """Test run shows floe-dagster not installed error."""
         result = cli_runner.invoke(run)
         assert result.exit_code == 2
         assert "floe-dagster" in result.output.lower()
         assert "not installed" in result.output.lower()
 
-    def test_run_shows_install_instructions(
-        self, cli_runner: CliRunner
-    ) -> None:
+    def test_run_shows_install_instructions(self, cli_runner: CliRunner) -> None:
         """Test run shows installation instructions."""
         result = cli_runner.invoke(run)
         assert result.exit_code == 2
@@ -49,9 +45,7 @@ class TestRunOptions:
 
     def test_run_accepts_all_options(self, cli_runner: CliRunner) -> None:
         """Test run accepts all options together."""
-        result = cli_runner.invoke(
-            run, ["--file", "custom.yaml", "--select", "my_model"]
-        )
+        result = cli_runner.invoke(run, ["--file", "custom.yaml", "--select", "my_model"])
         assert result.exit_code == 2
 
 

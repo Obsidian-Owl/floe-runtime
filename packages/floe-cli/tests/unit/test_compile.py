@@ -48,9 +48,7 @@ class TestCompileCommand:
         assert result.exit_code == 0
         assert output_dir.exists()
 
-    def test_compile_missing_file(
-        self, cli_runner: CliRunner, tmp_path: Path
-    ) -> None:
+    def test_compile_missing_file(self, cli_runner: CliRunner, tmp_path: Path) -> None:
         """Test compilation when file doesn't exist."""
         nonexistent = tmp_path / "nonexistent.yaml"
         result = cli_runner.invoke(
@@ -97,9 +95,12 @@ class TestCompileTargetOption:
         result = cli_runner.invoke(
             compile_cmd,
             [
-                "--file", str(valid_floe_yaml),
-                "--output", str(output_dir),
-                "--target", "duckdb",
+                "--file",
+                str(valid_floe_yaml),
+                "--output",
+                str(output_dir),
+                "--target",
+                "duckdb",
             ],
         )
         assert result.exit_code == 0
@@ -112,9 +113,12 @@ class TestCompileTargetOption:
         result = cli_runner.invoke(
             compile_cmd,
             [
-                "--file", str(valid_floe_yaml),
-                "--output", str(output_dir),
-                "--target", "nonexistent_target",
+                "--file",
+                str(valid_floe_yaml),
+                "--output",
+                str(output_dir),
+                "--target",
+                "nonexistent_target",
             ],
         )
         assert result.exit_code == 1
@@ -183,9 +187,7 @@ class TestCompileEdgeCases:
         assert "old" not in new_content
         assert "version" in new_content
 
-    def test_compile_empty_transforms(
-        self, cli_runner: CliRunner, tmp_path: Path
-    ) -> None:
+    def test_compile_empty_transforms(self, cli_runner: CliRunner, tmp_path: Path) -> None:
         """Test compilation with no transforms."""
         config_file = tmp_path / "minimal.yaml"
         config_file.write_text(
