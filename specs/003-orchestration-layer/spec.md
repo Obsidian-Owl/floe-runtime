@@ -119,13 +119,14 @@ As a data engineer, I want to run the same pipeline against different environmen
 - **FR-009**: System MUST stream dbt execution events to Dagster event log
 - **FR-010**: System MUST attach metadata from dbt models (description, tags, owner) to Dagster assets
 
-**OpenLineage Integration**:
+**OpenLineage Integration** (custom emission via floe-dagster for orchestrator portability):
 
 - **FR-011**: System MUST emit OpenLineage START event when dbt execution begins
 - **FR-012**: System MUST emit OpenLineage COMPLETE event with schema facets on successful execution
 - **FR-013**: System MUST emit OpenLineage FAIL event with error details on failed execution
 - **FR-014**: System MUST include input/output dataset information in lineage events
 - **FR-015**: System MUST include column classifications from governance config in dataset facets
+- **FR-024**: System MUST implement OpenLineage emission in floe-dagster code (not via Dagster sensor) for standards-based portability
 
 **OpenTelemetry Integration**:
 
@@ -168,6 +169,8 @@ As a data engineer, I want to run the same pipeline against different environmen
 - Environment variables for credentials are set in the execution environment
 - OpenLineage and OTLP backends are accessible when enabled (graceful degradation when not)
 - Users are familiar with Dagster concepts (assets, runs, schedules)
+- Iceberg table format is handled by dbt adapters (via `file_format='iceberg'` config), not by floe-dagster
+- Polaris catalog registration is deferred to floe-iceberg package (next feature), keeping orchestration layer storage-agnostic
 
 ## Dependencies
 
@@ -187,3 +190,10 @@ As a data engineer, I want to run the same pipeline against different environmen
 - Iceberg table management (separate floe-iceberg package)
 - Cube semantic layer (separate floe-cube package)
 - Web UI for configuration (CLI-only in this feature)
+
+## Clarifications
+
+### Session 2025-12-16
+
+- Q: OpenLineage event source - use Dagster native lineage only, custom OpenLineage emission, or wrapper? → A: Option B - Emit OpenLineage events via custom floe-dagster code (standards-based portability for future orchestrator flexibility)
+- Q: Iceberg/Polaris relationship to orchestration layer - agnostic, include hooks, or defer? → A: Option A - Orchestration layer is Iceberg-agnostic (clean separation; dbt adapters handle storage format, floe-iceberg handles Polaris registration)
