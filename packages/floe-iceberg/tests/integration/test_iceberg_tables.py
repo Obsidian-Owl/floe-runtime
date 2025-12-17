@@ -1,6 +1,800 @@
 """Integration tests for Iceberg table operations.
 
-TODO: Implement tests per US3
+These tests require a running Polaris + MinIO stack. Use Docker Compose to start:
+
+    cd testing/docker
+    docker compose --profile storage up -d
+
+Run tests with:
+
+    pytest -m integration packages/floe-iceberg/tests/integration/
+
+Environment variables:
+    POLARIS_URI: Polaris REST API URL (default: http://localhost:8181/api/catalog)
+    POLARIS_WAREHOUSE: Warehouse name (default: warehouse)
+    POLARIS_CLIENT_ID: OAuth2 client ID (default: root)
+    POLARIS_CLIENT_SECRET: OAuth2 client secret (default: s3cr3t)
 """
 
 from __future__ import annotations
+
+import os
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING, Generator
+
+import pandas as pd
+import pyarrow as pa
+import pytest
+
+from floe_iceberg import (
+    IcebergTableManager,
+    PartitionTransform,
+    PartitionTransformType,
+    SchemaEvolutionError,
+    TableExistsError,
+    TableNotFoundError,
+)
+from floe_polaris import (
+    NamespaceNotFoundError,
+    PolarisCatalog,
+    PolarisCatalogConfig,
+    create_catalog,
+)
+
+if TYPE_CHECKING:
+    from floe_iceberg.config import SnapshotInfo
+
+
+# =============================================================================
+# Test Configuration
+# =============================================================================
+
+
+def get_test_config() -> PolarisCatalogConfig:
+    """Get Polaris configuration from environment or defaults."""
+    return PolarisCatalogConfig(
+        uri=os.environ.get("POLARIS_URI", "http://localhost:8181/api/catalog"),
+        warehouse=os.environ.get("POLARIS_WAREHOUSE", "warehouse"),
+        client_id=os.environ.get("POLARIS_CLIENT_ID", "root"),
+        client_secret=os.environ.get("POLARIS_CLIENT_SECRET", "s3cr3t"),
+    )
+
+
+def is_polaris_available() -> bool:
+    """Check if Polaris is available for testing."""
+    import socket
+
+    try:
+        with socket.create_connection(("localhost", 8181), timeout=2):
+            return True
+    except (OSError, ConnectionRefusedError):
+        return False
+
+
+# Skip all tests if Polaris is not available
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        not is_polaris_available(),
+        reason="Polaris server not available at localhost:8181",
+    ),
+]
+
+
+# =============================================================================
+# Fixtures
+# =============================================================================
+
+
+@pytest.fixture(scope="module")
+def catalog() -> Generator[PolarisCatalog, None, None]:
+    """Provide connected catalog instance for the module."""
+    config = get_test_config()
+    cat = create_catalog(config)
+    yield cat
+
+
+@pytest.fixture(scope="module")
+def table_manager(catalog: PolarisCatalog) -> IcebergTableManager:
+    """Provide IcebergTableManager instance."""
+    return IcebergTableManager(catalog)
+
+
+@pytest.fixture(scope="module")
+def test_namespace(catalog: PolarisCatalog) -> Generator[str, None, None]:
+    """Provide a unique test namespace for the module."""
+    ns_name = f"iceberg_test_{uuid.uuid4().hex[:8]}"
+
+    # Create namespace
+    catalog.create_namespace(ns_name)
+
+    yield ns_name
+
+    # Cleanup: Drop all tables and namespace
+    try:
+        tables = catalog.list_tables(ns_name)
+        for table in tables:
+            # Tables will be cleaned up by individual test cleanup
+            pass
+        catalog.drop_namespace(ns_name)
+    except Exception:
+        pass
+
+
+@pytest.fixture
+def test_table_name(test_namespace: str) -> Generator[str, None, None]:
+    """Provide a unique fully-qualified table name."""
+    table_name = f"{test_namespace}.test_table_{uuid.uuid4().hex[:8]}"
+    yield table_name
+
+
+@pytest.fixture
+def sample_schema() -> pa.Schema:
+    """Provide a sample PyArrow schema."""
+    return pa.schema([
+        pa.field("id", pa.int64()),
+        pa.field("name", pa.string()),
+        pa.field("amount", pa.float64()),
+        pa.field("created_at", pa.timestamp("us", tz="UTC")),
+    ])
+
+
+@pytest.fixture
+def sample_data() -> pa.Table:
+    """Provide sample data as PyArrow Table."""
+    return pa.Table.from_pydict({
+        "id": [1, 2, 3],
+        "name": ["Alice", "Bob", "Charlie"],
+        "amount": [100.0, 200.5, 300.75],
+        "created_at": [
+            datetime(2024, 1, 1, tzinfo=timezone.utc),
+            datetime(2024, 1, 2, tzinfo=timezone.utc),
+            datetime(2024, 1, 3, tzinfo=timezone.utc),
+        ],
+    })
+
+
+@pytest.fixture
+def sample_dataframe() -> pd.DataFrame:
+    """Provide sample data as Pandas DataFrame."""
+    return pd.DataFrame({
+        "id": [4, 5, 6],
+        "name": ["Dave", "Eve", "Frank"],
+        "amount": [400.0, 500.5, 600.75],
+        "created_at": pd.to_datetime([
+            "2024-01-04",
+            "2024-01-05",
+            "2024-01-06",
+        ]).tz_localize("UTC"),
+    })
+
+
+# =============================================================================
+# Table Creation Tests (US3)
+# =============================================================================
+
+
+class TestTableCreation:
+    """Tests for Iceberg table creation."""
+
+    def test_create_table_with_arrow_schema(
+        self,
+        table_manager: IcebergTableManager,
+        test_table_name: str,
+        sample_schema: pa.Schema,
+    ) -> None:
+        """Test creating a table with PyArrow schema."""
+        try:
+            table = table_manager.create_table(test_table_name, sample_schema)
+
+            assert table is not None
+            assert table_manager.table_exists(test_table_name)
+        finally:
+            try:
+                table_manager.drop_table(test_table_name)
+            except TableNotFoundError:
+                pass
+
+    def test_create_table_with_properties(
+        self,
+        table_manager: IcebergTableManager,
+        test_table_name: str,
+        sample_schema: pa.Schema,
+    ) -> None:
+        """Test creating a table with custom properties."""
+        properties = {
+            "owner": "test_team",
+            "description": "Test table",
+        }
+
+        try:
+            table = table_manager.create_table(
+                test_table_name,
+                sample_schema,
+                properties=properties,
+            )
+
+            assert table is not None
+            # Properties should be set on the table
+        finally:
+            try:
+                table_manager.drop_table(test_table_name)
+            except TableNotFoundError:
+                pass
+
+    def test_create_partitioned_table(
+        self,
+        table_manager: IcebergTableManager,
+        test_table_name: str,
+        sample_schema: pa.Schema,
+    ) -> None:
+        """Test creating a partitioned table."""
+        partition_spec = [
+            PartitionTransform(
+                source_column="created_at",
+                transform_type=PartitionTransformType.DAY,
+            ),
+        ]
+
+        try:
+            table = table_manager.create_table(
+                test_table_name,
+                sample_schema,
+                partition_spec=partition_spec,
+            )
+
+            assert table is not None
+            # Verify partition spec
+            spec = table.spec()
+            assert len(spec.fields) == 1
+        finally:
+            try:
+                table_manager.drop_table(test_table_name)
+            except TableNotFoundError:
+                pass
+
+    def test_create_table_already_exists(
+        self,
+        table_manager: IcebergTableManager,
+        test_table_name: str,
+        sample_schema: pa.Schema,
+    ) -> None:
+        """Test that creating an existing table raises error."""
+        try:
+            table_manager.create_table(test_table_name, sample_schema)
+
+            with pytest.raises(TableExistsError):
+                table_manager.create_table(test_table_name, sample_schema)
+        finally:
+            try:
+                table_manager.drop_table(test_table_name)
+            except TableNotFoundError:
+                pass
+
+    def test_create_table_if_not_exists(
+        self,
+        table_manager: IcebergTableManager,
+        test_table_name: str,
+        sample_schema: pa.Schema,
+    ) -> None:
+        """Test idempotent table creation."""
+        try:
+            # First creation
+            table1 = table_manager.create_table_if_not_exists(
+                test_table_name,
+                sample_schema,
+            )
+            assert table1 is not None
+
+            # Second creation should not raise
+            table2 = table_manager.create_table_if_not_exists(
+                test_table_name,
+                sample_schema,
+            )
+            assert table2 is not None
+        finally:
+            try:
+                table_manager.drop_table(test_table_name)
+            except TableNotFoundError:
+                pass
+
+    def test_create_table_namespace_not_found(
+        self,
+        table_manager: IcebergTableManager,
+        sample_schema: pa.Schema,
+    ) -> None:
+        """Test creating table in non-existent namespace."""
+        with pytest.raises(NamespaceNotFoundError):
+            table_manager.create_table(
+                "nonexistent_ns_12345.test_table",
+                sample_schema,
+            )
+
+
+# =============================================================================
+# Table Operations Tests
+# =============================================================================
+
+
+class TestTableOperations:
+    """Tests for table load, drop, and list operations."""
+
+    def test_load_table(
+        self,
+        table_manager: IcebergTableManager,
+        test_table_name: str,
+        sample_schema: pa.Schema,
+    ) -> None:
+        """Test loading an existing table."""
+        try:
+            table_manager.create_table(test_table_name, sample_schema)
+
+            table = table_manager.load_table(test_table_name)
+
+            assert table is not None
+            assert len(table.schema().fields) == len(sample_schema)
+        finally:
+            try:
+                table_manager.drop_table(test_table_name)
+            except TableNotFoundError:
+                pass
+
+    def test_load_table_not_found(
+        self,
+        table_manager: IcebergTableManager,
+        test_namespace: str,
+    ) -> None:
+        """Test loading non-existent table raises error."""
+        with pytest.raises(TableNotFoundError):
+            table_manager.load_table(f"{test_namespace}.nonexistent_table_12345")
+
+    def test_drop_table(
+        self,
+        table_manager: IcebergTableManager,
+        test_table_name: str,
+        sample_schema: pa.Schema,
+    ) -> None:
+        """Test dropping a table."""
+        table_manager.create_table(test_table_name, sample_schema)
+
+        table_manager.drop_table(test_table_name)
+
+        assert not table_manager.table_exists(test_table_name)
+
+    def test_drop_table_not_found(
+        self,
+        table_manager: IcebergTableManager,
+        test_namespace: str,
+    ) -> None:
+        """Test dropping non-existent table raises error."""
+        with pytest.raises(TableNotFoundError):
+            table_manager.drop_table(f"{test_namespace}.nonexistent_table_12345")
+
+    def test_table_exists(
+        self,
+        table_manager: IcebergTableManager,
+        test_table_name: str,
+        sample_schema: pa.Schema,
+    ) -> None:
+        """Test table_exists check."""
+        assert not table_manager.table_exists(test_table_name)
+
+        try:
+            table_manager.create_table(test_table_name, sample_schema)
+
+            assert table_manager.table_exists(test_table_name)
+        finally:
+            try:
+                table_manager.drop_table(test_table_name)
+            except TableNotFoundError:
+                pass
+
+    def test_list_tables(
+        self,
+        table_manager: IcebergTableManager,
+        test_namespace: str,
+        sample_schema: pa.Schema,
+    ) -> None:
+        """Test listing tables in namespace."""
+        table1 = f"{test_namespace}.list_test_1_{uuid.uuid4().hex[:8]}"
+        table2 = f"{test_namespace}.list_test_2_{uuid.uuid4().hex[:8]}"
+
+        try:
+            table_manager.create_table(table1, sample_schema)
+            table_manager.create_table(table2, sample_schema)
+
+            tables = table_manager.list_tables(test_namespace)
+
+            # Should contain our two tables (and possibly others)
+            table_names = [t.split(".")[-1] for t in [table1, table2]]
+            for name in table_names:
+                assert name in tables
+        finally:
+            for t in [table1, table2]:
+                try:
+                    table_manager.drop_table(t)
+                except TableNotFoundError:
+                    pass
+
+
+# =============================================================================
+# Data Operations Tests
+# =============================================================================
+
+
+class TestDataOperations:
+    """Tests for append, overwrite, and scan operations."""
+
+    def test_append_arrow_table(
+        self,
+        table_manager: IcebergTableManager,
+        test_table_name: str,
+        sample_schema: pa.Schema,
+        sample_data: pa.Table,
+    ) -> None:
+        """Test appending PyArrow Table data."""
+        try:
+            table_manager.create_table(test_table_name, sample_schema)
+
+            snapshot = table_manager.append(test_table_name, sample_data)
+
+            assert snapshot is not None
+            assert snapshot.snapshot_id > 0
+            assert snapshot.operation == "append"
+
+            # Verify data was written
+            result = table_manager.scan(test_table_name)
+            assert result.num_rows == sample_data.num_rows
+        finally:
+            try:
+                table_manager.drop_table(test_table_name)
+            except TableNotFoundError:
+                pass
+
+    def test_append_dataframe(
+        self,
+        table_manager: IcebergTableManager,
+        test_table_name: str,
+        sample_schema: pa.Schema,
+        sample_dataframe: pd.DataFrame,
+    ) -> None:
+        """Test appending Pandas DataFrame."""
+        try:
+            table_manager.create_table(test_table_name, sample_schema)
+
+            snapshot = table_manager.append(test_table_name, sample_dataframe)
+
+            assert snapshot is not None
+
+            # Verify data was written
+            result = table_manager.scan(test_table_name)
+            assert result.num_rows == len(sample_dataframe)
+        finally:
+            try:
+                table_manager.drop_table(test_table_name)
+            except TableNotFoundError:
+                pass
+
+    def test_append_multiple_batches(
+        self,
+        table_manager: IcebergTableManager,
+        test_table_name: str,
+        sample_schema: pa.Schema,
+        sample_data: pa.Table,
+    ) -> None:
+        """Test multiple append operations."""
+        try:
+            table_manager.create_table(test_table_name, sample_schema)
+
+            # First append
+            table_manager.append(test_table_name, sample_data)
+            # Second append
+            table_manager.append(test_table_name, sample_data)
+
+            # Verify total rows
+            result = table_manager.scan(test_table_name)
+            assert result.num_rows == sample_data.num_rows * 2
+        finally:
+            try:
+                table_manager.drop_table(test_table_name)
+            except TableNotFoundError:
+                pass
+
+    def test_overwrite_data(
+        self,
+        table_manager: IcebergTableManager,
+        test_table_name: str,
+        sample_schema: pa.Schema,
+        sample_data: pa.Table,
+    ) -> None:
+        """Test overwrite operation replaces all data."""
+        try:
+            table_manager.create_table(test_table_name, sample_schema)
+
+            # Initial append
+            table_manager.append(test_table_name, sample_data)
+
+            # Create smaller replacement data
+            replacement = pa.Table.from_pydict({
+                "id": [100],
+                "name": ["Replacement"],
+                "amount": [999.99],
+                "created_at": [datetime(2024, 12, 31, tzinfo=timezone.utc)],
+            })
+
+            # Overwrite
+            snapshot = table_manager.overwrite(test_table_name, replacement)
+
+            assert snapshot.operation == "overwrite"
+
+            # Verify only replacement data exists
+            result = table_manager.scan(test_table_name)
+            assert result.num_rows == 1
+        finally:
+            try:
+                table_manager.drop_table(test_table_name)
+            except TableNotFoundError:
+                pass
+
+    def test_scan_all_data(
+        self,
+        table_manager: IcebergTableManager,
+        test_table_name: str,
+        sample_schema: pa.Schema,
+        sample_data: pa.Table,
+    ) -> None:
+        """Test scanning all table data."""
+        try:
+            table_manager.create_table(test_table_name, sample_schema)
+            table_manager.append(test_table_name, sample_data)
+
+            result = table_manager.scan(test_table_name)
+
+            assert result.num_rows == sample_data.num_rows
+            assert result.num_columns == sample_data.num_columns
+        finally:
+            try:
+                table_manager.drop_table(test_table_name)
+            except TableNotFoundError:
+                pass
+
+    def test_scan_select_columns(
+        self,
+        table_manager: IcebergTableManager,
+        test_table_name: str,
+        sample_schema: pa.Schema,
+        sample_data: pa.Table,
+    ) -> None:
+        """Test column projection in scan."""
+        try:
+            table_manager.create_table(test_table_name, sample_schema)
+            table_manager.append(test_table_name, sample_data)
+
+            result = table_manager.scan(
+                test_table_name,
+                columns=["id", "name"],
+            )
+
+            assert result.num_rows == sample_data.num_rows
+            assert result.num_columns == 2
+            assert "id" in result.column_names
+            assert "name" in result.column_names
+        finally:
+            try:
+                table_manager.drop_table(test_table_name)
+            except TableNotFoundError:
+                pass
+
+    def test_scan_with_limit(
+        self,
+        table_manager: IcebergTableManager,
+        test_table_name: str,
+        sample_schema: pa.Schema,
+        sample_data: pa.Table,
+    ) -> None:
+        """Test scan with row limit."""
+        try:
+            table_manager.create_table(test_table_name, sample_schema)
+            table_manager.append(test_table_name, sample_data)
+
+            result = table_manager.scan(test_table_name, limit=1)
+
+            assert result.num_rows == 1
+        finally:
+            try:
+                table_manager.drop_table(test_table_name)
+            except TableNotFoundError:
+                pass
+
+
+# =============================================================================
+# Snapshot Tests
+# =============================================================================
+
+
+class TestSnapshotOperations:
+    """Tests for snapshot management."""
+
+    def test_list_snapshots(
+        self,
+        table_manager: IcebergTableManager,
+        test_table_name: str,
+        sample_schema: pa.Schema,
+        sample_data: pa.Table,
+    ) -> None:
+        """Test listing table snapshots."""
+        try:
+            table_manager.create_table(test_table_name, sample_schema)
+            table_manager.append(test_table_name, sample_data)
+            table_manager.append(test_table_name, sample_data)
+
+            snapshots = table_manager.list_snapshots(test_table_name)
+
+            # Should have at least 2 snapshots from appends
+            assert len(snapshots) >= 2
+            # Newest first
+            assert snapshots[0].timestamp_ms >= snapshots[1].timestamp_ms
+        finally:
+            try:
+                table_manager.drop_table(test_table_name)
+            except TableNotFoundError:
+                pass
+
+    def test_get_current_snapshot(
+        self,
+        table_manager: IcebergTableManager,
+        test_table_name: str,
+        sample_schema: pa.Schema,
+        sample_data: pa.Table,
+    ) -> None:
+        """Test getting current snapshot."""
+        try:
+            table_manager.create_table(test_table_name, sample_schema)
+            append_result = table_manager.append(test_table_name, sample_data)
+
+            current = table_manager.get_current_snapshot(test_table_name)
+
+            assert current is not None
+            assert current.snapshot_id == append_result.snapshot_id
+        finally:
+            try:
+                table_manager.drop_table(test_table_name)
+            except TableNotFoundError:
+                pass
+
+    def test_time_travel_scan(
+        self,
+        table_manager: IcebergTableManager,
+        test_table_name: str,
+        sample_schema: pa.Schema,
+        sample_data: pa.Table,
+    ) -> None:
+        """Test time travel by scanning specific snapshot."""
+        try:
+            table_manager.create_table(test_table_name, sample_schema)
+
+            # First append
+            first_snapshot = table_manager.append(test_table_name, sample_data)
+
+            # Second append with more data
+            more_data = pa.Table.from_pydict({
+                "id": [100, 101],
+                "name": ["Extra1", "Extra2"],
+                "amount": [1000.0, 1001.0],
+                "created_at": [
+                    datetime(2024, 12, 1, tzinfo=timezone.utc),
+                    datetime(2024, 12, 2, tzinfo=timezone.utc),
+                ],
+            })
+            table_manager.append(test_table_name, more_data)
+
+            # Scan current state (should have all rows)
+            current_data = table_manager.scan(test_table_name)
+            assert current_data.num_rows == sample_data.num_rows + more_data.num_rows
+
+            # Time travel to first snapshot (should have only original rows)
+            historical_data = table_manager.scan(
+                test_table_name,
+                snapshot_id=first_snapshot.snapshot_id,
+            )
+            assert historical_data.num_rows == sample_data.num_rows
+        finally:
+            try:
+                table_manager.drop_table(test_table_name)
+            except TableNotFoundError:
+                pass
+
+
+# =============================================================================
+# Schema Evolution Tests
+# =============================================================================
+
+
+class TestSchemaEvolution:
+    """Tests for automatic schema evolution."""
+
+    def test_append_with_new_columns(
+        self,
+        table_manager: IcebergTableManager,
+        test_table_name: str,
+        sample_schema: pa.Schema,
+        sample_data: pa.Table,
+    ) -> None:
+        """Test that new columns are added automatically."""
+        try:
+            table_manager.create_table(test_table_name, sample_schema)
+            table_manager.append(test_table_name, sample_data)
+
+            # Add data with new column
+            extended_data = pa.Table.from_pydict({
+                "id": [10],
+                "name": ["New"],
+                "amount": [10.0],
+                "created_at": [datetime(2024, 6, 1, tzinfo=timezone.utc)],
+                "new_column": ["new_value"],  # New column!
+            })
+
+            # Should evolve schema automatically
+            table_manager.append(test_table_name, extended_data, evolve_schema=True)
+
+            # Verify new column exists
+            result = table_manager.scan(test_table_name)
+            assert "new_column" in result.column_names
+        finally:
+            try:
+                table_manager.drop_table(test_table_name)
+            except TableNotFoundError:
+                pass
+
+
+# =============================================================================
+# Integration Scenarios
+# =============================================================================
+
+
+class TestIntegrationScenarios:
+    """End-to-end integration scenarios."""
+
+    def test_full_table_lifecycle(
+        self,
+        table_manager: IcebergTableManager,
+        test_namespace: str,
+    ) -> None:
+        """Test complete table lifecycle: create, write, read, drop."""
+        table_name = f"{test_namespace}.lifecycle_test_{uuid.uuid4().hex[:8]}"
+
+        schema = pa.schema([
+            pa.field("id", pa.int64()),
+            pa.field("value", pa.string()),
+        ])
+
+        try:
+            # Create
+            table_manager.create_table(table_name, schema)
+            assert table_manager.table_exists(table_name)
+
+            # Write
+            data = pa.Table.from_pydict({"id": [1, 2, 3], "value": ["a", "b", "c"]})
+            snapshot = table_manager.append(table_name, data)
+            assert snapshot.snapshot_id > 0
+
+            # Read
+            result = table_manager.scan(table_name)
+            assert result.num_rows == 3
+
+            # Overwrite
+            new_data = pa.Table.from_pydict({"id": [100], "value": ["replaced"]})
+            table_manager.overwrite(table_name, new_data)
+            result = table_manager.scan(table_name)
+            assert result.num_rows == 1
+
+            # Drop
+            table_manager.drop_table(table_name)
+            assert not table_manager.table_exists(table_name)
+
+        finally:
+            try:
+                table_manager.drop_table(table_name)
+            except TableNotFoundError:
+                pass

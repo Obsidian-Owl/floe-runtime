@@ -1,0 +1,318 @@
+# floe-runtime E2E Test Infrastructure
+# Docker Compose configuration for local integration testing
+#
+# Usage:
+#   docker compose up -d                    # Start base services
+#   docker compose --profile storage up -d  # Include Polaris + MinIO
+#   docker compose --profile compute up -d  # Include Spark + Trino
+#   docker compose --profile full up -d     # All services including Cube
+#
+# Services:
+#   Base:     PostgreSQL, Jaeger
+#   Storage:  MinIO (S3), Polaris (Iceberg catalog)
+#   Compute:  Trino, Spark
+#   Full:     Cube (semantic layer), Marquez (lineage)
+
+networks:
+  floe-network:
+    driver: bridge
+    name: floe-network
+
+volumes:
+  postgres-data:
+    name: floe-postgres-data
+  minio-data:
+    name: floe-minio-data
+
+services:
+  # ==============================================================================
+  # BASE INFRASTRUCTURE (always started)
+  # ==============================================================================
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: floe-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - floe-network
+    restart: unless-stopped
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62
+    container_name: floe-jaeger
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+      - "6831:6831/udp"  # Thrift compact (legacy)
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:16686"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - floe-network
+    restart: unless-stopped
+
+  # ==============================================================================
+  # STORAGE PROFILE (--profile storage)
+  # ==============================================================================
+
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: floe-minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Console UI
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_REGION: ${AWS_REGION:-us-east-1}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - floe-network
+    restart: unless-stopped
+    profiles:
+      - storage
+      - compute
+      - full
+
+  # Create MinIO buckets on startup
+  minio-init:
+    image: quay.io/minio/mc:latest
+    container_name: floe-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for MinIO...';
+      sleep 3;
+      /usr/bin/mc alias set myminio http://minio:9000 $${MINIO_ROOT_USER:-minioadmin} $${MINIO_ROOT_PASSWORD:-minioadmin};
+      /usr/bin/mc mb myminio/warehouse --ignore-existing;
+      /usr/bin/mc mb myminio/iceberg --ignore-existing;
+      /usr/bin/mc mb myminio/cube-preaggs --ignore-existing;
+      /usr/bin/mc mb myminio/dbt-artifacts --ignore-existing;
+      echo 'Buckets created successfully';
+      exit 0;
+      "
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    networks:
+      - floe-network
+    profiles:
+      - storage
+      - compute
+      - full
+
+  polaris:
+    image: apache/polaris:latest
+    container_name: floe-polaris
+    ports:
+      - "8181:8181"   # REST API
+      - "8182:8182"   # Admin
+    environment:
+      # Bootstrap credentials (realm,client_id,secret)
+      POLARIS_BOOTSTRAP_CREDENTIALS: ${POLARIS_BOOTSTRAP_CREDENTIALS:-default-realm,root,s3cr3t}
+      # PostgreSQL connection
+      QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://postgres:5432/polaris
+      QUARKUS_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      QUARKUS_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      # S3/MinIO credentials for storage
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/api/catalog/v1/config"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
+    networks:
+      - floe-network
+    restart: unless-stopped
+    profiles:
+      - storage
+      - compute
+      - full
+
+  # ==============================================================================
+  # COMPUTE PROFILE (--profile compute)
+  # ==============================================================================
+
+  trino:
+    image: trinodb/trino:443
+    container_name: floe-trino
+    ports:
+      - "8080:8080"   # HTTP API / UI
+    environment:
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+    volumes:
+      - ./trino-config/catalog:/etc/trino/catalog:ro
+    depends_on:
+      polaris:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "trino", "--execute", "SELECT 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - floe-network
+    restart: unless-stopped
+    profiles:
+      - compute
+      - full
+
+  spark-iceberg:
+    image: tabulario/spark-iceberg:3.5.1_1.5.2
+    container_name: floe-spark
+    ports:
+      - "8888:8888"   # Jupyter Notebook
+      - "10000:10000" # Spark Thrift Server
+      - "4040:4040"   # Spark UI (when running)
+    environment:
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+    volumes:
+      - ./spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
+    depends_on:
+      polaris:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - floe-network
+    restart: unless-stopped
+    profiles:
+      - compute
+      - full
+
+  # ==============================================================================
+  # FULL PROFILE (--profile full)
+  # ==============================================================================
+
+  marquez:
+    image: marquezproject/marquez:0.49.0
+    container_name: floe-marquez
+    ports:
+      - "5000:5000"   # API (OpenLineage endpoint)
+      - "5001:5001"   # Admin
+    environment:
+      MARQUEZ_PORT: "5000"
+      MARQUEZ_ADMIN_PORT: "5001"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: marquez
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - floe-network
+    restart: unless-stopped
+    profiles:
+      - full
+
+  marquez-web:
+    image: marquezproject/marquez-web:0.49.0
+    container_name: floe-marquez-web
+    ports:
+      - "3001:3000"   # Web UI
+    environment:
+      MARQUEZ_HOST: marquez
+      MARQUEZ_PORT: "5000"
+    depends_on:
+      marquez:
+        condition: service_healthy
+    networks:
+      - floe-network
+    restart: unless-stopped
+    profiles:
+      - full
+
+  cube:
+    image: cubejs/cube:v0.36
+    container_name: floe-cube
+    ports:
+      - "4000:4000"   # REST API / GraphQL
+      - "15432:15432" # SQL API (Postgres wire protocol)
+    environment:
+      # Connect to Trino for Iceberg queries
+      CUBEJS_DB_TYPE: trino
+      CUBEJS_DB_HOST: trino
+      CUBEJS_DB_PORT: "8080"
+      CUBEJS_DB_CATALOG: iceberg
+      CUBEJS_DB_SCHEMA: default
+      # API configuration
+      CUBEJS_API_SECRET: ${CUBEJS_API_SECRET:-floe-cube-secret}
+      CUBEJS_DEV_MODE: "true"
+      CUBEJS_EXTERNAL_DEFAULT: "true"
+      # Telemetry
+      CUBEJS_TELEMETRY: "false"
+      # Pre-aggregation storage (optional S3)
+      CUBEJS_DB_EXPORT_BUCKET_TYPE: s3
+      CUBEJS_DB_EXPORT_BUCKET: s3://cube-preaggs
+      CUBEJS_DB_EXPORT_BUCKET_AWS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      CUBEJS_DB_EXPORT_BUCKET_AWS_REGION: ${AWS_REGION:-us-east-1}
+    volumes:
+      - ./cube-schema:/cube/conf/schema:ro
+    depends_on:
+      trino:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - floe-network
+    restart: unless-stopped
+    profiles:
+      - full
