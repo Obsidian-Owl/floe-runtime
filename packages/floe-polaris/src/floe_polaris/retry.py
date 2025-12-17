@@ -179,7 +179,7 @@ def create_retry_decorator(
                 if circuit_breaker is not None:
                     circuit_breaker.record_failure()
                 if last_exception is not None:
-                    raise last_exception
+                    raise last_exception from None
                 raise
 
             # Should not reach here, but satisfy type checker
@@ -204,7 +204,7 @@ def _calculate_wait_time(config: RetryConfig, attempt: int) -> float:
     """
     base_wait = config.initial_wait_seconds * (2 ** (attempt - 1))
     jitter = random.uniform(0, config.jitter_seconds)  # noqa: S311
-    return min(base_wait + jitter, config.max_wait_seconds)
+    return float(min(base_wait + jitter, config.max_wait_seconds))
 
 
 def with_retry(

@@ -133,7 +133,10 @@ class PartitionTransform(BaseModel):
 
     Example:
         >>> # Partition by day
-        >>> pt = PartitionTransform(source_column="created_at", transform_type=PartitionTransformType.DAY)
+        >>> pt = PartitionTransform(
+        ...     source_column="created_at",
+        ...     transform_type=PartitionTransformType.DAY
+        ... )
 
         >>> # Bucket partitioning
         >>> pt = PartitionTransform(

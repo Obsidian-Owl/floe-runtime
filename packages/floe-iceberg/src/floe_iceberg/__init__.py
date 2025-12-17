@@ -43,6 +43,8 @@ __all__ = [
     "IcebergIOManager",
     # Table manager
     "IcebergTableManager",
+    # Partition spec builder
+    "build_partition_spec",
     # Configuration models
     "IcebergIOManagerConfig",
     "WriteMode",
@@ -79,6 +81,10 @@ def __getattr__(name: str) -> object:
         from floe_iceberg.tables import IcebergTableManager
 
         return IcebergTableManager
+    if name == "build_partition_spec":
+        from floe_iceberg.tables import build_partition_spec
+
+        return build_partition_spec
     if name in (
         "IcebergIOManagerConfig",
         "WriteMode",
