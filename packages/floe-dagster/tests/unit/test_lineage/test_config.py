@@ -22,7 +22,7 @@ class TestOpenLineageConfig:
         assert config.namespace == "floe"
         assert config.producer == "floe-dagster"
         assert config.async_transport is True
-        assert config.timeout == 5.0
+        assert config.timeout == pytest.approx(5.0)
 
     def test_create_with_endpoint(self) -> None:
         """Test creating config with OpenLineage endpoint."""
@@ -50,7 +50,7 @@ class TestOpenLineageConfig:
         assert config.namespace == "production"
         assert config.producer == "my-pipeline"
         assert config.async_transport is False
-        assert config.timeout == 10.0
+        assert config.timeout == pytest.approx(10.0)
 
     def test_enabled_property_when_endpoint_set(self) -> None:
         """Test enabled property returns True when endpoint is set."""

@@ -199,7 +199,7 @@ class TestAssetMaterializationResult:
         )
 
         assert result.status == "success"
-        assert result.execution_time == 1.5
+        assert result.execution_time == pytest.approx(1.5)
         assert result.rows_affected == 1000
         assert result.error_message is None
 

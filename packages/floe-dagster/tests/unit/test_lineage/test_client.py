@@ -30,7 +30,7 @@ class TestOpenLineageEmitter:
         """Create disabled OpenLineageConfig."""
         from floe_dagster.lineage.config import OpenLineageConfig
 
-        return OpenLineageConfig()  # endpoint=None
+        return OpenLineageConfig()
 
     def test_create_emitter_with_config(self, mock_config: Any) -> None:
         """Test creating emitter with valid config."""
@@ -296,12 +296,10 @@ class TestOpenLineageEmitter:
 
         emitter = OpenLineageEmitter(mock_config)
 
-        with (
-            patch.object(emitter, "_send_event") as mock_send,
-            pytest.raises(ValueError),
-        ):
-            with emitter.run_context("test_model", inputs=[], outputs=[]):
-                raise ValueError("Something went wrong")
+        with patch.object(emitter, "_send_event") as mock_send:
+            with pytest.raises(ValueError):
+                with emitter.run_context("test_model", inputs=[], outputs=[]):
+                    raise ValueError("Something went wrong")
 
             # FAIL should be emitted on exception
             assert mock_send.call_count == 2

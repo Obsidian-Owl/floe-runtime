@@ -30,7 +30,7 @@ class TestTracingManager:
         """Create disabled TracingConfig."""
         from floe_dagster.observability.config import TracingConfig
 
-        return TracingConfig()  # endpoint=None
+        return TracingConfig()
 
     def test_create_manager_with_config(self, mock_config: Any) -> None:
         """Test creating manager with valid config."""
