@@ -17,6 +17,9 @@ import pytest
 # In tests, we'll use dicts that match the expected structure
 CompiledArtifactsDict = dict[str, Any]
 
+# Constants for test fixtures to avoid duplication
+PROFILES_DIR = ".floe/profiles"
+
 
 @pytest.fixture
 def base_metadata() -> dict[str, Any]:
@@ -141,14 +144,14 @@ def minimal_compiled_artifacts(
         "version": "1.0.0",
         "metadata": base_metadata,
         "compute": duckdb_compute_config,
-        "transforms": [{"type": "dbt", "project_dir": ".", "profiles_dir": ".floe/profiles"}],
+        "transforms": [{"type": "dbt", "project_dir": ".", "profiles_dir": PROFILES_DIR}],
         "consumption": {"enabled": False},
         "governance": {"enabled": False},
         "observability": {"traces": {"enabled": False}, "lineage": {"enabled": False}},
         "catalog": None,
         "dbt_manifest_path": None,
         "dbt_project_path": ".",
-        "dbt_profiles_path": ".floe/profiles",
+        "dbt_profiles_path": PROFILES_DIR,
         "lineage_namespace": None,
         "environment_context": None,
         "column_classifications": None,
@@ -165,14 +168,14 @@ def snowflake_compiled_artifacts(
         "version": "1.0.0",
         "metadata": base_metadata,
         "compute": snowflake_compute_config,
-        "transforms": [{"type": "dbt", "project_dir": ".", "profiles_dir": ".floe/profiles"}],
+        "transforms": [{"type": "dbt", "project_dir": ".", "profiles_dir": PROFILES_DIR}],
         "consumption": {"enabled": False},
         "governance": {"enabled": False},
         "observability": {"traces": {"enabled": False}, "lineage": {"enabled": False}},
         "catalog": None,
         "dbt_manifest_path": None,
         "dbt_project_path": ".",
-        "dbt_profiles_path": ".floe/profiles",
+        "dbt_profiles_path": PROFILES_DIR,
         "lineage_namespace": None,
         "environment_context": None,
         "column_classifications": None,
@@ -182,7 +185,7 @@ def snowflake_compiled_artifacts(
 def make_compiled_artifacts(
     compute_config: dict[str, Any],
     metadata: dict[str, Any] | None = None,
-    dbt_profiles_path: str = ".floe/profiles",
+    dbt_profiles_path: str = PROFILES_DIR,
 ) -> CompiledArtifactsDict:
     """Factory function to create CompiledArtifacts dicts for testing.
 

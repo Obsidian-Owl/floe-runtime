@@ -15,6 +15,11 @@ from uuid import uuid4
 
 import pytest
 
+# Constants for test fixtures to avoid duplication
+PROFILES_DIR = ".floe/profiles"
+MODEL_UNIQUE_ID = "model.my_project.customers"
+SOURCE_UNIQUE_ID = "source.my_project.raw.raw_customers"
+
 
 @pytest.fixture
 def base_metadata() -> dict[str, Any]:
@@ -49,14 +54,14 @@ def minimal_compiled_artifacts(
         "version": "1.0.0",
         "metadata": base_metadata,
         "compute": duckdb_compute_config,
-        "transforms": [{"type": "dbt", "project_dir": ".", "profiles_dir": ".floe/profiles"}],
+        "transforms": [{"type": "dbt", "project_dir": ".", "profiles_dir": PROFILES_DIR}],
         "consumption": {"enabled": False},
         "governance": {"enabled": False},
         "observability": {"traces": {"enabled": False}, "lineage": {"enabled": False}},
         "catalog": None,
         "dbt_manifest_path": "target/manifest.json",
         "dbt_project_path": ".",
-        "dbt_profiles_path": ".floe/profiles",
+        "dbt_profiles_path": PROFILES_DIR,
         "lineage_namespace": None,
         "environment_context": None,
         "column_classifications": None,
@@ -73,7 +78,7 @@ def observability_enabled_artifacts(
         "version": "1.0.0",
         "metadata": base_metadata,
         "compute": duckdb_compute_config,
-        "transforms": [{"type": "dbt", "project_dir": ".", "profiles_dir": ".floe/profiles"}],
+        "transforms": [{"type": "dbt", "project_dir": ".", "profiles_dir": PROFILES_DIR}],
         "consumption": {"enabled": False},
         "governance": {"enabled": False},
         "observability": {
@@ -89,7 +94,7 @@ def observability_enabled_artifacts(
         "catalog": None,
         "dbt_manifest_path": "target/manifest.json",
         "dbt_project_path": ".",
-        "dbt_profiles_path": ".floe/profiles",
+        "dbt_profiles_path": PROFILES_DIR,
         "lineage_namespace": "floe.test",
         "environment_context": None,
         "column_classifications": {
@@ -105,7 +110,7 @@ def observability_enabled_artifacts(
 def sample_dbt_manifest_node() -> dict[str, Any]:
     """Sample dbt manifest node for translator testing."""
     return {
-        "unique_id": "model.my_project.customers",
+        "unique_id": MODEL_UNIQUE_ID,
         "name": "customers",
         "resource_type": "model",
         "package_name": "my_project",
@@ -143,7 +148,7 @@ def sample_dbt_manifest_node() -> dict[str, Any]:
             },
         },
         "depends_on": {
-            "nodes": ["source.my_project.raw.raw_customers"],
+            "nodes": [SOURCE_UNIQUE_ID],
         },
         "refs": [],
         "sources": [["raw", "raw_customers"]],
@@ -166,11 +171,11 @@ def sample_dbt_manifest(sample_dbt_manifest_node: dict[str, Any]) -> dict[str, A
             "generated_at": datetime.now(timezone.utc).isoformat(),
         },
         "nodes": {
-            "model.my_project.customers": sample_dbt_manifest_node,
+            MODEL_UNIQUE_ID: sample_dbt_manifest_node,
         },
         "sources": {
-            "source.my_project.raw.raw_customers": {
-                "unique_id": "source.my_project.raw.raw_customers",
+            SOURCE_UNIQUE_ID: {
+                "unique_id": SOURCE_UNIQUE_ID,
                 "name": "raw_customers",
                 "resource_type": "source",
                 "source_name": "raw",
@@ -183,10 +188,10 @@ def sample_dbt_manifest(sample_dbt_manifest_node: dict[str, Any]) -> dict[str, A
         "metrics": {},
         "exposures": {},
         "parent_map": {
-            "model.my_project.customers": ["source.my_project.raw.raw_customers"],
+            MODEL_UNIQUE_ID: [SOURCE_UNIQUE_ID],
         },
         "child_map": {
-            "source.my_project.raw.raw_customers": ["model.my_project.customers"],
+            SOURCE_UNIQUE_ID: [MODEL_UNIQUE_ID],
         },
     }
 

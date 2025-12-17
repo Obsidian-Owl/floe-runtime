@@ -298,7 +298,8 @@ class BaseCredentialProfileGeneratorTests(BaseProfileGeneratorTests):
         # Add fake credentials to properties (should be ignored)
         compute = artifacts.get("compute", {})
         properties = compute.get("properties", {})
-        properties["password"] = "secret123"
+        # NOSONAR: S2068 - Intentional fake password for security test
+        properties["password"] = "secret123"  # noqa: S105
         properties["user"] = "admin"
         compute["properties"] = properties
         artifacts["compute"] = compute

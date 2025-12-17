@@ -115,7 +115,9 @@ class TestTracingConfig:
 
         # Should be different dict instances
         assert config1.attributes is not config2.attributes
-        assert config1.attributes == config2.attributes == {}
+        # Both should be empty dicts
+        assert config1.attributes == {}
+        assert config2.attributes == {}
 
     def test_from_compiled_artifacts(self) -> None:
         """Test creating config from CompiledArtifacts dict."""
