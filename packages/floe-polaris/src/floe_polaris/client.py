@@ -536,17 +536,23 @@ class PolarisCatalog:
 
         Returns:
             List of fully qualified table names.
+
+        Raises:
+            NamespaceNotFoundError: If namespace doesn't exist.
         """
         ns_tuple = self._normalize_namespace(namespace)
         ns_str = ".".join(ns_tuple)
 
         with catalog_operation("list_tables", namespace=ns_str):
-            catalog = self._ensure_connected()
-            tables = catalog.list_tables(ns_tuple)
-            # Convert identifiers to strings
-            result = [".".join(t) if isinstance(t, tuple) else str(t) for t in tables]
-            self._logger.debug("tables_listed", namespace=ns_str, count=len(result))
-            return result
+            try:
+                catalog = self._ensure_connected()
+                tables = catalog.list_tables(ns_tuple)
+                # Convert identifiers to strings
+                result = [".".join(t) if isinstance(t, tuple) else str(t) for t in tables]
+                self._logger.debug("tables_listed", namespace=ns_str, count=len(result))
+                return result
+            except PyIcebergNamespaceNotFoundError as exc:
+                raise NamespaceNotFoundError(ns_str) from exc
 
     # ==================== Helper Methods ====================
 

@@ -75,6 +75,9 @@ filterwarnings = [
     # PyIceberg falls back to pure Python Avro decoder when Cython is not available
     # This is expected in container environments without compiled extensions
     "ignore:Falling back to pure Python Avro decoder:UserWarning",
+    # Dagster OutputContext.metadata deprecation - use definition_metadata in 2.0
+    # This is in dagster library code, not our code
+    "ignore:Property `OutputContext.metadata` is deprecated:DeprecationWarning",
 ]
 pythonpath = ["."]
 markers = [

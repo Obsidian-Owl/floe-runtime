@@ -823,10 +823,39 @@ class IcebergTableManager:
 
     @staticmethod
     def _to_arrow(data: pa.Table | pd.DataFrame) -> pa.Table:
-        """Convert data to PyArrow Table."""
+        """Convert data to PyArrow Table with Iceberg-compatible types.
+
+        Iceberg requires microsecond (us) timestamp precision, but Pandas
+        defaults to nanosecond (ns). This method handles the conversion.
+        """
         if isinstance(data, pd.DataFrame):
-            return pa.Table.from_pandas(data)
-        return data
+            table = pa.Table.from_pandas(data)
+        else:
+            table = data
+
+        # Downcast any nanosecond timestamps to microsecond for Iceberg compatibility
+        # Iceberg spec only supports microseconds, not nanoseconds
+        new_schema_fields = []
+        needs_conversion = False
+
+        for field in table.schema:
+            if pa.types.is_timestamp(field.type):
+                # Check if it's nanosecond precision
+                if field.type.unit == "ns":
+                    # Downcast to microseconds, preserving timezone
+                    new_type = pa.timestamp("us", tz=field.type.tz)
+                    new_schema_fields.append(pa.field(field.name, new_type, field.nullable))
+                    needs_conversion = True
+                else:
+                    new_schema_fields.append(field)
+            else:
+                new_schema_fields.append(field)
+
+        if needs_conversion:
+            new_schema = pa.schema(new_schema_fields)
+            table = table.cast(new_schema)
+
+        return table
 
     @staticmethod
     def _to_iceberg_schema(schema: pa.Schema | Schema) -> Schema:
