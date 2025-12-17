@@ -1,6 +1,6 @@
 """Integration tests for Dagster asset materialization with Iceberg IOManager.
 
-These tests require a running Polaris + MinIO stack. Use Docker Compose to start:
+These tests require a running Polaris + LocalStack stack. Use Docker Compose to start:
 
     cd testing/docker
     docker compose --profile storage up -d
@@ -14,6 +14,7 @@ Environment variables:
     POLARIS_WAREHOUSE: Warehouse name (default: warehouse)
     POLARIS_CLIENT_ID: OAuth2 client ID (default: root)
     POLARIS_CLIENT_SECRET: OAuth2 client secret (default: s3cr3t)
+    LOCALSTACK_ENDPOINT: LocalStack S3 endpoint (default: http://localhost:4566)
 """
 
 from __future__ import annotations
@@ -62,38 +63,75 @@ if TYPE_CHECKING:
 
 
 def get_test_config() -> PolarisCatalogConfig:
-    """Get Polaris configuration from environment or defaults."""
+    """Get Polaris configuration for TESTING ONLY.
+
+    Note: scope="PRINCIPAL_ROLE:ALL" grants maximum privileges and should
+    ONLY be used in test environments. Production deployments must use
+    narrowly-scoped principal roles following least privilege principle.
+    """
     return PolarisCatalogConfig(
         uri=os.environ.get("POLARIS_URI", "http://localhost:8181/api/catalog"),
         warehouse=os.environ.get("POLARIS_WAREHOUSE", "warehouse"),
         client_id=os.environ.get("POLARIS_CLIENT_ID", "root"),
         client_secret=os.environ.get("POLARIS_CLIENT_SECRET", "s3cr3t"),
+        # TESTING ONLY: PRINCIPAL_ROLE:ALL grants all roles - never use in production!
+        scope=os.environ.get("POLARIS_SCOPE", "PRINCIPAL_ROLE:ALL"),
     )
 
 
 def get_io_manager_config(namespace: str) -> IcebergIOManagerConfig:
-    """Get Iceberg IOManager configuration."""
+    """Get Iceberg IOManager configuration for TESTING ONLY.
+
+    Note: scope="PRINCIPAL_ROLE:ALL" grants maximum privileges and should
+    ONLY be used in test environments. Production deployments must use
+    narrowly-scoped principal roles following least privilege principle.
+
+    LocalStack provides proper STS credential vending support, but we still
+    provide static S3 credentials as a fallback for simpler test setups.
+    In production with AWS S3, vended credentials would be used instead.
+    """
     return IcebergIOManagerConfig(
         catalog_uri=os.environ.get("POLARIS_URI", "http://localhost:8181/api/catalog"),
         warehouse=os.environ.get("POLARIS_WAREHOUSE", "warehouse"),
         client_id=os.environ.get("POLARIS_CLIENT_ID", "root"),
         client_secret=os.environ.get("POLARIS_CLIENT_SECRET", "s3cr3t"),
+        # TESTING ONLY: PRINCIPAL_ROLE:ALL grants all roles - never use in production!
+        scope=os.environ.get("POLARIS_SCOPE", "PRINCIPAL_ROLE:ALL"),
         default_namespace=namespace,
         write_mode=WriteMode.APPEND,
         auto_create_tables=True,
         schema_evolution_enabled=True,
+        # LocalStack S3 credentials - static credentials for local testing
+        # In production with AWS S3, vended credentials from Polaris would be used instead
+        s3_endpoint=os.environ.get("LOCALSTACK_ENDPOINT", "http://localhost:4566"),
+        s3_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID", "test"),
+        s3_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY", "test"),
+        s3_region=os.environ.get("AWS_REGION", "us-east-1"),
     )
 
 
 def is_polaris_available() -> bool:
-    """Check if Polaris is available for testing."""
+    """Check if Polaris is available for testing.
+
+    Uses context-aware hostname detection:
+    - Inside Docker container (DOCKER_CONTAINER=1): connects to 'polaris:8181'
+    - On host machine: connects to 'localhost:8181'
+    """
     import socket
 
+    # Use internal hostname when running in Docker container
+    host = "polaris" if os.environ.get("DOCKER_CONTAINER") == "1" else "localhost"
+
     try:
-        with socket.create_connection(("localhost", 8181), timeout=2):
+        with socket.create_connection((host, 8181), timeout=2):
             return True
     except (OSError, ConnectionRefusedError):
         return False
+
+
+def get_polaris_host() -> str:
+    """Get the Polaris hostname based on execution context."""
+    return "polaris" if os.environ.get("DOCKER_CONTAINER") == "1" else "localhost"
 
 
 # Skip all tests if Polaris is not available
@@ -101,7 +139,7 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.skipif(
         not is_polaris_available(),
-        reason="Polaris server not available at localhost:8181",
+        reason=f"Polaris server not available at {get_polaris_host()}:8181",
     ),
 ]
 
@@ -151,10 +189,13 @@ def io_manager_config(test_namespace: str) -> IcebergIOManagerConfig:
 @pytest.fixture
 def io_manager(
     io_manager_config: IcebergIOManagerConfig,
-    catalog: PolarisCatalog,
 ) -> IcebergIOManager:
-    """Provide configured IOManager instance."""
-    return create_io_manager(io_manager_config, catalog=catalog.inner_catalog)
+    """Provide configured IOManager instance.
+
+    Note: We don't pass a pre-configured catalog here because the IOManager
+    needs to create its own catalog with S3 credentials for LocalStack access.
+    """
+    return create_io_manager(io_manager_config)
 
 
 # =============================================================================
@@ -324,22 +365,28 @@ class TestHandleOutput:
     def test_handle_output_overwrite_mode(
         self,
         io_manager_config: IcebergIOManagerConfig,
-        catalog: PolarisCatalog,
         table_manager: IcebergTableManager,
         test_namespace: str,
     ) -> None:
         """Test overwrite mode replaces all data."""
-        # Create IOManager with overwrite mode
+        # Create IOManager with overwrite mode - inherit all config from fixture
+        # Note: Don't pass pre-configured catalog - let IOManager create its own with S3 creds
         config = IcebergIOManagerConfig(
             catalog_uri=io_manager_config.catalog_uri,
             warehouse=io_manager_config.warehouse,
             client_id=io_manager_config.client_id,
             client_secret=io_manager_config.client_secret,
+            scope=io_manager_config.scope,  # TESTING ONLY: inherit scope from fixture
             default_namespace=test_namespace,
             write_mode=WriteMode.OVERWRITE,
             auto_create_tables=True,
+            # Inherit S3 config from fixture for LocalStack testing
+            s3_endpoint=io_manager_config.s3_endpoint,
+            s3_access_key_id=io_manager_config.s3_access_key_id,
+            s3_secret_access_key=io_manager_config.s3_secret_access_key,
+            s3_region=io_manager_config.s3_region,
         )
-        io_manager = create_io_manager(config, catalog=catalog.inner_catalog)
+        io_manager = create_io_manager(config)
 
         table_name = f"output_overwrite_{uuid.uuid4().hex[:8]}"
         asset_key = AssetKey([test_namespace, table_name])

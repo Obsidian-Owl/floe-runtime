@@ -11,7 +11,7 @@ cube(`Orders`, {
   // Query the Iceberg table via Trino
   sql: `SELECT * FROM iceberg.default.orders`,
 
-  // Pre-aggregations for performance (stored in MinIO)
+  // Pre-aggregations for performance (stored in LocalStack S3)
   preAggregations: {
     ordersByDay: {
       measures: [CUBE.count, CUBE.totalAmount],

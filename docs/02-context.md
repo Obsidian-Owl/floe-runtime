@@ -45,7 +45,7 @@ This document describes the system context—floe-runtime and its interactions w
 │  │ • DuckDB     │  │ • S3         │  │ • Jaeger     │  │ • Polaris   │        │
 │  │ • Snowflake  │  │ • GCS        │  │ • Grafana    │  │ • Hive      │        │
 │  │ • BigQuery   │  │ • Azure Blob │  │ • Marquez    │  │ • Glue      │        │
-│  │ • Postgres   │  │ • MinIO      │  │ • Datadog    │  │              │        │
+│  │ • Postgres   │  │ • LocalStack │  │ • Datadog    │  │              │        │
 │  │ • Spark      │  │ • Local FS   │  │              │  │              │        │
 │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘        │
 │                                                                                  │
@@ -184,7 +184,7 @@ Iceberg tables require object storage or filesystem.
 | Backend | Use Case | Configuration |
 |---------|----------|---------------|
 | **Local filesystem** | Development | `file:///path/to/warehouse` |
-| **MinIO** | Local S3-compatible | `s3://bucket/` with MinIO endpoint |
+| **LocalStack** | Local AWS emulation (S3+STS) | `s3://bucket/` with LocalStack endpoint |
 | **AWS S3** | Production cloud | `s3://bucket/` with AWS credentials |
 | **Google GCS** | Production cloud | `gs://bucket/` with GCP credentials |
 | **Azure Blob** | Production cloud | `abfs://container@account/` |

@@ -957,12 +957,27 @@ class IcebergTableManager:
 
     @staticmethod
     def _to_snapshot_info(snapshot: Any) -> SnapshotInfo:
-        """Convert PyIceberg Snapshot to SnapshotInfo."""
+        """Convert PyIceberg Snapshot to SnapshotInfo.
+
+        Note: In PyIceberg, the operation is nested inside snapshot.summary.operation,
+        not directly on the snapshot object.
+        """
+        # Extract operation from summary (it's a nested field)
+        operation = "unknown"
+        summary_dict: dict[str, str] = {}
+        if snapshot.summary is not None:
+            # summary.operation is an Operation enum
+            operation = snapshot.summary.operation.value if snapshot.summary.operation else "unknown"
+            # Convert Summary to dict for additional fields (exclude 'operation' which is separate)
+            summary_dict = {
+                k: str(v) for k, v in snapshot.summary.model_dump().items() if k != "operation"
+            }
+
         return SnapshotInfo(
             snapshot_id=snapshot.snapshot_id,
             timestamp_ms=snapshot.timestamp_ms,
-            operation=snapshot.operation or "unknown",
-            summary=dict(snapshot.summary) if snapshot.summary else {},
+            operation=operation,
+            summary=summary_dict,
             manifest_list=snapshot.manifest_list,
         )
 

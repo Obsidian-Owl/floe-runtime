@@ -1,0 +1,78 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Allow manual trigger
+  workflow_dispatch:
+
+# Cancel in-progress runs on the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Start Docker services
+        working-directory: testing/docker
+        run: |
+          # Start storage profile services
+          docker compose --profile storage up -d
+
+          # Wait for polaris-init to complete (generates credentials)
+          echo "Waiting for polaris-init to complete..."
+          timeout 120 sh -c 'until docker compose ps polaris-init 2>/dev/null | grep -q "exited"; do sleep 5; done' || {
+            echo "polaris-init did not complete in time"
+            docker compose logs polaris-init
+            exit 1
+          }
+
+          # Verify credentials file was generated
+          if [ ! -f config/polaris-credentials.env ]; then
+            echo "ERROR: Credentials file not generated"
+            docker compose logs polaris-init
+            exit 1
+          fi
+
+          echo "Services ready!"
+
+      - name: Build test runner
+        working-directory: testing/docker
+        run: |
+          docker compose --profile test build test-runner
+
+      - name: Run integration tests
+        working-directory: testing/docker
+        run: |
+          # Run tests inside Docker network
+          docker compose --profile test run --rm test-runner \
+            uv run pytest -m integration packages/floe-polaris/tests/ packages/floe-iceberg/tests/ -v --tb=short
+
+      - name: Show logs on failure
+        if: failure()
+        working-directory: testing/docker
+        run: |
+          echo "=== Polaris logs ==="
+          docker compose logs polaris || true
+          echo "=== Polaris-init logs ==="
+          docker compose logs polaris-init || true
+          echo "=== LocalStack logs ==="
+          docker compose logs localstack || true
+          echo "=== Test runner logs ==="
+          docker compose logs test-runner || true
+
+      - name: Cleanup
+        if: always()
+        working-directory: testing/docker
+        run: |
+          docker compose --profile storage --profile test down -v

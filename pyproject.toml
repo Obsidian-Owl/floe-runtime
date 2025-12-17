@@ -64,7 +64,18 @@ testpaths = [
     "packages/floe-cube/tests",
 ]
 addopts = "--import-mode=importlib"
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    # PyIceberg uses deprecated Pydantic patterns (model_validator with classmethod)
+    # We can't fix this upstream - it's in pyiceberg itself
+    "ignore:Using `@model_validator`:pydantic.warnings.PydanticDeprecatedSince212:pyiceberg",
+    # PyIceberg OAuth2 endpoint deprecation warning - temporary until PyIceberg 1.0
+    # See: https://github.com/apache/iceberg/issues/10537
+    "ignore:Deprecated in 0.8.0.*oauth2-server-uri:DeprecationWarning",
+    # PyIceberg falls back to pure Python Avro decoder when Cython is not available
+    # This is expected in container environments without compiled extensions
+    "ignore:Falling back to pure Python Avro decoder:UserWarning",
+]
 pythonpath = ["."]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",

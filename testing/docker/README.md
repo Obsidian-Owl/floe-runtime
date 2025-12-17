@@ -24,8 +24,8 @@ Docker Compose configuration for local integration and E2E testing of the comple
 │         ┌───────────────────┼───────────────────┐                      │
 │         │                   │                   │                       │
 │  ┌──────┴───────┐    ┌──────┴───────┐    ┌──────┴───────┐              │
-│  │  PostgreSQL  │    │    MinIO     │    │   Marquez    │  Storage &   │
-│  │ (Port 5432)  │    │ (Port 9000)  │    │ (Port 5000)  │  Lineage     │
+│  │  PostgreSQL  │    │  LocalStack  │    │   Marquez    │  Storage &   │
+│  │ (Port 5432)  │    │ (Port 4566)  │    │ (Port 5000)  │  Lineage     │
 │  └──────────────┘    └──────────────┘    └──────────────┘              │
 │                                                                         │
 │  ┌──────────────┐                                                      │
@@ -48,7 +48,7 @@ cp env.example .env
 # Start base services (PostgreSQL + Jaeger)
 docker compose up -d
 
-# Start with storage profile (adds MinIO + Polaris)
+# Start with storage profile (adds LocalStack + Polaris)
 docker compose --profile storage up -d
 
 # Start with compute profile (adds Trino + Spark)
@@ -63,7 +63,7 @@ docker compose --profile full up -d
 | Profile | Services | Use Case |
 |---------|----------|----------|
 | (none) | PostgreSQL, Jaeger | Unit tests, dbt-postgres target |
-| storage | + MinIO, Polaris | Iceberg storage tests |
+| storage | + LocalStack (S3+STS+IAM), Polaris | Iceberg storage tests |
 | compute | + Trino, Spark | Compute engine tests |
 | full | + Cube, Marquez | E2E tests, semantic layer |
 
@@ -80,7 +80,7 @@ docker compose --profile full up -d
 
 | Service | Port | Description |
 |---------|------|-------------|
-| MinIO | 9000, 9001 | S3-compatible object storage |
+| LocalStack | 4566 | AWS emulator (S3, STS, IAM) for production-aligned testing |
 | Polaris | 8181, 8182 | Apache Polaris - Iceberg REST catalog |
 
 ### Compute Layer (--profile compute)
@@ -102,7 +102,7 @@ docker compose --profile full up -d
 
 After starting services, access UIs at:
 
-- **MinIO Console**: http://localhost:9001 (minioadmin/minioadmin)
+- **LocalStack Health**: http://localhost:4566/_localstack/health
 - **Polaris API**: http://localhost:8181
 - **Trino UI**: http://localhost:8080
 - **Jaeger UI**: http://localhost:16686
@@ -154,12 +154,15 @@ Copy `env.example` to `.env` and customize:
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 
-# MinIO
-MINIO_ROOT_USER=minioadmin
-MINIO_ROOT_PASSWORD=minioadmin
+# LocalStack (uses test credentials by default)
+# AWS_ACCESS_KEY_ID=test
+# AWS_SECRET_ACCESS_KEY=test
+AWS_REGION=us-east-1
 
 # Polaris
-POLARIS_BOOTSTRAP_CREDENTIALS=default-realm,root,s3cr3t
+POLARIS_BOOTSTRAP_CREDENTIALS=POLARIS,root,s3cr3t
+POLARIS_CLIENT_ID=root
+POLARIS_CLIENT_SECRET=s3cr3t
 
 # Cube
 CUBEJS_API_SECRET=floe-cube-secret
@@ -209,9 +212,9 @@ docker compose --profile full down -v --rmi all
 docker compose ps
 
 # Check specific service health
-curl -f http://localhost:8181/api/catalog/v1/config  # Polaris
-curl -f http://localhost:9000/minio/health/live      # MinIO
-curl -f http://localhost:4000/readyz                 # Cube
+curl -f http://localhost:8181/api/catalog/v1/config         # Polaris
+curl -f http://localhost:4566/_localstack/health            # LocalStack
+curl -f http://localhost:4000/readyz                        # Cube
 ```
 
 ## Databases
@@ -227,7 +230,7 @@ PostgreSQL is pre-configured with multiple databases:
 
 ## S3 Buckets
 
-MinIO is pre-configured with buckets:
+LocalStack is pre-configured with buckets:
 
 | Bucket | Purpose |
 |--------|---------|
@@ -235,6 +238,19 @@ MinIO is pre-configured with buckets:
 | iceberg | Alternative Iceberg location |
 | cube-preaggs | Cube pre-aggregation storage |
 | dbt-artifacts | dbt artifacts storage |
+
+## Security Testing with LocalStack
+
+LocalStack provides AWS S3 + STS + IAM emulation, enabling production-aligned
+credential vending testing. This allows us to test the same authentication flows
+that would be used in production with real AWS.
+
+Key features:
+- **S3**: Object storage for Iceberg table data
+- **STS**: Credential vending for temporary security credentials
+- **IAM**: Role-based access control simulation
+
+The `polaris-storage-role` IAM role is created automatically for credential vending.
 
 ## Troubleshooting
 
@@ -252,11 +268,11 @@ Ensure Polaris is fully initialized (takes ~30s):
 curl http://localhost:8181/api/catalog/v1/config
 ```
 
-### MinIO buckets not created
+### LocalStack buckets not created
 
-The `minio-init` service runs once. Check logs:
+The `localstack-init` service runs once. Check logs:
 ```bash
-docker compose logs minio-init
+docker compose logs localstack-init
 ```
 
 ### Out of memory

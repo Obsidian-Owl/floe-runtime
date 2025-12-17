@@ -75,7 +75,7 @@ Python 3.10+ (per Constitution: Dagster/dbt minimum): Follow standard convention
 
 Docker Compose profiles for local testing:
 - `(none)`: PostgreSQL, Jaeger (unit tests, dbt-postgres)
-- `storage`: + MinIO, Polaris (Iceberg storage tests)
+- `storage`: + LocalStack (S3+STS+IAM), Polaris (Iceberg storage tests)
 - `compute`: + Trino, Spark (compute engine tests)
 - `full`: + Cube, Marquez (E2E tests, semantic layer)
 
@@ -86,7 +86,7 @@ docker compose --profile storage up -d
 
 # Check service health
 curl http://localhost:8181/api/catalog/v1/config  # Polaris
-curl http://localhost:9000/minio/health/live      # MinIO
+curl http://localhost:4566/_localstack/health     # LocalStack
 ```
 
 ## Recent Changes

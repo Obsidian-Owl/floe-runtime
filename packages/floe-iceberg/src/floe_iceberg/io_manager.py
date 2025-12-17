@@ -79,11 +79,17 @@ class IcebergIOManager(ConfigurableIOManager):
     client_id: str | None = None
     client_secret: str | None = None
     token: str | None = None
+    scope: str | None = None  # OAuth2 scope - set explicitly for least privilege
     default_namespace: str = "public"
     write_mode: str = "append"
     schema_evolution_enabled: bool = True
     auto_create_tables: bool = True
     partition_column: str | None = None
+    # S3 configuration for local testing (e.g., LocalStack)
+    s3_endpoint: str | None = None
+    s3_access_key_id: str | None = None
+    s3_secret_access_key: str | None = None
+    s3_region: str = "us-east-1"
 
     # Internal state (not config)
     _catalog: Catalog | None = None
@@ -109,7 +115,20 @@ class IcebergIOManager(ConfigurableIOManager):
         )
 
     def _create_catalog(self) -> Catalog:
-        """Create PyIceberg catalog from configuration."""
+        """Create PyIceberg catalog from configuration.
+
+        Supports multiple authentication modes:
+        1. Vended credentials (production with AWS/Azure/GCP) - catalog provides temp creds
+        2. Static S3 credentials (local testing) - pass credentials directly
+
+        For production deployments:
+        - AWS S3: Use vended credentials via Polaris (no s3_* fields needed)
+        - Azure: Use vended credentials or configure Azure-specific properties
+        - GCP: Use vended credentials or configure GCS-specific properties
+
+        For local testing with LocalStack:
+        - Set s3_endpoint, s3_access_key_id, s3_secret_access_key
+        """
         from pyiceberg.catalog import load_catalog
 
         properties: dict[str, Any] = {
@@ -121,6 +140,23 @@ class IcebergIOManager(ConfigurableIOManager):
             properties["token"] = self.token
         elif self.client_id and self.client_secret:
             properties["credential"] = f"{self.client_id}:{self.client_secret}"
+
+        # Scope is optional - only set if explicitly configured
+        # Production should use minimal scopes; tests can use PRINCIPAL_ROLE:ALL
+        if self.scope:
+            properties["scope"] = self.scope
+
+        # S3 configuration for local testing (e.g., LocalStack)
+        # When these are set, PyIceberg uses static credentials instead of vended credentials.
+        # In production with AWS/Azure/GCP, vended credentials are used instead.
+        if self.s3_endpoint:
+            properties["s3.endpoint"] = self.s3_endpoint
+        if self.s3_access_key_id:
+            properties["s3.access-key-id"] = self.s3_access_key_id
+        if self.s3_secret_access_key:
+            properties["s3.secret-access-key"] = self.s3_secret_access_key
+        if self.s3_region:
+            properties["s3.region"] = self.s3_region
 
         return load_catalog("floe_iceberg", **properties)
 
@@ -215,7 +251,7 @@ class IcebergIOManager(ConfigurableIOManager):
         """
         table_id = self.get_table_identifier(context)
         asset_key = str(context.asset_key) if context.asset_key else "unknown"
-        partition_key = context.partition_key
+        partition_key = context.partition_key if context.has_partition_key else None
 
         with dagster_asset_operation(
             "handle_output",
@@ -335,7 +371,7 @@ class IcebergIOManager(ConfigurableIOManager):
         """
         table_id = self.get_table_identifier(context)
         asset_key = str(context.asset_key) if context.asset_key else "unknown"
-        partition_key = context.partition_key
+        partition_key = context.partition_key if context.has_partition_key else None
 
         with dagster_asset_operation(
             "load_input",
@@ -605,6 +641,11 @@ def create_io_manager(
     # Extract secret values if present
     client_secret = config.client_secret.get_secret_value() if config.client_secret else None
     token = config.token.get_secret_value() if config.token else None
+    s3_secret_access_key = (
+        config.s3_secret_access_key.get_secret_value()
+        if config.s3_secret_access_key
+        else None
+    )
 
     io_manager = IcebergIOManager(
         catalog_uri=config.catalog_uri,
@@ -612,11 +653,17 @@ def create_io_manager(
         client_id=config.client_id,
         client_secret=client_secret,
         token=token,
+        scope=config.scope,  # Pass scope - should be set explicitly per environment
         default_namespace=config.default_namespace,
         write_mode=config.write_mode.value,
         schema_evolution_enabled=config.schema_evolution_enabled,
         auto_create_tables=config.auto_create_tables,
         partition_column=config.partition_column,
+        # S3 configuration for local testing (not needed for AWS with vended creds)
+        s3_endpoint=config.s3_endpoint,
+        s3_access_key_id=config.s3_access_key_id,
+        s3_secret_access_key=s3_secret_access_key,
+        s3_region=config.s3_region,
     )
 
     # If pre-configured catalog provided, set it

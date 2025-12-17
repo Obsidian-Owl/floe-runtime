@@ -144,6 +144,27 @@ class PolarisCatalogConfig(BaseModel):
         default_factory=RetryConfig,
         description="Retry policy configuration",
     )
+    # S3 FileIO properties (optional, for non-AWS S3-compatible storage)
+    s3_endpoint: str | None = Field(
+        default=None,
+        description="S3-compatible endpoint URL (e.g., http://localhost:4566 for LocalStack)",
+    )
+    s3_access_key_id: str | None = Field(
+        default=None,
+        description="S3 access key ID (if not using vended credentials)",
+    )
+    s3_secret_access_key: SecretStr | None = Field(
+        default=None,
+        description="S3 secret access key (if not using vended credentials)",
+    )
+    s3_region: str = Field(
+        default="us-east-1",
+        description="S3 region",
+    )
+    s3_path_style_access: bool = Field(
+        default=False,
+        description="Use path-style S3 access (required for LocalStack/MinIO)",
+    )
 
     @field_validator("uri")
     @classmethod

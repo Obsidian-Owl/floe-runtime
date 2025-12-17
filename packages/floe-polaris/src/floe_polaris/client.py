@@ -154,6 +154,26 @@ class PolarisCatalog:
         # Access delegation mode
         properties["header.X-Iceberg-Access-Delegation"] = self.config.access_delegation
 
+        # S3 FileIO properties (for S3-compatible storage like LocalStack/MinIO)
+        # These override any server-side configuration from the REST catalog
+        if self.config.s3_endpoint:
+            # Force PyArrow FileIO to use our client-side S3 configuration
+            # This is critical for local testing where the catalog server uses
+            # Docker-internal hostnames (e.g., localstack:4566) but the client
+            # needs localhost:4566
+            properties["py-io-impl"] = "pyiceberg.io.pyarrow.PyArrowFileIO"
+            properties["s3.endpoint"] = self.config.s3_endpoint
+            properties["s3.path-style-access"] = str(self.config.s3_path_style_access).lower()
+            properties["s3.region"] = self.config.s3_region
+
+            # Static S3 credentials (if not using vended credentials)
+            if self.config.s3_access_key_id:
+                properties["s3.access-key-id"] = self.config.s3_access_key_id
+            if self.config.s3_secret_access_key:
+                properties["s3.secret-access-key"] = (
+                    self.config.s3_secret_access_key.get_secret_value()
+                )
+
         return properties
 
     def _handle_connection_error(self, exc: Exception) -> None:

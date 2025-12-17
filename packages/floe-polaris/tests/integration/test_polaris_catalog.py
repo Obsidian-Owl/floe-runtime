@@ -55,14 +55,27 @@ def get_test_config() -> PolarisCatalogConfig:
 
 
 def is_polaris_available() -> bool:
-    """Check if Polaris is available for testing."""
+    """Check if Polaris is available for testing.
+
+    Uses context-aware hostname detection:
+    - Inside Docker container (DOCKER_CONTAINER=1): connects to 'polaris:8181'
+    - On host machine: connects to 'localhost:8181'
+    """
     import socket
 
+    # Use internal hostname when running in Docker container
+    host = "polaris" if os.environ.get("DOCKER_CONTAINER") == "1" else "localhost"
+
     try:
-        with socket.create_connection(("localhost", 8181), timeout=2):
+        with socket.create_connection((host, 8181), timeout=2):
             return True
     except (OSError, ConnectionRefusedError):
         return False
+
+
+def get_polaris_host() -> str:
+    """Get the Polaris hostname based on execution context."""
+    return "polaris" if os.environ.get("DOCKER_CONTAINER") == "1" else "localhost"
 
 
 # Skip all tests if Polaris is not available
@@ -70,7 +83,7 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.skipif(
         not is_polaris_available(),
-        reason="Polaris server not available at localhost:8181",
+        reason=f"Polaris server not available at {get_polaris_host()}:8181",
     ),
 ]
 

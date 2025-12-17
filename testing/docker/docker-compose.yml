@@ -3,15 +3,20 @@
 #
 # Usage:
 #   docker compose up -d                    # Start base services
-#   docker compose --profile storage up -d  # Include Polaris + MinIO
+#   docker compose --profile storage up -d  # Include Polaris + LocalStack
 #   docker compose --profile compute up -d  # Include Spark + Trino
 #   docker compose --profile full up -d     # All services including Cube
 #
 # Services:
 #   Base:     PostgreSQL, Jaeger
-#   Storage:  MinIO (S3), Polaris (Iceberg catalog)
+#   Storage:  LocalStack (S3 + STS), Polaris (Iceberg catalog)
 #   Compute:  Trino, Spark
 #   Full:     Cube (semantic layer), Marquez (lineage)
+#
+# Security Note:
+#   LocalStack provides AWS S3 + STS emulation, enabling production-aligned
+#   credential vending. This allows us to test the same authentication flows
+#   that would be used in production with real AWS.
 
 networks:
   floe-network:
@@ -21,8 +26,15 @@ networks:
 volumes:
   postgres-data:
     name: floe-postgres-data
-  minio-data:
-    name: floe-minio-data
+  localstack-data:
+    name: floe-localstack-data
+  # Shared config volume for credential exchange between containers and host
+  # polaris-init writes credentials here, tests read them
+  polaris-credentials:
+    name: floe-polaris-credentials
+  # Cache for test runner to speed up repeated runs
+  test-cache:
+    name: floe-test-cache
 
 services:
   # ==============================================================================
@@ -73,27 +85,37 @@ services:
 
   # ==============================================================================
   # STORAGE PROFILE (--profile storage)
+  # LocalStack provides S3 + STS emulation for production-aligned testing.
+  # This enables proper credential vending without the security shortcuts
+  # that would be needed with MinIO (which lacks STS support).
   # ==============================================================================
 
-  minio:
-    image: quay.io/minio/minio:latest
-    container_name: floe-minio
-    command: server /data --console-address ":9001"
+  localstack:
+    image: localstack/localstack:latest
+    container_name: floe-localstack
     ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # Console UI
+      - "4566:4566"   # LocalStack Gateway (S3, STS, IAM, etc.)
+      - "4510-4559:4510-4559"  # External service ports
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      MINIO_REGION: ${AWS_REGION:-us-east-1}
+      # Enable S3, STS, IAM services for credential vending
+      SERVICES: s3,sts,iam
+      # Persist data across restarts
+      PERSISTENCE: 1
+      # Debug logging (optional)
+      DEBUG: ${LOCALSTACK_DEBUG:-0}
+      # Default region
+      AWS_DEFAULT_REGION: ${AWS_REGION:-us-east-1}
+      # Ensure consistent endpoint behavior
+      LOCALSTACK_HOST: localstack
     volumes:
-      - minio-data:/data
+      - localstack-data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
       interval: 5s
       timeout: 5s
-      retries: 5
-      start_period: 10s
+      retries: 10
+      start_period: 20s
     networks:
       - floe-network
     restart: unless-stopped
@@ -102,28 +124,37 @@ services:
       - compute
       - full
 
-  # Create MinIO buckets on startup
-  minio-init:
-    image: quay.io/minio/mc:latest
-    container_name: floe-minio-init
+  # Create S3 buckets and IAM roles on startup
+  # Bucket names are defined in config/buckets.env (single source of truth)
+  localstack-init:
+    image: amazon/aws-cli:latest
+    container_name: floe-localstack-init
     depends_on:
-      minio:
+      localstack:
         condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      echo 'Waiting for MinIO...';
-      sleep 3;
-      /usr/bin/mc alias set myminio http://minio:9000 $${MINIO_ROOT_USER:-minioadmin} $${MINIO_ROOT_PASSWORD:-minioadmin};
-      /usr/bin/mc mb myminio/warehouse --ignore-existing;
-      /usr/bin/mc mb myminio/iceberg --ignore-existing;
-      /usr/bin/mc mb myminio/cube-preaggs --ignore-existing;
-      /usr/bin/mc mb myminio/dbt-artifacts --ignore-existing;
-      echo 'Buckets created successfully';
-      exit 0;
-      "
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo 'Configuring LocalStack S3 buckets and IAM...'
+        sleep 5
+        # Create buckets from FLOE_BUCKETS environment variable (comma-separated)
+        echo "Creating buckets: $${FLOE_BUCKETS}"
+        for bucket in $$(echo "$${FLOE_BUCKETS}" | tr ',' ' '); do
+          aws --endpoint-url=http://localstack:4566 s3 mb s3://$${bucket} 2>/dev/null || true
+          echo "  - s3://$${bucket}"
+        done
+        echo 'Creating IAM role for Polaris credential vending...'
+        aws --endpoint-url=http://localstack:4566 iam create-role --role-name polaris-storage-role --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"polaris.amazonaws.com"},"Action":"sts:AssumeRole"}]}' 2>/dev/null || true
+        aws --endpoint-url=http://localstack:4566 iam attach-role-policy --role-name polaris-storage-role --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess 2>/dev/null || true
+        echo 'LocalStack initialization complete'
+        echo "Buckets: $${FLOE_BUCKETS}"
+        echo 'IAM Role: polaris-storage-role'
+    env_file:
+      - ./config/buckets.env
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: ${AWS_REGION:-us-east-1}
     networks:
       - floe-network
     profiles:
@@ -132,36 +163,75 @@ services:
       - full
 
   polaris:
-    image: apache/polaris:latest
+    # LocalStack's pre-configured Polaris image - designed for LocalStack S3 compatibility
+    # See: https://docs.localstack.cloud/snowflake/features/polaris-catalog/
+    # NOTE: This image uses in-memory storage (data doesn't persist across restarts)
+    #       This is fine for dev/test but document for production planning.
+    image: localstack/polaris:latest
     container_name: floe-polaris
     ports:
       - "8181:8181"   # REST API
       - "8182:8182"   # Admin
     environment:
-      # Bootstrap credentials (realm,client_id,secret)
-      POLARIS_BOOTSTRAP_CREDENTIALS: ${POLARIS_BOOTSTRAP_CREDENTIALS:-default-realm,root,s3cr3t}
-      # PostgreSQL connection
-      QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://postgres:5432/polaris
-      QUARKUS_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
-      QUARKUS_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      # S3/MinIO credentials for storage
+      # AWS credentials for LocalStack S3 access
       AWS_REGION: ${AWS_REGION:-us-east-1}
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
-      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      # Point Polaris to LocalStack S3 endpoint
+      # LocalStack's Polaris image handles path-style access internally
+      AWS_ENDPOINT_URL: http://localstack:4566
+      # Disable OpenTelemetry to reduce startup noise (optional)
+      quarkus.otel.sdk.disabled: "true"
+    # NOTE: Polaris auto-generates root credentials on startup.
+    # The polaris-init container extracts them from logs dynamically.
+    # No volumes needed - LocalStack's Polaris image has built-in configuration
+    # No postgres dependency - uses in-memory storage by default
     depends_on:
-      postgres:
-        condition: service_healthy
-      minio:
+      localstack:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8182/q/health"]
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 45s
+      start_period: 30s
     networks:
       - floe-network
     restart: unless-stopped
+    profiles:
+      - storage
+      - compute
+      - full
+
+  # Initialize Polaris catalog on startup
+  # This container extracts auto-generated credentials from Polaris logs
+  # and creates the warehouse catalog with proper permissions.
+  polaris-init:
+    image: docker:cli
+    container_name: floe-polaris-init
+    depends_on:
+      polaris:
+        condition: service_healthy
+      localstack-init:
+        condition: service_completed_successfully
+    environment:
+      POLARIS_URI: http://polaris:8181
+      # Realm is always 'POLARIS' - the default realm name
+      POLARIS_REALM: ${POLARIS_REALM:-POLARIS}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      # LocalStack credentials
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      # LocalStack endpoint for S3 (single endpoint - LocalStack's Polaris handles it)
+      S3_ENDPOINT: http://localstack:4566
+    volumes:
+      - ./init-scripts/02-init-polaris.sh:/init-polaris.sh:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Mount config directory to write credentials for tests to read
+      - ./config:/config:rw
+    entrypoint: ["/bin/sh", "/init-polaris.sh"]
+    networks:
+      - floe-network
     profiles:
       - storage
       - compute
@@ -177,15 +247,16 @@ services:
     ports:
       - "8080:8080"   # HTTP API / UI
     environment:
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
-      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      # LocalStack credentials
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
       AWS_REGION: ${AWS_REGION:-us-east-1}
     volumes:
       - ./trino-config/catalog:/etc/trino/catalog:ro
     depends_on:
       polaris:
         condition: service_healthy
-      minio:
+      localstack:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "trino", "--execute", "SELECT 1"]
@@ -208,15 +279,16 @@ services:
       - "10000:10000" # Spark Thrift Server
       - "4040:4040"   # Spark UI (when running)
     environment:
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
-      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      # LocalStack credentials
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
       AWS_REGION: ${AWS_REGION:-us-east-1}
     volumes:
       - ./spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
     depends_on:
       polaris:
         condition: service_healthy
-      minio:
+      localstack:
         condition: service_healthy
     networks:
       - floe-network
@@ -294,12 +366,14 @@ services:
       CUBEJS_EXTERNAL_DEFAULT: "true"
       # Telemetry
       CUBEJS_TELEMETRY: "false"
-      # Pre-aggregation storage (optional S3)
+      # Pre-aggregation storage (LocalStack S3)
       CUBEJS_DB_EXPORT_BUCKET_TYPE: s3
       CUBEJS_DB_EXPORT_BUCKET: s3://cube-preaggs
-      CUBEJS_DB_EXPORT_BUCKET_AWS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      CUBEJS_DB_EXPORT_BUCKET_AWS_KEY: test
+      CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET: test
       CUBEJS_DB_EXPORT_BUCKET_AWS_REGION: ${AWS_REGION:-us-east-1}
+      # Point to LocalStack S3
+      AWS_ENDPOINT_URL: http://localstack:4566
     volumes:
       - ./cube-schema:/cube/conf/schema:ro
     depends_on:
@@ -316,3 +390,48 @@ services:
     restart: unless-stopped
     profiles:
       - full
+
+  # ==============================================================================
+  # TEST PROFILE (--profile test)
+  # Runs integration tests inside Docker network for proper hostname resolution.
+  # This eliminates the need for /etc/hosts configuration on the host machine.
+  # ==============================================================================
+
+  test-runner:
+    build:
+      context: ../..
+      dockerfile: testing/docker/Dockerfile.test-runner
+    container_name: floe-test-runner
+    working_dir: /workspace
+    volumes:
+      # Mount workspace as read-write for pytest cache and coverage
+      - ../..:/workspace
+      # Mount credentials from polaris-init
+      - ./config:/workspace/testing/docker/config:ro
+      # Persist test cache across runs
+      - test-cache:/workspace/.pytest_cache
+    # Load credentials generated by polaris-init
+    env_file:
+      - ./config/polaris-credentials.env
+    environment:
+      # Docker context detection
+      DOCKER_CONTAINER: "1"
+      # Override POLARIS_URI to use internal hostname (file has localhost)
+      POLARIS_URI: http://polaris:8181/api/catalog
+      POLARIS_WAREHOUSE: warehouse
+      # LocalStack S3 configuration (internal Docker hostname)
+      LOCALSTACK_ENDPOINT: http://localstack:4566
+      # Override credentials from file with LocalStack values
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      # Python settings
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      polaris-init:
+        condition: service_completed_successfully
+    networks:
+      - floe-network
+    profiles:
+      - test

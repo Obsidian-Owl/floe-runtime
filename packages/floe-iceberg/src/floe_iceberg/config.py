@@ -350,6 +350,15 @@ class IcebergIOManagerConfig(BaseModel):
         default=None,
         description="Pre-fetched bearer token",
     )
+    scope: str | None = Field(
+        default=None,
+        description=(
+            "OAuth2 scope for token requests. Should follow least privilege principle. "
+            "For Polaris, use format like 'PRINCIPAL_ROLE:my_role'. "
+            "Only set in test environments to 'PRINCIPAL_ROLE:ALL' for convenience. "
+            "Production deployments should use narrowly-scoped principal roles."
+        ),
+    )
     default_namespace: str = Field(
         default="public",
         min_length=1,
@@ -370,6 +379,34 @@ class IcebergIOManagerConfig(BaseModel):
     partition_column: str | None = Field(
         default=None,
         description="Default partition column for time-based partitioning",
+    )
+    # S3 configuration for local testing (e.g., LocalStack)
+    # In production with AWS S3, vended credentials are preferred.
+    # For local testing, provide static credentials here.
+    s3_endpoint: str | None = Field(
+        default=None,
+        description=(
+            "S3-compatible storage endpoint URL (e.g., http://localhost:4566 for LocalStack). "
+            "Only needed for local testing. Production AWS S3 uses vended credentials."
+        ),
+    )
+    s3_access_key_id: str | None = Field(
+        default=None,
+        description=(
+            "S3 access key ID for static credentials. "
+            "Use only for local testing (e.g., LocalStack). Production uses vended credentials."
+        ),
+    )
+    s3_secret_access_key: SecretStr | None = Field(
+        default=None,
+        description=(
+            "S3 secret access key for static credentials. "
+            "Use only for local testing (e.g., LocalStack). Production uses vended credentials."
+        ),
+    )
+    s3_region: str = Field(
+        default="us-east-1",
+        description="AWS region for S3 operations.",
     )
 
     @field_validator("catalog_uri")
