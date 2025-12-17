@@ -49,13 +49,13 @@ class TestFormatPydanticError:
         class TestModel(BaseModel):
             name: str
 
-        try:
+        with pytest.raises(PydanticValidationError) as exc_info:
             TestModel()  # Missing required field
-        except PydanticValidationError as e:
-            formatted = format_pydantic_error(e)
-            assert "Validation failed:" in formatted
-            assert "name" in formatted
-            assert "Field required" in formatted
+
+        formatted = format_pydantic_error(exc_info.value)
+        assert "Validation failed:" in formatted
+        assert "name" in formatted
+        assert "Field required" in formatted
 
     def test_format_multiple_errors(self) -> None:
         """Test formatting multiple validation errors."""
@@ -64,13 +64,13 @@ class TestFormatPydanticError:
             name: str
             version: str
 
-        try:
+        with pytest.raises(PydanticValidationError) as exc_info:
             TestModel()  # Missing both fields
-        except PydanticValidationError as e:
-            formatted = format_pydantic_error(e)
-            assert "Validation failed:" in formatted
-            assert "name" in formatted
-            assert "version" in formatted
+
+        formatted = format_pydantic_error(exc_info.value)
+        assert "Validation failed:" in formatted
+        assert "name" in formatted
+        assert "version" in formatted
 
     def test_format_nested_error(self) -> None:
         """Test formatting errors in nested models."""
@@ -81,12 +81,12 @@ class TestFormatPydanticError:
         class ParentModel(BaseModel):
             nested: NestedModel
 
-        try:
+        with pytest.raises(PydanticValidationError) as exc_info:
             ParentModel(nested={"value": "not_an_int"})
-        except PydanticValidationError as e:
-            formatted = format_pydantic_error(e)
-            assert "Validation failed:" in formatted
-            assert "nested.value" in formatted or "nested" in formatted
+
+        formatted = format_pydantic_error(exc_info.value)
+        assert "Validation failed:" in formatted
+        assert "nested.value" in formatted or "nested" in formatted
 
 
 class TestHandleFileNotFound:
@@ -138,11 +138,11 @@ class TestHandleValidationError:
         class TestModel(BaseModel):
             name: str
 
-        try:
+        with pytest.raises(PydanticValidationError) as pydantic_exc:
             TestModel()  # Missing required field
-        except PydanticValidationError as e:
-            with pytest.raises(CLIError) as exc_info:
-                handle_validation_error(e, "floe.yaml")
 
-            assert "Invalid configuration in floe.yaml" in str(exc_info.value)
-            assert "name" in str(exc_info.value)
+        with pytest.raises(CLIError) as exc_info:
+            handle_validation_error(pydantic_exc.value, "floe.yaml")
+
+        assert "Invalid configuration in floe.yaml" in str(exc_info.value)
+        assert "name" in str(exc_info.value)

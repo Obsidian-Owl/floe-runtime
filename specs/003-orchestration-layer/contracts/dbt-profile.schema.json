@@ -1,0 +1,309 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://floe.dev/spec/contracts/dbt-profile.schema.json",
+  "title": "FloeDbtProfile",
+  "description": "Schema for generated dbt profiles.yml structure",
+  "type": "object",
+  "additionalProperties": {
+    "$ref": "#/$defs/Profile"
+  },
+  "$defs": {
+    "Profile": {
+      "type": "object",
+      "required": ["target", "outputs"],
+      "properties": {
+        "target": {
+          "type": "string",
+          "description": "Default target name"
+        },
+        "outputs": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Output"
+          }
+        }
+      }
+    },
+    "Output": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["duckdb", "snowflake", "bigquery", "redshift", "databricks", "postgres", "spark"],
+          "description": "dbt adapter type"
+        },
+        "threads": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "default": 4
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "type": { "const": "duckdb" } }
+          },
+          "then": {
+            "$ref": "#/$defs/DuckDBOutput"
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "snowflake" } }
+          },
+          "then": {
+            "$ref": "#/$defs/SnowflakeOutput"
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "bigquery" } }
+          },
+          "then": {
+            "$ref": "#/$defs/BigQueryOutput"
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "redshift" } }
+          },
+          "then": {
+            "$ref": "#/$defs/RedshiftOutput"
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "databricks" } }
+          },
+          "then": {
+            "$ref": "#/$defs/DatabricksOutput"
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "postgres" } }
+          },
+          "then": {
+            "$ref": "#/$defs/PostgresOutput"
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "spark" } }
+          },
+          "then": {
+            "$ref": "#/$defs/SparkOutput"
+          }
+        }
+      ]
+    },
+    "DuckDBOutput": {
+      "type": "object",
+      "required": ["path"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Path to DuckDB database file (supports env_var templating)"
+        },
+        "extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "DuckDB extensions to load"
+        }
+      }
+    },
+    "SnowflakeOutput": {
+      "type": "object",
+      "required": ["account", "user", "database", "warehouse", "schema"],
+      "properties": {
+        "account": {
+          "type": "string",
+          "description": "Snowflake account identifier (supports env_var templating)"
+        },
+        "user": {
+          "type": "string",
+          "description": "Snowflake username (supports env_var templating)"
+        },
+        "password": {
+          "type": "string",
+          "description": "Snowflake password (MUST use env_var templating)"
+        },
+        "private_key_path": {
+          "type": "string",
+          "description": "Path to private key file (supports env_var templating)"
+        },
+        "role": {
+          "type": "string",
+          "description": "Snowflake role (supports env_var templating)"
+        },
+        "database": {
+          "type": "string",
+          "description": "Snowflake database (supports env_var templating)"
+        },
+        "warehouse": {
+          "type": "string",
+          "description": "Snowflake warehouse (supports env_var templating)"
+        },
+        "schema": {
+          "type": "string",
+          "description": "Default schema (supports env_var templating)"
+        },
+        "query_tag": {
+          "type": "string",
+          "description": "Query tag for tracking"
+        }
+      }
+    },
+    "BigQueryOutput": {
+      "type": "object",
+      "required": ["method", "project", "dataset"],
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": ["service-account", "oauth"],
+          "description": "Authentication method"
+        },
+        "project": {
+          "type": "string",
+          "description": "GCP project ID (supports env_var templating)"
+        },
+        "dataset": {
+          "type": "string",
+          "description": "BigQuery dataset (supports env_var templating)"
+        },
+        "keyfile": {
+          "type": "string",
+          "description": "Path to service account key file (supports env_var templating)"
+        },
+        "location": {
+          "type": "string",
+          "description": "BigQuery location (US, EU, etc.)"
+        },
+        "maximum_bytes_billed": {
+          "type": "integer",
+          "description": "Maximum bytes billed per query"
+        }
+      }
+    },
+    "RedshiftOutput": {
+      "type": "object",
+      "required": ["host", "user", "dbname", "schema"],
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "Redshift cluster hostname (supports env_var templating)"
+        },
+        "port": {
+          "type": "integer",
+          "default": 5439,
+          "description": "Redshift port"
+        },
+        "user": {
+          "type": "string",
+          "description": "Redshift username (supports env_var templating)"
+        },
+        "password": {
+          "type": "string",
+          "description": "Redshift password (MUST use env_var templating)"
+        },
+        "dbname": {
+          "type": "string",
+          "description": "Database name (supports env_var templating)"
+        },
+        "schema": {
+          "type": "string",
+          "description": "Default schema (supports env_var templating)"
+        },
+        "ra3_node": {
+          "type": "boolean",
+          "description": "Using RA3 node type"
+        }
+      }
+    },
+    "DatabricksOutput": {
+      "type": "object",
+      "required": ["host", "http_path", "schema"],
+      "properties": {
+        "catalog": {
+          "type": "string",
+          "description": "Unity Catalog name (supports env_var templating)"
+        },
+        "schema": {
+          "type": "string",
+          "description": "Default schema (supports env_var templating)"
+        },
+        "host": {
+          "type": "string",
+          "description": "Databricks workspace hostname (supports env_var templating)"
+        },
+        "http_path": {
+          "type": "string",
+          "description": "SQL warehouse HTTP path (supports env_var templating)"
+        },
+        "token": {
+          "type": "string",
+          "description": "Personal access token (MUST use env_var templating)"
+        }
+      }
+    },
+    "PostgresOutput": {
+      "type": "object",
+      "required": ["host", "user", "dbname", "schema"],
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "PostgreSQL hostname (supports env_var templating)"
+        },
+        "port": {
+          "type": "integer",
+          "default": 5432,
+          "description": "PostgreSQL port"
+        },
+        "user": {
+          "type": "string",
+          "description": "PostgreSQL username (supports env_var templating)"
+        },
+        "password": {
+          "type": "string",
+          "description": "PostgreSQL password (MUST use env_var templating)"
+        },
+        "dbname": {
+          "type": "string",
+          "description": "Database name (supports env_var templating)"
+        },
+        "schema": {
+          "type": "string",
+          "description": "Default schema (supports env_var templating)"
+        }
+      }
+    },
+    "SparkOutput": {
+      "type": "object",
+      "required": ["method", "host", "schema"],
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": ["thrift", "odbc", "session", "http"],
+          "description": "Connection method"
+        },
+        "host": {
+          "type": "string",
+          "description": "Spark server hostname (supports env_var templating)"
+        },
+        "port": {
+          "type": "integer",
+          "default": 10000,
+          "description": "Spark server port"
+        },
+        "schema": {
+          "type": "string",
+          "description": "Default schema (supports env_var templating)"
+        }
+      }
+    }
+  }
+}

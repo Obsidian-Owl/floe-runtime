@@ -220,7 +220,7 @@ When creating this spec from a user prompt:
    - Have multiple reasonable interpretations with different implications
    - Lack any reasonable default
 4. **Prioritize clarifications**: scope > security/privacy > user experience > technical details
-5. **Think like a tester**: Every vague requirement should fail the "testable and unambiguous" checklist item
+5. **Think like a tester**: Every vague requirement should fail the "testable and unambiguous" checklist item - see [text](../../TESTING.md)
 6. **Common areas needing clarification** (only if no reasonable default exists):
    - Feature scope and boundaries (include/exclude specific use cases)
    - User types and permissions (if multiple conflicting interpretations possible)

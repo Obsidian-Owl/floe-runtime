@@ -21,17 +21,25 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "dbt-core>=1.9",
+    "dbt-core>=1.10",
+    "dbt-duckdb>=1.10",  # Default local compute (standalone-first)
     "floe-core",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
-duckdb = ["dbt-duckdb>=1.9"]
+# DuckDB is now a core dependency for standalone-first local development
+# Note: Some adapters don't have 1.10 stable yet, using compatible versions
 snowflake = ["dbt-snowflake>=1.9"]
 bigquery = ["dbt-bigquery>=1.9"]
 postgres = ["dbt-postgres>=1.9"]
 redshift = ["dbt-redshift>=1.9"]
 databricks = ["dbt-databricks>=1.9"]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "hypothesis>=6.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/your-org/floe-runtime"

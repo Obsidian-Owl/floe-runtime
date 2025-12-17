@@ -25,7 +25,19 @@ dependencies = [
     "dagster-dbt>=0.25",
     "openlineage-python>=1.24",
     "opentelemetry-api>=1.28",
+    "opentelemetry-sdk>=1.28",
+    "opentelemetry-exporter-otlp>=1.28",
+    "structlog>=24.0",
     "floe-core",
+    "floe-dbt",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "hypothesis>=6.0",
+    "dagster-webserver>=1.9",
 ]
 
 [project.urls]
@@ -38,3 +50,4 @@ packages = ["src/floe_dagster"]
 
 [tool.uv.sources]
 floe-core = { workspace = true }
+floe-dbt = { workspace = true }

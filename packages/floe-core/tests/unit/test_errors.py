@@ -43,10 +43,12 @@ class TestFloeError:
 
     def test_floe_error_logs_internal_details(self, capsys: pytest.CaptureFixture[str]) -> None:
         """FloeError should log internal_details when provided."""
-        FloeError(
+        error = FloeError(
             "User sees this",
             internal_details="Secret debug info: /path/to/file.py:42",
         )
+        # Verify exception message is correct
+        assert error.user_message == "User sees this"
 
         # structlog outputs to stdout
         captured = capsys.readouterr()
@@ -58,7 +60,9 @@ class TestFloeError:
     def test_floe_error_no_log_without_internal_details(self, caplog: LogCaptureFixture) -> None:
         """FloeError should not log if internal_details is None."""
         with caplog.at_level(logging.ERROR):
-            FloeError("Just a user message")
+            error = FloeError("Just a user message")
+            # Verify exception message is correct
+            assert error.user_message == "Just a user message"
 
         # No error logging when internal_details not provided
         assert caplog.text == "" or "floe_error" not in caplog.text
@@ -87,10 +91,12 @@ class TestValidationError:
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """ValidationError should log internal_details."""
-        ValidationError(
+        error = ValidationError(
             "Config invalid",
             internal_details="Field 'name' failed regex: got 'invalid!'",
         )
+        # Verify exception message is correct
+        assert error.user_message == "Config invalid"
 
         captured = capsys.readouterr()
         assert "Field 'name' failed regex" in captured.out
@@ -119,10 +125,12 @@ class TestCompilationError:
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """CompilationError should log internal_details."""
-        CompilationError(
+        error = CompilationError(
             "Compilation failed",
             internal_details="Missing dbt manifest at /project/target/manifest.json",
         )
+        # Verify exception message is correct
+        assert error.user_message == "Compilation failed"
 
         captured = capsys.readouterr()
         assert "Missing dbt manifest" in captured.out
