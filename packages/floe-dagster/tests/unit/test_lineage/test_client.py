@@ -297,8 +297,9 @@ class TestOpenLineageEmitter:
         emitter = OpenLineageEmitter(mock_config)
 
         with patch.object(emitter, "_send_event") as mock_send:
-            with pytest.raises(ValueError), emitter.run_context(
-                "test_model", inputs=[], outputs=[]
+            with (
+                pytest.raises(ValueError),
+                emitter.run_context("test_model", inputs=[], outputs=[]),
             ):
                 raise ValueError("Something went wrong")
 

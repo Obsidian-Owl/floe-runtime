@@ -68,7 +68,7 @@ def extract_column_classifications(
     # Load manifest
     try:
         manifest = _load_manifest(manifest_path)
-    except (json.JSONDecodeError, ValueError) as e:
+    except ValueError as e:
         msg = f"Invalid manifest.json at {manifest_path}: {e}"
         if strict:
             raise ValueError(msg) from e
