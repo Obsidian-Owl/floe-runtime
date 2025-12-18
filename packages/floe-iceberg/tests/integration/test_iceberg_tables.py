@@ -23,7 +23,6 @@ import uuid
 from collections.abc import Generator
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pandas as pd
 import pyarrow as pa
@@ -55,10 +54,6 @@ from floe_iceberg import (  # noqa: E402
     TableExistsError,
     TableNotFoundError,
 )
-
-if TYPE_CHECKING:
-    pass
-
 
 # =============================================================================
 # Test Configuration
@@ -165,42 +160,50 @@ def test_table_name(test_namespace: str) -> Generator[str, None, None]:
 @pytest.fixture
 def sample_schema() -> pa.Schema:
     """Provide a sample PyArrow schema."""
-    return pa.schema([
-        pa.field("id", pa.int64()),
-        pa.field("name", pa.string()),
-        pa.field("amount", pa.float64()),
-        pa.field("created_at", pa.timestamp("us", tz="UTC")),
-    ])
+    return pa.schema(
+        [
+            pa.field("id", pa.int64()),
+            pa.field("name", pa.string()),
+            pa.field("amount", pa.float64()),
+            pa.field("created_at", pa.timestamp("us", tz="UTC")),
+        ]
+    )
 
 
 @pytest.fixture
 def sample_data() -> pa.Table:
     """Provide sample data as PyArrow Table."""
-    return pa.Table.from_pydict({
-        "id": [1, 2, 3],
-        "name": ["Alice", "Bob", "Charlie"],
-        "amount": [100.0, 200.5, 300.75],
-        "created_at": [
-            datetime(2024, 1, 1, tzinfo=timezone.utc),
-            datetime(2024, 1, 2, tzinfo=timezone.utc),
-            datetime(2024, 1, 3, tzinfo=timezone.utc),
-        ],
-    })
+    return pa.Table.from_pydict(
+        {
+            "id": [1, 2, 3],
+            "name": ["Alice", "Bob", "Charlie"],
+            "amount": [100.0, 200.5, 300.75],
+            "created_at": [
+                datetime(2024, 1, 1, tzinfo=timezone.utc),
+                datetime(2024, 1, 2, tzinfo=timezone.utc),
+                datetime(2024, 1, 3, tzinfo=timezone.utc),
+            ],
+        }
+    )
 
 
 @pytest.fixture
 def sample_dataframe() -> pd.DataFrame:
     """Provide sample data as Pandas DataFrame."""
-    return pd.DataFrame({
-        "id": [4, 5, 6],
-        "name": ["Dave", "Eve", "Frank"],
-        "amount": [400.0, 500.5, 600.75],
-        "created_at": pd.to_datetime([
-            "2024-01-04",
-            "2024-01-05",
-            "2024-01-06",
-        ]).tz_localize("UTC"),
-    })
+    return pd.DataFrame(
+        {
+            "id": [4, 5, 6],
+            "name": ["Dave", "Eve", "Frank"],
+            "amount": [400.0, 500.5, 600.75],
+            "created_at": pd.to_datetime(
+                [
+                    "2024-01-04",
+                    "2024-01-05",
+                    "2024-01-06",
+                ]
+            ).tz_localize("UTC"),
+        }
+    )
 
 
 # =============================================================================
@@ -527,12 +530,14 @@ class TestDataOperations:
             table_manager.append(test_table_name, sample_data)
 
             # Create smaller replacement data
-            replacement = pa.Table.from_pydict({
-                "id": [100],
-                "name": ["Replacement"],
-                "amount": [999.99],
-                "created_at": [datetime(2024, 12, 31, tzinfo=timezone.utc)],
-            })
+            replacement = pa.Table.from_pydict(
+                {
+                    "id": [100],
+                    "name": ["Replacement"],
+                    "amount": [999.99],
+                    "created_at": [datetime(2024, 12, 31, tzinfo=timezone.utc)],
+                }
+            )
 
             # Overwrite
             snapshot = table_manager.overwrite(test_table_name, replacement)
@@ -682,15 +687,17 @@ class TestSnapshotOperations:
             first_snapshot = table_manager.append(test_table_name, sample_data)
 
             # Second append with more data
-            more_data = pa.Table.from_pydict({
-                "id": [100, 101],
-                "name": ["Extra1", "Extra2"],
-                "amount": [1000.0, 1001.0],
-                "created_at": [
-                    datetime(2024, 12, 1, tzinfo=timezone.utc),
-                    datetime(2024, 12, 2, tzinfo=timezone.utc),
-                ],
-            })
+            more_data = pa.Table.from_pydict(
+                {
+                    "id": [100, 101],
+                    "name": ["Extra1", "Extra2"],
+                    "amount": [1000.0, 1001.0],
+                    "created_at": [
+                        datetime(2024, 12, 1, tzinfo=timezone.utc),
+                        datetime(2024, 12, 2, tzinfo=timezone.utc),
+                    ],
+                }
+            )
             table_manager.append(test_table_name, more_data)
 
             # Scan current state (should have all rows)
@@ -729,13 +736,15 @@ class TestSchemaEvolution:
             table_manager.append(test_table_name, sample_data)
 
             # Add data with new column
-            extended_data = pa.Table.from_pydict({
-                "id": [10],
-                "name": ["New"],
-                "amount": [10.0],
-                "created_at": [datetime(2024, 6, 1, tzinfo=timezone.utc)],
-                "new_column": ["new_value"],  # New column!
-            })
+            extended_data = pa.Table.from_pydict(
+                {
+                    "id": [10],
+                    "name": ["New"],
+                    "amount": [10.0],
+                    "created_at": [datetime(2024, 6, 1, tzinfo=timezone.utc)],
+                    "new_column": ["new_value"],  # New column!
+                }
+            )
 
             # Should evolve schema automatically
             table_manager.append(test_table_name, extended_data, evolve_schema=True)
@@ -764,10 +773,12 @@ class TestIntegrationScenarios:
         """Test complete table lifecycle: create, write, read, drop."""
         table_name = f"{test_namespace}.lifecycle_test_{uuid.uuid4().hex[:8]}"
 
-        schema = pa.schema([
-            pa.field("id", pa.int64()),
-            pa.field("value", pa.string()),
-        ])
+        schema = pa.schema(
+            [
+                pa.field("id", pa.int64()),
+                pa.field("value", pa.string()),
+            ]
+        )
 
         try:
             # Create

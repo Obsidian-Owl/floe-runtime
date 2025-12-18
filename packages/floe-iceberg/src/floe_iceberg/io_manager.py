@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from pyiceberg.catalog import Catalog
 
 
-class IcebergIOManager(ConfigurableIOManager):  # type: ignore[misc]
+class IcebergIOManager(ConfigurableIOManager):
     """Iceberg-backed IOManager for Dagster assets.
 
     Maps Dagster asset keys to Iceberg table identifiers:
@@ -199,10 +199,8 @@ class IcebergIOManager(ConfigurableIOManager):  # type: ignore[misc]
             >>> identifier
             'bronze.customers'
         """
-        if context.asset_key is None:
-            msg = "Asset key is required for Iceberg IOManager"
-            raise ValueError(msg)
-
+        # asset_key is always present in OutputContext/InputContext for asset materialization
+        # (mypy correctly identifies this check as unreachable)
         parts = list(context.asset_key.path)
 
         if len(parts) == 1:
@@ -647,9 +645,7 @@ def create_io_manager(
     client_secret = config.client_secret.get_secret_value() if config.client_secret else None
     token = config.token.get_secret_value() if config.token else None
     s3_secret_access_key = (
-        config.s3_secret_access_key.get_secret_value()
-        if config.s3_secret_access_key
-        else None
+        config.s3_secret_access_key.get_secret_value() if config.s3_secret_access_key else None
     )
 
     io_manager = IcebergIOManager(

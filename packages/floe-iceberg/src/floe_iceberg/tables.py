@@ -780,9 +780,7 @@ class IcebergTableManager:
 
             # Calculate snapshots to expire
             expire_ids = [
-                snap.snapshot_id
-                for snap in snapshots
-                if snap.snapshot_id not in keep_snapshot_ids
+                snap.snapshot_id for snap in snapshots if snap.snapshot_id not in keep_snapshot_ids
             ]
 
             if not expire_ids:
@@ -898,10 +896,12 @@ class IcebergTableManager:
         fields: list[PartitionField] = []
         for i, transform in enumerate(partition_spec):
             # Find the source field in the schema
-            source_field = schema.find_field(transform.source_column)
-            if source_field is None:
+            # PyIceberg's find_field raises ValueError if not found (doesn't return None)
+            try:
+                source_field = schema.find_field(transform.source_column)
+            except ValueError as e:
                 msg = f"Source column '{transform.source_column}' not found in schema"
-                raise ValueError(msg)
+                raise ValueError(msg) from e
 
             iceberg_transform = self._to_iceberg_transform(transform)
             field = PartitionField(
@@ -926,7 +926,10 @@ class IcebergTableManager:
         }
 
         if transform.transform_type in transform_map:
-            return transform_map[transform.transform_type]()
+            # Mypy thinks Transform requires 'root' arg but concrete subclasses
+            # like IdentityTransform() take no arguments - suppress false positive
+            transform_cls = transform_map[transform.transform_type]
+            return transform_cls()  # type: ignore[call-arg]
 
         if transform.transform_type == PartitionTransformType.BUCKET:
             if transform.param is None:
@@ -1041,10 +1044,12 @@ def build_partition_spec(
 
     fields: list[PartitionField] = []
     for i, transform in enumerate(transforms):
-        source_field = iceberg_schema.find_field(transform.source_column)
-        if source_field is None:
+        # PyIceberg's find_field raises ValueError if not found (doesn't return None)
+        try:
+            source_field = iceberg_schema.find_field(transform.source_column)
+        except ValueError as e:
             msg = f"Source column '{transform.source_column}' not found in schema"
-            raise ValueError(msg)
+            raise ValueError(msg) from e
 
         iceberg_transform = IcebergTableManager._to_iceberg_transform(transform)
         field = PartitionField(

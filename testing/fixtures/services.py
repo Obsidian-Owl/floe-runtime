@@ -109,6 +109,7 @@ def get_service_host(service: str) -> str:
         return service
     return "localhost"
 
+
 # Service health check endpoints
 SERVICE_HEALTH_CHECKS: dict[str, dict[str, Any]] = {
     "postgres": {

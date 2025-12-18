@@ -21,9 +21,9 @@ class TestRetryConfig:
         config = RetryConfig()
 
         assert config.max_attempts == 3
-        assert config.initial_wait_seconds == 1.0
-        assert config.max_wait_seconds == 30.0
-        assert config.jitter_seconds == 1.0
+        assert config.initial_wait_seconds == pytest.approx(1.0)
+        assert config.max_wait_seconds == pytest.approx(30.0)
+        assert config.jitter_seconds == pytest.approx(1.0)
         assert config.circuit_breaker_threshold == 5
 
     def test_custom_values(self) -> None:
@@ -37,9 +37,9 @@ class TestRetryConfig:
         )
 
         assert config.max_attempts == 5
-        assert config.initial_wait_seconds == 0.5
-        assert config.max_wait_seconds == 60.0
-        assert config.jitter_seconds == 2.0
+        assert config.initial_wait_seconds == pytest.approx(0.5)
+        assert config.max_wait_seconds == pytest.approx(60.0)
+        assert config.jitter_seconds == pytest.approx(2.0)
         assert config.circuit_breaker_threshold == 10
 
     def test_max_attempts_min_boundary(self) -> None:
@@ -81,7 +81,7 @@ class TestRetryConfig:
         """Test jitter_seconds can be 0 (disabled)."""
         config = RetryConfig(jitter_seconds=0.0)
 
-        assert config.jitter_seconds == 0.0
+        assert config.jitter_seconds == pytest.approx(0.0)
 
     def test_circuit_breaker_disabled(self) -> None:
         """Test circuit_breaker_threshold 0 disables circuit breaker."""

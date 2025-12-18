@@ -434,9 +434,7 @@ class TestCreateCatalogFactory:
         mock_catalog_cls.assert_called_once_with(basic_config)
 
     @patch("floe_polaris.factory.PolarisCatalog")
-    def test_create_catalog_with_generic_config(
-        self, mock_catalog_cls: MagicMock
-    ) -> None:
+    def test_create_catalog_with_generic_config(self, mock_catalog_cls: MagicMock) -> None:
         """Test factory with generic CatalogConfig-like object."""
         # Create a mock that looks like a CatalogConfig
         generic_config = MagicMock()

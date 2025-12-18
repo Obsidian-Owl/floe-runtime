@@ -9,7 +9,6 @@ Tests for:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, PropertyMock
 
 import pyarrow as pa
@@ -29,9 +28,6 @@ from floe_iceberg.errors import (
 )
 from floe_iceberg.tables import IcebergTableManager, build_partition_spec
 
-if TYPE_CHECKING:
-    pass
-
 
 @pytest.fixture
 def mock_catalog() -> MagicMock:
@@ -50,20 +46,24 @@ def manager(mock_catalog: MagicMock) -> IcebergTableManager:
 @pytest.fixture
 def sample_schema() -> pa.Schema:
     """Create a sample PyArrow schema for testing."""
-    return pa.schema([
-        pa.field("id", pa.int64()),
-        pa.field("name", pa.string()),
-        pa.field("created_at", pa.timestamp("us")),
-    ])
+    return pa.schema(
+        [
+            pa.field("id", pa.int64()),
+            pa.field("name", pa.string()),
+            pa.field("created_at", pa.timestamp("us")),
+        ]
+    )
 
 
 @pytest.fixture
 def sample_data() -> pa.Table:
     """Create sample PyArrow Table for testing."""
-    return pa.Table.from_pydict({
-        "id": [1, 2, 3],
-        "name": ["Alice", "Bob", "Charlie"],
-    })
+    return pa.Table.from_pydict(
+        {
+            "id": [1, 2, 3],
+            "name": ["Alice", "Bob", "Charlie"],
+        }
+    )
 
 
 class TestIcebergTableManagerInit:
@@ -131,8 +131,8 @@ class TestCreateTable:
         """Test TableExistsError when table already exists."""
         from pyiceberg.exceptions import TableAlreadyExistsError
 
-        manager._catalog.inner_catalog.create_table.side_effect = (
-            TableAlreadyExistsError("Table already exists")
+        manager._catalog.inner_catalog.create_table.side_effect = TableAlreadyExistsError(
+            "Table already exists"
         )
 
         with pytest.raises(TableExistsError) as exc_info:
@@ -146,8 +146,8 @@ class TestCreateTable:
         """Test NamespaceNotFoundError when namespace doesn't exist."""
         from pyiceberg.exceptions import NoSuchNamespaceError
 
-        manager._catalog.inner_catalog.create_table.side_effect = (
-            NoSuchNamespaceError("Namespace not found")
+        manager._catalog.inner_catalog.create_table.side_effect = NoSuchNamespaceError(
+            "Namespace not found"
         )
 
         from floe_polaris.errors import NamespaceNotFoundError
@@ -168,9 +168,7 @@ class TestCreateTableIfNotExists:
         # First call (table_exists check) raises NoSuchTableError
         # Second call (create_table) returns mock table
         mock_table = MagicMock()
-        manager._catalog.inner_catalog.load_table.side_effect = NoSuchTableError(
-            "Table not found"
-        )
+        manager._catalog.inner_catalog.load_table.side_effect = NoSuchTableError("Table not found")
         manager._catalog.inner_catalog.create_table.return_value = mock_table
 
         result = manager.create_table_if_not_exists("bronze.customers", sample_schema)
@@ -202,17 +200,13 @@ class TestLoadTable:
         result = manager.load_table("bronze.customers")
 
         assert result is mock_table
-        manager._catalog.inner_catalog.load_table.assert_called_once_with(
-            ("bronze", "customers")
-        )
+        manager._catalog.inner_catalog.load_table.assert_called_once_with(("bronze", "customers"))
 
     def test_load_table_not_found(self, manager: IcebergTableManager) -> None:
         """Test TableNotFoundError when table doesn't exist."""
         from pyiceberg.exceptions import NoSuchTableError
 
-        manager._catalog.inner_catalog.load_table.side_effect = NoSuchTableError(
-            "Table not found"
-        )
+        manager._catalog.inner_catalog.load_table.side_effect = NoSuchTableError("Table not found")
 
         with pytest.raises(TableNotFoundError) as exc_info:
             manager.load_table("bronze.nonexistent")
@@ -239,26 +233,20 @@ class TestDropTable:
         manager.drop_table("bronze.customers")
 
         # Note: PyIceberg's base Catalog.drop_table doesn't accept purge param
-        manager._catalog.inner_catalog.drop_table.assert_called_once_with(
-            ("bronze", "customers")
-        )
+        manager._catalog.inner_catalog.drop_table.assert_called_once_with(("bronze", "customers"))
 
     def test_drop_table_with_purge(self, manager: IcebergTableManager) -> None:
         """Test dropping table with purge=True (purge is logged but not passed to catalog)."""
         manager.drop_table("bronze.customers", purge=True)
 
         # Note: purge param is logged but not passed to PyIceberg catalog
-        manager._catalog.inner_catalog.drop_table.assert_called_once_with(
-            ("bronze", "customers")
-        )
+        manager._catalog.inner_catalog.drop_table.assert_called_once_with(("bronze", "customers"))
 
     def test_drop_table_not_found(self, manager: IcebergTableManager) -> None:
         """Test TableNotFoundError when dropping nonexistent table."""
         from pyiceberg.exceptions import NoSuchTableError
 
-        manager._catalog.inner_catalog.drop_table.side_effect = NoSuchTableError(
-            "Table not found"
-        )
+        manager._catalog.inner_catalog.drop_table.side_effect = NoSuchTableError("Table not found")
 
         with pytest.raises(TableNotFoundError):
             manager.drop_table("bronze.nonexistent")
@@ -278,9 +266,7 @@ class TestTableExists:
         """Test returns False when table doesn't exist."""
         from pyiceberg.exceptions import NoSuchTableError
 
-        manager._catalog.inner_catalog.load_table.side_effect = NoSuchTableError(
-            "Table not found"
-        )
+        manager._catalog.inner_catalog.load_table.side_effect = NoSuchTableError("Table not found")
 
         assert manager.table_exists("bronze.nonexistent") is False
 
@@ -310,9 +296,7 @@ class TestListTables:
         result = manager.list_tables("bronze.raw")
 
         assert result == ["events"]
-        manager._catalog.inner_catalog.list_tables.assert_called_once_with(
-            ("bronze", "raw")
-        )
+        manager._catalog.inner_catalog.list_tables.assert_called_once_with(("bronze", "raw"))
 
     def test_list_tables_empty(self, manager: IcebergTableManager) -> None:
         """Test listing tables in empty namespace."""
@@ -326,9 +310,7 @@ class TestListTables:
 class TestAppend:
     """Tests for append method."""
 
-    def test_append_data(
-        self, manager: IcebergTableManager, sample_data: pa.Table
-    ) -> None:
+    def test_append_data(self, manager: IcebergTableManager, sample_data: pa.Table) -> None:
         """Test appending data to table."""
         mock_table = MagicMock()
         mock_snapshot = MagicMock()
@@ -356,16 +338,12 @@ class TestAppend:
         """Test TableNotFoundError when appending to nonexistent table."""
         from pyiceberg.exceptions import NoSuchTableError
 
-        manager._catalog.inner_catalog.load_table.side_effect = NoSuchTableError(
-            "Table not found"
-        )
+        manager._catalog.inner_catalog.load_table.side_effect = NoSuchTableError("Table not found")
 
         with pytest.raises(TableNotFoundError):
             manager.append("bronze.nonexistent", sample_data)
 
-    def test_append_write_error(
-        self, manager: IcebergTableManager, sample_data: pa.Table
-    ) -> None:
+    def test_append_write_error(self, manager: IcebergTableManager, sample_data: pa.Table) -> None:
         """Test WriteError when append fails."""
         mock_table = MagicMock()
         mock_table.schema.return_value = MagicMock(fields=[])
@@ -381,9 +359,7 @@ class TestAppend:
 class TestOverwrite:
     """Tests for overwrite method."""
 
-    def test_overwrite_data(
-        self, manager: IcebergTableManager, sample_data: pa.Table
-    ) -> None:
+    def test_overwrite_data(self, manager: IcebergTableManager, sample_data: pa.Table) -> None:
         """Test overwriting table data."""
         mock_table = MagicMock()
         mock_snapshot = MagicMock()
@@ -578,9 +554,11 @@ class TestBuildPartitionSpec:
 
     def test_build_bucket_partition(self) -> None:
         """Test building bucket partition spec."""
-        schema = pa.schema([
-            pa.field("customer_id", pa.int64()),
-        ])
+        schema = pa.schema(
+            [
+                pa.field("customer_id", pa.int64()),
+            ]
+        )
         transforms = [
             PartitionTransform(
                 source_column="customer_id",
@@ -689,9 +667,7 @@ class TestToArrow:
 class TestExpireSnapshots:
     """Tests for expire_snapshots method."""
 
-    def test_expire_snapshots_requires_parameter(
-        self, mock_catalog: MagicMock
-    ) -> None:
+    def test_expire_snapshots_requires_parameter(self, mock_catalog: MagicMock) -> None:
         """Test that at least one parameter is required."""
         manager = IcebergTableManager(mock_catalog)
 
@@ -700,9 +676,7 @@ class TestExpireSnapshots:
 
         assert "At least one of older_than or retain_last" in str(exc_info.value)
 
-    def test_expire_snapshots_with_retain_last(
-        self, mock_catalog: MagicMock
-    ) -> None:
+    def test_expire_snapshots_with_retain_last(self, mock_catalog: MagicMock) -> None:
         """Test expire_snapshots with retain_last parameter."""
         manager = IcebergTableManager(mock_catalog)
 
@@ -725,16 +699,12 @@ class TestExpireSnapshots:
         mock_catalog.inner_catalog.load_table.return_value = mock_table
 
         # Retain only 2 most recent (snap2, snap3)
-        expired_count = manager.expire_snapshots(
-            "bronze.customers", retain_last=2
-        )
+        expired_count = manager.expire_snapshots("bronze.customers", retain_last=2)
 
         # snap1 should be expired
         assert expired_count == 1
 
-    def test_expire_snapshots_with_older_than(
-        self, mock_catalog: MagicMock
-    ) -> None:
+    def test_expire_snapshots_with_older_than(self, mock_catalog: MagicMock) -> None:
         """Test expire_snapshots with older_than parameter."""
         from datetime import datetime
 
@@ -760,18 +730,14 @@ class TestExpireSnapshots:
 
         # Expire snapshots older than 2024-03-01
         cutoff = datetime(2024, 3, 1)
-        expired_count = manager.expire_snapshots(
-            "bronze.customers", older_than=cutoff
-        )
+        expired_count = manager.expire_snapshots("bronze.customers", older_than=cutoff)
 
         # snap1 and snap2 are older than cutoff
         # But snap3 is current, so it's kept even if older
         # snap2 should be expired (snap1 too, but snap3 is current)
         assert expired_count == 2
 
-    def test_expire_snapshots_with_both_parameters(
-        self, mock_catalog: MagicMock
-    ) -> None:
+    def test_expire_snapshots_with_both_parameters(self, mock_catalog: MagicMock) -> None:
         """Test expire_snapshots with both older_than and retain_last."""
         from datetime import datetime
 
@@ -802,9 +768,7 @@ class TestExpireSnapshots:
         # Snapshots 1, 2, 3 should be expired (snap4, snap5 kept by both criteria)
         assert expired_count == 3
 
-    def test_expire_snapshots_current_always_retained(
-        self, mock_catalog: MagicMock
-    ) -> None:
+    def test_expire_snapshots_current_always_retained(self, mock_catalog: MagicMock) -> None:
         """Test that current snapshot is always retained."""
         from datetime import datetime
 
@@ -823,16 +787,12 @@ class TestExpireSnapshots:
         # Even with retain_last=0 (if that were allowed), current is kept
         # With older_than in the future, nothing should expire
         cutoff = datetime(2099, 1, 1)
-        expired_count = manager.expire_snapshots(
-            "bronze.customers", older_than=cutoff
-        )
+        expired_count = manager.expire_snapshots("bronze.customers", older_than=cutoff)
 
         # Current snapshot is always retained
         assert expired_count == 0
 
-    def test_expire_snapshots_no_snapshots(
-        self, mock_catalog: MagicMock
-    ) -> None:
+    def test_expire_snapshots_no_snapshots(self, mock_catalog: MagicMock) -> None:
         """Test expire_snapshots with no existing snapshots."""
         manager = IcebergTableManager(mock_catalog)
 
@@ -841,15 +801,11 @@ class TestExpireSnapshots:
         mock_table.current_snapshot.return_value = None
         mock_catalog.inner_catalog.load_table.return_value = mock_table
 
-        expired_count = manager.expire_snapshots(
-            "bronze.customers", retain_last=5
-        )
+        expired_count = manager.expire_snapshots("bronze.customers", retain_last=5)
 
         assert expired_count == 0
 
-    def test_expire_snapshots_with_table_identifier(
-        self, mock_catalog: MagicMock
-    ) -> None:
+    def test_expire_snapshots_with_table_identifier(self, mock_catalog: MagicMock) -> None:
         """Test expire_snapshots accepts TableIdentifier."""
         manager = IcebergTableManager(mock_catalog)
 

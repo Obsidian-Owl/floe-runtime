@@ -85,19 +85,23 @@ def mock_table_manager() -> MagicMock:
 @pytest.fixture
 def sample_arrow_table() -> pa.Table:
     """Create a sample PyArrow table."""
-    return pa.Table.from_pydict({
-        "id": [1, 2, 3],
-        "name": ["Alice", "Bob", "Charlie"],
-    })
+    return pa.Table.from_pydict(
+        {
+            "id": [1, 2, 3],
+            "name": ["Alice", "Bob", "Charlie"],
+        }
+    )
 
 
 @pytest.fixture
 def sample_dataframe() -> pd.DataFrame:
     """Create a sample Pandas DataFrame."""
-    return pd.DataFrame({
-        "id": [1, 2, 3],
-        "name": ["Alice", "Bob", "Charlie"],
-    })
+    return pd.DataFrame(
+        {
+            "id": [1, 2, 3],
+            "name": ["Alice", "Bob", "Charlie"],
+        }
+    )
 
 
 def create_output_context(
@@ -198,25 +202,19 @@ class TestIcebergIOManagerInit:
 class TestGetTableIdentifier:
     """Tests for get_table_identifier method."""
 
-    def test_single_part_key_uses_default_namespace(
-        self, io_manager: IcebergIOManager
-    ) -> None:
+    def test_single_part_key_uses_default_namespace(self, io_manager: IcebergIOManager) -> None:
         """Test single-part asset key uses default namespace."""
         context = create_output_context(["customers"])
         result = io_manager.get_table_identifier(context)
         assert result == "bronze.customers"
 
-    def test_two_part_key_uses_first_as_namespace(
-        self, io_manager: IcebergIOManager
-    ) -> None:
+    def test_two_part_key_uses_first_as_namespace(self, io_manager: IcebergIOManager) -> None:
         """Test two-part asset key uses first part as namespace."""
         context = create_output_context(["silver", "orders"])
         result = io_manager.get_table_identifier(context)
         assert result == "silver.orders"
 
-    def test_multi_part_key_joins_with_underscore(
-        self, io_manager: IcebergIOManager
-    ) -> None:
+    def test_multi_part_key_joins_with_underscore(self, io_manager: IcebergIOManager) -> None:
         """Test multi-part asset key joins tail parts with underscore."""
         context = create_output_context(["gold", "metrics", "daily"])
         result = io_manager.get_table_identifier(context)
@@ -228,19 +226,12 @@ class TestGetTableIdentifier:
         result = io_manager.get_table_identifier(context)
         assert result == "gold.dim_customer_scd2"
 
-    def test_raises_for_missing_asset_key(
-        self, io_manager: IcebergIOManager
-    ) -> None:
-        """Test raises ValueError if asset key is None."""
-        context = MagicMock()
-        context.asset_key = None
+    # Note: Removed test_raises_for_missing_asset_key test because:
+    # 1. Dagster's OutputContext/InputContext always have asset_key present
+    # 2. mypy correctly identifies any None check as unreachable code
+    # 3. The test was mocking an impossible scenario in real Dagster usage
 
-        with pytest.raises(ValueError, match="Asset key is required"):
-            io_manager.get_table_identifier(context)
-
-    def test_input_context_works_same_as_output(
-        self, io_manager: IcebergIOManager
-    ) -> None:
+    def test_input_context_works_same_as_output(self, io_manager: IcebergIOManager) -> None:
         """Test InputContext works the same as OutputContext."""
         context = create_input_context(["bronze", "raw_events"])
         result = io_manager.get_table_identifier(context)
@@ -369,17 +360,13 @@ class TestHandleOutputDataFrame:
 class TestWriteModeSelection:
     """Tests for write mode selection logic."""
 
-    def test_default_write_mode_from_config(
-        self, io_manager: IcebergIOManager
-    ) -> None:
+    def test_default_write_mode_from_config(self, io_manager: IcebergIOManager) -> None:
         """Test default write mode comes from config."""
         context = create_output_context(["customers"])
         result = io_manager._get_write_mode(context)
         assert result == WriteMode.APPEND
 
-    def test_write_mode_from_metadata_string(
-        self, io_manager: IcebergIOManager
-    ) -> None:
+    def test_write_mode_from_metadata_string(self, io_manager: IcebergIOManager) -> None:
         """Test write mode from metadata as string."""
         context = create_output_context(
             ["customers"],
@@ -388,9 +375,7 @@ class TestWriteModeSelection:
         result = io_manager._get_write_mode(context)
         assert result == WriteMode.OVERWRITE
 
-    def test_write_mode_from_metadata_enum(
-        self, io_manager: IcebergIOManager
-    ) -> None:
+    def test_write_mode_from_metadata_enum(self, io_manager: IcebergIOManager) -> None:
         """Test write mode from metadata as WriteMode enum."""
         context = create_output_context(
             ["customers"],
@@ -817,9 +802,7 @@ class TestPartitionedReads:
 class TestContextExtraction:
     """Tests for context extraction helper methods."""
 
-    def test_get_columns_from_context_with_list(
-        self, io_manager: IcebergIOManager
-    ) -> None:
+    def test_get_columns_from_context_with_list(self, io_manager: IcebergIOManager) -> None:
         """Test column extraction from list."""
         context = MagicMock()
         context.metadata = {"columns": ["id", "name", "email"]}
@@ -828,9 +811,7 @@ class TestContextExtraction:
 
         assert result == ["id", "name", "email"]
 
-    def test_get_columns_from_context_with_tuple(
-        self, io_manager: IcebergIOManager
-    ) -> None:
+    def test_get_columns_from_context_with_tuple(self, io_manager: IcebergIOManager) -> None:
         """Test column extraction from tuple."""
         context = MagicMock()
         context.metadata = {"columns": ("id", "name")}
@@ -839,9 +820,7 @@ class TestContextExtraction:
 
         assert result == ["id", "name"]
 
-    def test_get_columns_from_context_none(
-        self, io_manager: IcebergIOManager
-    ) -> None:
+    def test_get_columns_from_context_none(self, io_manager: IcebergIOManager) -> None:
         """Test column extraction returns None when not specified."""
         context = MagicMock()
         context.metadata = {}
@@ -850,9 +829,7 @@ class TestContextExtraction:
 
         assert result is None
 
-    def test_get_row_filter_from_context(
-        self, io_manager: IcebergIOManager
-    ) -> None:
+    def test_get_row_filter_from_context(self, io_manager: IcebergIOManager) -> None:
         """Test row filter extraction."""
         context = MagicMock()
         context.metadata = {"row_filter": "id > 100"}
@@ -861,9 +838,7 @@ class TestContextExtraction:
 
         assert result == "id > 100"
 
-    def test_get_snapshot_id_from_context(
-        self, io_manager: IcebergIOManager
-    ) -> None:
+    def test_get_snapshot_id_from_context(self, io_manager: IcebergIOManager) -> None:
         """Test snapshot ID extraction."""
         context = MagicMock()
         context.metadata = {"snapshot_id": "123456789"}
@@ -872,9 +847,7 @@ class TestContextExtraction:
 
         assert result == 123456789
 
-    def test_get_limit_from_context(
-        self, io_manager: IcebergIOManager
-    ) -> None:
+    def test_get_limit_from_context(self, io_manager: IcebergIOManager) -> None:
         """Test limit extraction."""
         context = MagicMock()
         context.metadata = {"limit": "500"}
@@ -920,9 +893,7 @@ class TestContextExtraction:
 class TestCreateIOManager:
     """Tests for create_io_manager factory function."""
 
-    def test_create_io_manager_from_config(
-        self, sample_config: IcebergIOManagerConfig
-    ) -> None:
+    def test_create_io_manager_from_config(self, sample_config: IcebergIOManagerConfig) -> None:
         """Test create_io_manager creates IOManager from config."""
         io_manager = create_io_manager(sample_config)
 
@@ -974,14 +945,14 @@ class TestCreateIOManager:
 class TestPartitionSpecGeneration:
     """Tests for partition spec generation."""
 
-    def test_no_partition_spec_by_default(
-        self, io_manager: IcebergIOManager
-    ) -> None:
+    def test_no_partition_spec_by_default(self, io_manager: IcebergIOManager) -> None:
         """Test no partition spec when partition_column not set."""
-        schema = pa.schema([
-            pa.field("id", pa.int64()),
-            pa.field("name", pa.string()),
-        ])
+        schema = pa.schema(
+            [
+                pa.field("id", pa.int64()),
+                pa.field("name", pa.string()),
+            ]
+        )
         context = create_output_context(["bronze", "customers"])
 
         result = io_manager._get_partition_spec(schema, context)
@@ -995,10 +966,12 @@ class TestPartitionSpecGeneration:
             warehouse="test",
             partition_column="created_at",
         )
-        schema = pa.schema([
-            pa.field("id", pa.int64()),
-            pa.field("created_at", pa.timestamp("us")),
-        ])
+        schema = pa.schema(
+            [
+                pa.field("id", pa.int64()),
+                pa.field("created_at", pa.timestamp("us")),
+            ]
+        )
         context = create_output_context(["bronze", "events"])
 
         result = io_manager._get_partition_spec(schema, context)
@@ -1012,10 +985,12 @@ class TestPartitionSpecGeneration:
             warehouse="test",
             partition_column="created_at",
         )
-        schema = pa.schema([
-            pa.field("id", pa.int64()),
-            pa.field("name", pa.string()),
-        ])
+        schema = pa.schema(
+            [
+                pa.field("id", pa.int64()),
+                pa.field("name", pa.string()),
+            ]
+        )
         context = create_output_context(["bronze", "customers"])
 
         result = io_manager._get_partition_spec(schema, context)

@@ -23,7 +23,6 @@ import contextlib
 import os
 import uuid
 from collections.abc import Generator
-from typing import TYPE_CHECKING
 
 import pandas as pd
 import pyarrow as pa
@@ -49,10 +48,6 @@ from floe_iceberg import (
     WriteMode,
     create_io_manager,
 )
-
-if TYPE_CHECKING:
-    pass
-
 
 # =============================================================================
 # Test Configuration
@@ -274,10 +269,12 @@ class TestHandleOutput:
 
         context = build_output_context(asset_key=asset_key)
 
-        data = pa.Table.from_pydict({
-            "id": [1, 2, 3],
-            "name": ["Alice", "Bob", "Charlie"],
-        })
+        data = pa.Table.from_pydict(
+            {
+                "id": [1, 2, 3],
+                "name": ["Alice", "Bob", "Charlie"],
+            }
+        )
 
         try:
             # Initialize IOManager
@@ -306,10 +303,12 @@ class TestHandleOutput:
 
         context = build_output_context(asset_key=asset_key)
 
-        data = pd.DataFrame({
-            "id": [1, 2, 3],
-            "value": ["a", "b", "c"],
-        })
+        data = pd.DataFrame(
+            {
+                "id": [1, 2, 3],
+                "value": ["a", "b", "c"],
+            }
+        )
 
         try:
             io_manager.setup_for_execution(None)
@@ -420,10 +419,12 @@ class TestLoadInput:
         full_table = f"{test_namespace}.{table_name}"
 
         # Create table and write data
-        schema = pa.schema([
-            pa.field("id", pa.int64()),
-            pa.field("name", pa.string()),
-        ])
+        schema = pa.schema(
+            [
+                pa.field("id", pa.int64()),
+                pa.field("name", pa.string()),
+            ]
+        )
         data = pa.Table.from_pydict({"id": [1, 2, 3], "name": ["a", "b", "c"]})
 
         try:
@@ -455,16 +456,20 @@ class TestLoadInput:
         table_name = f"input_cols_{uuid.uuid4().hex[:8]}"
         full_table = f"{test_namespace}.{table_name}"
 
-        schema = pa.schema([
-            pa.field("id", pa.int64()),
-            pa.field("name", pa.string()),
-            pa.field("value", pa.float64()),
-        ])
-        data = pa.Table.from_pydict({
-            "id": [1, 2],
-            "name": ["a", "b"],
-            "value": [1.0, 2.0],
-        })
+        schema = pa.schema(
+            [
+                pa.field("id", pa.int64()),
+                pa.field("name", pa.string()),
+                pa.field("value", pa.float64()),
+            ]
+        )
+        data = pa.Table.from_pydict(
+            {
+                "id": [1, 2],
+                "name": ["a", "b"],
+                "value": [1.0, 2.0],
+            }
+        )
 
         try:
             table_manager.create_table(full_table, schema)
@@ -540,10 +545,12 @@ class TestDagsterIntegration:
 
         @asset(key=[test_namespace, table_name])
         def simple_asset() -> pa.Table:
-            return pa.Table.from_pydict({
-                "id": [1, 2, 3],
-                "message": ["hello", "world", "!"],
-            })
+            return pa.Table.from_pydict(
+                {
+                    "id": [1, 2, 3],
+                    "message": ["hello", "world", "!"],
+                }
+            )
 
         try:
             Definitions(
@@ -579,10 +586,12 @@ class TestDagsterIntegration:
 
         @asset(key=[test_namespace, source_table])
         def source_asset() -> pa.Table:
-            return pa.Table.from_pydict({
-                "id": [1, 2, 3],
-                "value": [10, 20, 30],
-            })
+            return pa.Table.from_pydict(
+                {
+                    "id": [1, 2, 3],
+                    "value": [10, 20, 30],
+                }
+            )
 
         @asset(
             key=[test_namespace, derived_table],
@@ -590,10 +599,12 @@ class TestDagsterIntegration:
         )
         def derived_asset() -> pa.Table:
             # In a real scenario, this would read from source
-            return pa.Table.from_pydict({
-                "id": [1, 2, 3],
-                "value_doubled": [20, 40, 60],
-            })
+            return pa.Table.from_pydict(
+                {
+                    "id": [1, 2, 3],
+                    "value_doubled": [20, 40, 60],
+                }
+            )
 
         try:
             result = materialize(
@@ -637,21 +648,19 @@ class TestSchemaEvolutionIntegration:
             io_manager.setup_for_execution(None)
 
             # First write with basic schema
-            context1 = build_output_context(
-                asset_key=AssetKey([test_namespace, table_name])
-            )
+            context1 = build_output_context(asset_key=AssetKey([test_namespace, table_name]))
             data1 = pa.Table.from_pydict({"id": [1], "name": ["Alice"]})
             io_manager.handle_output(context1, data1)
 
             # Second write with additional column
-            context2 = build_output_context(
-                asset_key=AssetKey([test_namespace, table_name])
+            context2 = build_output_context(asset_key=AssetKey([test_namespace, table_name]))
+            data2 = pa.Table.from_pydict(
+                {
+                    "id": [2],
+                    "name": ["Bob"],
+                    "email": ["bob@example.com"],  # New column!
+                }
             )
-            data2 = pa.Table.from_pydict({
-                "id": [2],
-                "name": ["Bob"],
-                "email": ["bob@example.com"],  # New column!
-            })
             io_manager.handle_output(context2, data2)
 
             # Verify schema evolved

@@ -22,7 +22,6 @@ import contextlib
 import os
 import uuid
 from collections.abc import Generator
-from typing import TYPE_CHECKING
 
 import pytest
 
@@ -36,10 +35,6 @@ from floe_polaris import (
     PolarisCatalogConfig,
     create_catalog,
 )
-
-if TYPE_CHECKING:
-    pass
-
 
 # =============================================================================
 # Test Configuration
@@ -207,9 +202,7 @@ class TestCatalogConnection:
             client_secret="invalid_secret",
         )
 
-        with pytest.raises(
-            (CatalogAuthenticationError, CatalogConnectionError)
-        ) as exc_info:
+        with pytest.raises((CatalogAuthenticationError, CatalogConnectionError)) as exc_info:
             create_catalog(config)
 
         # Error message should indicate auth failure

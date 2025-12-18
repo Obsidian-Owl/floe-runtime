@@ -36,8 +36,8 @@ echo "Extracting root credentials from Polaris logs..."
 CREDS_LINE=$(docker logs floe-polaris 2>&1 | grep "root principal credentials:" | head -1)
 
 if [ -z "${CREDS_LINE}" ]; then
-  echo "ERROR: Could not find credentials in Polaris logs"
-  echo "Polaris logs:"
+  echo "ERROR: Could not find credentials in Polaris logs" >&2
+  echo "Polaris logs:" >&2
   docker logs floe-polaris 2>&1 | head -30
   exit 1
 fi
@@ -48,7 +48,7 @@ POLARIS_CLIENT_ID=$(echo "${CREDS}" | cut -d: -f1)
 POLARIS_CLIENT_SECRET=$(echo "${CREDS}" | cut -d: -f2)
 
 if [ -z "${POLARIS_CLIENT_ID}" ] || [ -z "${POLARIS_CLIENT_SECRET}" ]; then
-  echo "ERROR: Failed to parse credentials from line: ${CREDS_LINE}"
+  echo "ERROR: Failed to parse credentials from line: ${CREDS_LINE}" >&2
   exit 1
 fi
 

@@ -100,6 +100,64 @@ class CircuitOpenError(Exception):
         super().__init__(message)
 
 
+def _check_circuit_breaker(circuit_breaker: CircuitBreaker | None, operation_name: str) -> None:
+    """Check circuit breaker state and raise if open.
+
+    Args:
+        circuit_breaker: Optional circuit breaker to check.
+        operation_name: Name for error message.
+
+    Raises:
+        CircuitOpenError: If circuit breaker is open.
+    """
+    if circuit_breaker is not None and circuit_breaker.is_open:
+        raise CircuitOpenError(f"Circuit open for {operation_name}")
+
+
+def _handle_success(circuit_breaker: CircuitBreaker | None) -> None:
+    """Record success with circuit breaker if present."""
+    if circuit_breaker is not None:
+        circuit_breaker.record_success()
+
+
+def _handle_retry_exception(
+    config: RetryConfig,
+    operation_name: str,
+    attempt: int,
+    exc: Exception,
+) -> None:
+    """Log retry attempt if more retries are available."""
+    if attempt < config.max_attempts:
+        wait_time = _calculate_wait_time(config, attempt)
+        log_retry_attempt(
+            operation=operation_name,
+            attempt=attempt,
+            max_attempts=config.max_attempts,
+            wait_seconds=wait_time,
+            error=str(exc),
+        )
+
+
+def _handle_exhausted_retries(
+    circuit_breaker: CircuitBreaker | None,
+    last_exception: Exception | None,
+) -> None:
+    """Handle case when all retries are exhausted.
+
+    Args:
+        circuit_breaker: Optional circuit breaker to record failure.
+        last_exception: The last exception that occurred.
+
+    Raises:
+        The last exception if available.
+        RetryError: If no exception was captured.
+    """
+    if circuit_breaker is not None:
+        circuit_breaker.record_failure()
+    if last_exception is not None:
+        raise last_exception from None
+
+
 def create_retry_decorator(
     config: RetryConfig,
     *,
@@ -135,11 +193,8 @@ def create_retry_decorator(
 
         @wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-            # Check circuit breaker first
-            if circuit_breaker is not None and circuit_breaker.is_open:
-                raise CircuitOpenError(f"Circuit open for {op_name}")
+            _check_circuit_breaker(circuit_breaker, op_name)
 
-            attempt = 0
             last_exception: Exception | None = None
 
             try:
@@ -157,29 +212,14 @@ def create_retry_decorator(
                         attempt = attempt_state.retry_state.attempt_number
                         try:
                             result = func(*args, **kwargs)
-                            # Success - reset circuit breaker
-                            if circuit_breaker is not None:
-                                circuit_breaker.record_success()
+                            _handle_success(circuit_breaker)
                             return result
                         except exceptions as exc:
                             last_exception = exc
-                            # Log retry attempt
-                            if attempt < config.max_attempts:
-                                wait_time = _calculate_wait_time(config, attempt)
-                                log_retry_attempt(
-                                    operation=op_name,
-                                    attempt=attempt,
-                                    max_attempts=config.max_attempts,
-                                    wait_seconds=wait_time,
-                                    error=str(exc),
-                                )
+                            _handle_retry_exception(config, op_name, attempt, exc)
                             raise
             except RetryError:
-                # All retries exhausted - record failure
-                if circuit_breaker is not None:
-                    circuit_breaker.record_failure()
-                if last_exception is not None:
-                    raise last_exception from None
+                _handle_exhausted_retries(circuit_breaker, last_exception)
                 raise
 
             # Should not reach here, but satisfy type checker

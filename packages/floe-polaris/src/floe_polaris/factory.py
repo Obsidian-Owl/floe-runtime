@@ -6,14 +6,11 @@ configured PolarisCatalog instances from configuration objects.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from floe_polaris.client import PolarisCatalog
 from floe_polaris.config import PolarisCatalogConfig
 from floe_polaris.observability import catalog_operation, get_logger
-
-if TYPE_CHECKING:
-    pass
 
 
 def create_catalog(
