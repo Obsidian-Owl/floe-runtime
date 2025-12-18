@@ -66,8 +66,9 @@ jobs:
         working-directory: testing/docker
         run: |
           # Run tests inside Docker network (need both profiles for dependencies)
+          # Use -p no:cacheprovider to avoid permission errors writing to /workspace/.pytest_cache
           docker compose --profile storage --profile test run --rm test-runner \
-            uv run pytest -m integration packages/floe-polaris/tests/ packages/floe-iceberg/tests/ -v --tb=short
+            uv run pytest -m integration packages/floe-polaris/tests/ packages/floe-iceberg/tests/ -v --tb=short -p no:cacheprovider
 
       - name: Show logs on failure
         if: failure()
