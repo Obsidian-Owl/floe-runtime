@@ -2,6 +2,7 @@
 
 T015: [US1] Contract test - generated config matches cube-config.schema.json
 T025: [US2] Contract test - generated schemas match cube-schema.schema.json
+T079: [US8] Contract test - emitted events match openlineage-event.schema.json
 
 These tests ensure that generated artifacts conform to their JSON schemas,
 providing contract stability between floe-cube and downstream consumers.
@@ -50,10 +51,12 @@ class TestCubeConfigContractStability:
                 / "cube-config.schema.json"
             )
         if not schema_path.exists():
+            path1 = "packages/floe-core/src/floe_core/schemas/json/cube-config.schema.json"
+            path2 = "specs/005-consumption-layer/contracts/cube-config.schema.json"
             pytest.fail(
                 f"cube-config.schema.json not found. Searched:\n"
-                f"  - {project_root / 'packages/floe-core/src/floe_core/schemas/json/cube-config.schema.json'}\n"
-                f"  - {project_root / 'specs/005-consumption-layer/contracts/cube-config.schema.json'}"
+                f"  - {project_root / path1}\n"
+                f"  - {project_root / path2}"
             )
 
         return json.loads(schema_path.read_text())
@@ -142,9 +145,7 @@ class TestCubeConfigContractStability:
             try:
                 jsonschema.validate(input_config, cube_config_schema)
             except jsonschema.ValidationError as e:
-                pytest.fail(
-                    f"Config for {db_type} does not match schema: {e.message}"
-                )
+                pytest.fail(f"Config for {db_type} does not match schema: {e.message}")
 
     def test_config_includes_required_fields(
         self,
@@ -242,6 +243,129 @@ class TestCubeSchemaContractStability:
             jsonschema.validate(schema_dict, cube_schema_json_schema)
         except jsonschema.ValidationError as e:
             pytest.fail(f"CubeSchema does not match JSON schema: {e.message}")
+
+
+class TestOpenLineageEventContractStability:
+    """Contract tests for OpenLineage event schema stability.
+
+    T079: [US8] Contract test - emitted events match openlineage-event.schema.json
+    """
+
+    @pytest.fixture
+    def openlineage_event_schema(self) -> dict[str, Any]:
+        """Load the openlineage-event JSON schema."""
+        project_root = Path(__file__).parent.parent.parent.parent.parent
+        schema_path = (
+            project_root
+            / "specs"
+            / "005-consumption-layer"
+            / "contracts"
+            / "openlineage-event.schema.json"
+        )
+        if not schema_path.exists():
+            pytest.fail(f"openlineage-event.schema.json not found at {schema_path}")
+
+        return json.loads(schema_path.read_text())
+
+    def test_start_event_matches_schema(
+        self,
+        openlineage_event_schema: dict[str, Any],
+    ) -> None:
+        """START event should validate against openlineage-event.schema.json."""
+        from datetime import datetime, timezone
+
+        import jsonschema
+
+        from floe_cube.lineage import EventType, QueryLineageEvent
+
+        event = QueryLineageEvent(
+            run_id="550e8400-e29b-41d4-a716-446655440000",
+            job_name="cube.orders.query",
+            namespace="floe-cube",
+            event_type=EventType.START,
+            event_time=datetime.now(tz=timezone.utc),
+            inputs=["orders"],
+            sql="SELECT * FROM orders",
+        )
+
+        event_dict = event.model_dump(mode="json")
+
+        try:
+            jsonschema.validate(event_dict, openlineage_event_schema)
+        except jsonschema.ValidationError as e:
+            pytest.fail(f"START event does not match schema: {e.message}")
+
+    def test_complete_event_matches_schema(
+        self,
+        openlineage_event_schema: dict[str, Any],
+    ) -> None:
+        """COMPLETE event should validate against openlineage-event.schema.json."""
+        from datetime import datetime, timezone
+
+        import jsonschema
+
+        from floe_cube.lineage import EventType, QueryLineageEvent
+
+        event = QueryLineageEvent(
+            run_id="550e8400-e29b-41d4-a716-446655440000",
+            job_name="cube.orders.query",
+            namespace="floe-cube",
+            event_type=EventType.COMPLETE,
+            event_time=datetime.now(tz=timezone.utc),
+            inputs=["orders"],
+            row_count=100,
+        )
+
+        event_dict = event.model_dump(mode="json")
+
+        try:
+            jsonschema.validate(event_dict, openlineage_event_schema)
+        except jsonschema.ValidationError as e:
+            pytest.fail(f"COMPLETE event does not match schema: {e.message}")
+
+    def test_fail_event_matches_schema(
+        self,
+        openlineage_event_schema: dict[str, Any],
+    ) -> None:
+        """FAIL event should validate against openlineage-event.schema.json."""
+        from datetime import datetime, timezone
+
+        import jsonschema
+
+        from floe_cube.lineage import EventType, QueryLineageEvent
+
+        event = QueryLineageEvent(
+            run_id="550e8400-e29b-41d4-a716-446655440000",
+            job_name="cube.orders.query",
+            namespace="floe-cube",
+            event_type=EventType.FAIL,
+            event_time=datetime.now(tz=timezone.utc),
+            inputs=["orders"],
+            error="Query timeout after 30 seconds",
+        )
+
+        event_dict = event.model_dump(mode="json")
+
+        try:
+            jsonschema.validate(event_dict, openlineage_event_schema)
+        except jsonschema.ValidationError as e:
+            pytest.fail(f"FAIL event does not match schema: {e.message}")
+
+    def test_openlineage_schema_has_version(self) -> None:
+        """OpenLineage schema should have version information."""
+        project_root = Path(__file__).parent.parent.parent.parent.parent
+        schema_path = (
+            project_root
+            / "specs"
+            / "005-consumption-layer"
+            / "contracts"
+            / "openlineage-event.schema.json"
+        )
+        if not schema_path.exists():
+            pytest.fail(f"openlineage-event.schema.json not found at {schema_path}")
+
+        schema = json.loads(schema_path.read_text())
+        assert "$schema" in schema, "Schema should declare its JSON Schema version"
 
 
 class TestSchemaVersionStability:

@@ -206,9 +206,7 @@ def tmp_cube_project(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def tmp_dbt_project(
-    tmp_path: Path, sample_dbt_manifest: dict[str, Any]
-) -> Path:
+def tmp_dbt_project(tmp_path: Path, sample_dbt_manifest: dict[str, Any]) -> Path:
     """Create a temporary dbt project with manifest.json.
 
     Args:

@@ -215,7 +215,6 @@ class TestSpanHierarchy:
     def test_span_hierarchy_names(self) -> None:
         """Span names should follow cube.* convention for hierarchy."""
         start = datetime.now(tz=timezone.utc)
-        parent_span_id = "c7ad6b7169203332"
 
         # Root SERVER span
         root_span = QueryTraceSpan(

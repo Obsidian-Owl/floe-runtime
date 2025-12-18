@@ -755,16 +755,12 @@ class TestPreAggregationYamlGeneration:
             name="orders",
             sql_table="public.orders",
             dimensions=[
-                CubeDimension(
-                    name="created_at", sql="${CUBE}.created_at", type=DimensionType.TIME
-                ),
+                CubeDimension(name="created_at", sql="${CUBE}.created_at", type=DimensionType.TIME),
                 CubeDimension(name="status", sql="${CUBE}.status", type=DimensionType.STRING),
             ],
             measures=[
                 CubeMeasure(name="count", type=MeasureType.COUNT),
-                CubeMeasure(
-                    name="total_amount", type=MeasureType.SUM, sql="${CUBE}.amount"
-                ),
+                CubeMeasure(name="total_amount", type=MeasureType.SUM, sql="${CUBE}.amount"),
             ],
             pre_aggregations=[
                 CubePreAggregation(
@@ -875,9 +871,7 @@ class TestPreAggregationYamlGeneration:
             name="orders",
             sql_table="public.orders",
             dimensions=[
-                CubeDimension(
-                    name="created_at", sql="${CUBE}.created_at", type=DimensionType.TIME
-                ),
+                CubeDimension(name="created_at", sql="${CUBE}.created_at", type=DimensionType.TIME),
             ],
             pre_aggregations=[
                 CubePreAggregation(

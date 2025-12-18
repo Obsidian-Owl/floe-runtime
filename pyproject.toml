@@ -29,6 +29,8 @@ dev-dependencies = [
     "psycopg2-binary>=2.9",  # SQL API integration tests
     "httpx>=0.27",           # REST/GraphQL integration tests
     "jsonschema>=4.0",       # Schema validation tests
+    # Type stubs
+    "types-PyYAML>=6.0",     # Type hints for PyYAML
 ]
 
 [tool.black]

@@ -31,7 +31,6 @@ from floe_cube.security import (
     extract_security_context,
 )
 
-
 # =============================================================================
 # T048: SecurityContext Model Validation Tests
 # =============================================================================

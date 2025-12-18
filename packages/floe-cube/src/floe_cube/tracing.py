@@ -113,9 +113,7 @@ def _parse_traceparent(traceparent: str | None) -> tuple[str | None, str | None]
         # Validate formats
         if len(trace_id) != 32 or not all(c in "0123456789abcdef" for c in trace_id):
             return None, None
-        if len(parent_span_id) != 16 or not all(
-            c in "0123456789abcdef" for c in parent_span_id
-        ):
+        if len(parent_span_id) != 16 or not all(c in "0123456789abcdef" for c in parent_span_id):
             return None, None
 
         return trace_id, parent_span_id
@@ -164,9 +162,7 @@ class QueryTracer:
         """
         self._service_name = service_name
         self._enabled = enabled
-        self._otlp_endpoint = otlp_endpoint or os.environ.get(
-            "OTEL_EXPORTER_OTLP_ENDPOINT"
-        )
+        self._otlp_endpoint = otlp_endpoint or os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
         self._log = logger.bind(service=service_name, tracing_enabled=enabled)
 
         if enabled:
@@ -192,9 +188,7 @@ class QueryTracer:
         """Get the OTLP endpoint."""
         return self._otlp_endpoint
 
-    def _extract_context(
-        self, headers: dict[str, str] | None
-    ) -> tuple[str, str | None]:
+    def _extract_context(self, headers: dict[str, str] | None) -> tuple[str, str | None]:
         """Extract W3C Trace Context from headers.
 
         Args:

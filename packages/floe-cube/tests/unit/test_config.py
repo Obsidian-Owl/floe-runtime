@@ -248,11 +248,10 @@ class TestCubeConfigGenerator:
         # Verify the secret value is NOT the secret name directly
         # but rather a reference to retrieve it
         for key, value in config.items():
-            if "SECRET" in key or "PASSWORD" in key or "KEY" in key:
-                if value is not None:
-                    assert value.startswith("${") or value == "", (
-                        f"Secret {key} appears to contain plaintext value"
-                    )
+            if ("SECRET" in key or "PASSWORD" in key or "KEY" in key) and value is not None:
+                assert (
+                    value.startswith("${") or value == ""
+                ), f"Secret {key} appears to contain plaintext value"
 
     def test_database_credentials_use_secret_refs(
         self,
@@ -266,14 +265,14 @@ class TestCubeConfigGenerator:
 
         # Database password should not be in the config directly
         # Instead it should reference env vars or k8s secrets
-        db_related_keys = [k for k in config.keys() if "DB" in k]
+        db_related_keys = [k for k in config if "DB" in k]
         for key in db_related_keys:
             if "PASS" in key or "SECRET" in key:
                 value = config.get(key)
                 if value:
-                    assert value.startswith("${"), (
-                        f"{key} should reference secret, not contain value"
-                    )
+                    assert value.startswith(
+                        "${"
+                    ), f"{key} should reference secret, not contain value"
 
     def test_no_hardcoded_credentials_in_config(
         self,
@@ -294,9 +293,9 @@ class TestCubeConfigGenerator:
             "-----BEGIN",  # PEM keys
         ]
         for pattern in sensitive_patterns:
-            assert pattern.lower() not in config_str.lower(), (
-                f"Sensitive pattern '{pattern}' found in config"
-            )
+            assert (
+                pattern.lower() not in config_str.lower()
+            ), f"Sensitive pattern '{pattern}' found in config"
 
 
 class TestCubeConfigFileWriter:
@@ -418,9 +417,7 @@ class TestConfigGeneratorWithCompiledArtifacts:
         """Should generate config from CompiledArtifacts."""
         from floe_cube.config import CubeConfigGenerator
 
-        generator = CubeConfigGenerator.from_compiled_artifacts(
-            sample_compiled_artifacts
-        )
+        generator = CubeConfigGenerator.from_compiled_artifacts(sample_compiled_artifacts)
         config = generator.generate()
 
         assert "CUBEJS_DB_TYPE" in config

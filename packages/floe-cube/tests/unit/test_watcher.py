@@ -13,11 +13,10 @@ Tests cover:
 from __future__ import annotations
 
 import json
-import threading
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -60,9 +59,7 @@ class TestManifestWatcherLifecycle:
         output.mkdir(parents=True, exist_ok=True)
         return output
 
-    def test_initial_state_is_stopped(
-        self, manifest_file: Path, output_dir: Path
-    ) -> None:
+    def test_initial_state_is_stopped(self, manifest_file: Path, output_dir: Path) -> None:
         """ManifestWatcher should start in STOPPED state."""
         watcher = ManifestWatcher(
             manifest_path=manifest_file,
@@ -70,9 +67,7 @@ class TestManifestWatcherLifecycle:
         )
         assert watcher.state == WatcherState.STOPPED
 
-    def test_start_changes_state_to_running(
-        self, manifest_file: Path, output_dir: Path
-    ) -> None:
+    def test_start_changes_state_to_running(self, manifest_file: Path, output_dir: Path) -> None:
         """ManifestWatcher.start() should change state to RUNNING."""
         watcher = ManifestWatcher(
             manifest_path=manifest_file,
@@ -85,9 +80,7 @@ class TestManifestWatcherLifecycle:
         finally:
             watcher.stop()
 
-    def test_stop_changes_state_to_stopped(
-        self, manifest_file: Path, output_dir: Path
-    ) -> None:
+    def test_stop_changes_state_to_stopped(self, manifest_file: Path, output_dir: Path) -> None:
         """ManifestWatcher.stop() should change state to STOPPED."""
         watcher = ManifestWatcher(
             manifest_path=manifest_file,
@@ -99,9 +92,7 @@ class TestManifestWatcherLifecycle:
 
         assert watcher.state == WatcherState.STOPPED
 
-    def test_start_twice_raises_error(
-        self, manifest_file: Path, output_dir: Path
-    ) -> None:
+    def test_start_twice_raises_error(self, manifest_file: Path, output_dir: Path) -> None:
         """ManifestWatcher.start() should raise if already running."""
         watcher = ManifestWatcher(
             manifest_path=manifest_file,
@@ -117,9 +108,7 @@ class TestManifestWatcherLifecycle:
         finally:
             watcher.stop()
 
-    def test_stop_when_not_running_is_safe(
-        self, manifest_file: Path, output_dir: Path
-    ) -> None:
+    def test_stop_when_not_running_is_safe(self, manifest_file: Path, output_dir: Path) -> None:
         """ManifestWatcher.stop() should be safe to call when not running."""
         watcher = ManifestWatcher(
             manifest_path=manifest_file,
@@ -132,9 +121,7 @@ class TestManifestWatcherLifecycle:
 
         assert watcher.state == WatcherState.STOPPED
 
-    def test_context_manager_protocol(
-        self, manifest_file: Path, output_dir: Path
-    ) -> None:
+    def test_context_manager_protocol(self, manifest_file: Path, output_dir: Path) -> None:
         """ManifestWatcher should support context manager protocol."""
         watcher = ManifestWatcher(
             manifest_path=manifest_file,
@@ -337,9 +324,7 @@ class TestManifestWatcherErrorHandling:
         # Error callback should have been called
         assert error_callback.called
 
-    def test_missing_manifest_directory_raises(
-        self, tmp_path: Path, output_dir: Path
-    ) -> None:
+    def test_missing_manifest_directory_raises(self, tmp_path: Path, output_dir: Path) -> None:
         """ManifestWatcher should raise if manifest directory doesn't exist."""
         missing_path = tmp_path / "nonexistent" / "manifest.json"
 
@@ -406,9 +391,7 @@ class TestManifestWatcherConfiguration:
         output.mkdir(parents=True, exist_ok=True)
         return output
 
-    def test_default_debounce_is_one_second(
-        self, manifest_file: Path, output_dir: Path
-    ) -> None:
+    def test_default_debounce_is_one_second(self, manifest_file: Path, output_dir: Path) -> None:
         """Default debounce should be 1 second."""
         watcher = ManifestWatcher(
             manifest_path=manifest_file,
@@ -425,9 +408,7 @@ class TestManifestWatcherConfiguration:
         )
         assert watcher.debounce_seconds == 2.5
 
-    def test_manifest_path_property(
-        self, manifest_file: Path, output_dir: Path
-    ) -> None:
+    def test_manifest_path_property(self, manifest_file: Path, output_dir: Path) -> None:
         """ManifestWatcher.manifest_path should return configured path."""
         watcher = ManifestWatcher(
             manifest_path=manifest_file,

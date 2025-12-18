@@ -9,8 +9,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from floe_cube.security_config import CubeSecurityGenerator
 
 
@@ -28,10 +26,12 @@ class TestCheckAuthGeneration:
 
     def test_check_auth_enabled_extracts_user_id(self) -> None:
         """When enabled, checkAuth should extract user ID from claim."""
-        generator = CubeSecurityGenerator({
-            "row_level": True,
-            "user_id_claim": "sub",
-        })
+        generator = CubeSecurityGenerator(
+            {
+                "row_level": True,
+                "user_id_claim": "sub",
+            }
+        )
         code = generator.generate_check_auth()
 
         assert "async function checkAuth" in code
@@ -40,10 +40,12 @@ class TestCheckAuthGeneration:
 
     def test_check_auth_uses_custom_user_id_claim(self) -> None:
         """checkAuth should use configured user_id_claim."""
-        generator = CubeSecurityGenerator({
-            "row_level": True,
-            "user_id_claim": "user_id",
-        })
+        generator = CubeSecurityGenerator(
+            {
+                "row_level": True,
+                "user_id_claim": "user_id",
+            }
+        )
         code = generator.generate_check_auth()
 
         assert "claims['user_id']" in code
@@ -51,10 +53,12 @@ class TestCheckAuthGeneration:
 
     def test_check_auth_extracts_roles(self) -> None:
         """checkAuth should extract roles from configured claim."""
-        generator = CubeSecurityGenerator({
-            "row_level": True,
-            "roles_claim": "groups",
-        })
+        generator = CubeSecurityGenerator(
+            {
+                "row_level": True,
+                "roles_claim": "groups",
+            }
+        )
         code = generator.generate_check_auth()
 
         assert "claims['groups']" in code
@@ -62,10 +66,12 @@ class TestCheckAuthGeneration:
 
     def test_check_auth_extracts_filter_claims(self) -> None:
         """checkAuth should extract all configured filter claims."""
-        generator = CubeSecurityGenerator({
-            "row_level": True,
-            "filter_claims": ["organization_id", "department"],
-        })
+        generator = CubeSecurityGenerator(
+            {
+                "row_level": True,
+                "filter_claims": ["organization_id", "department"],
+            }
+        )
         code = generator.generate_check_auth()
 
         assert "claims['organization_id']" in code
@@ -107,10 +113,12 @@ class TestQueryRewriteGeneration:
 
     def test_query_rewrite_adds_filter_for_each_claim(self) -> None:
         """queryRewrite should add filter for each configured claim."""
-        generator = CubeSecurityGenerator({
-            "row_level": True,
-            "filter_claims": ["organization_id", "department"],
-        })
+        generator = CubeSecurityGenerator(
+            {
+                "row_level": True,
+                "filter_claims": ["organization_id", "department"],
+            }
+        )
         code = generator.generate_query_rewrite()
 
         assert "securityContext.organization_id" in code
@@ -120,10 +128,12 @@ class TestQueryRewriteGeneration:
 
     def test_query_rewrite_merges_with_existing_filters(self) -> None:
         """queryRewrite should preserve existing query filters."""
-        generator = CubeSecurityGenerator({
-            "row_level": True,
-            "filter_claims": ["organization_id"],
-        })
+        generator = CubeSecurityGenerator(
+            {
+                "row_level": True,
+                "filter_claims": ["organization_id"],
+            }
+        )
         code = generator.generate_query_rewrite()
 
         assert "...query" in code
@@ -132,10 +142,12 @@ class TestQueryRewriteGeneration:
 
     def test_query_rewrite_uses_cube_member_syntax(self) -> None:
         """queryRewrite should use ${query.cube}.column syntax."""
-        generator = CubeSecurityGenerator({
-            "row_level": True,
-            "filter_claims": ["organization_id"],
-        })
+        generator = CubeSecurityGenerator(
+            {
+                "row_level": True,
+                "filter_claims": ["organization_id"],
+            }
+        )
         code = generator.generate_query_rewrite()
 
         assert "${query.cube}.organization_id" in code
@@ -154,60 +166,72 @@ class TestEnvVarGeneration:
 
     def test_env_vars_includes_user_id_claim(self) -> None:
         """Env vars should include user_id_claim."""
-        generator = CubeSecurityGenerator({
-            "row_level": True,
-            "user_id_claim": "user_id",
-        })
+        generator = CubeSecurityGenerator(
+            {
+                "row_level": True,
+                "user_id_claim": "user_id",
+            }
+        )
         env_vars = generator.generate_env_vars()
 
         assert env_vars["FLOE_SECURITY_USER_ID_CLAIM"] == "user_id"
 
     def test_env_vars_includes_roles_claim(self) -> None:
         """Env vars should include roles_claim."""
-        generator = CubeSecurityGenerator({
-            "row_level": True,
-            "roles_claim": "groups",
-        })
+        generator = CubeSecurityGenerator(
+            {
+                "row_level": True,
+                "roles_claim": "groups",
+            }
+        )
         env_vars = generator.generate_env_vars()
 
         assert env_vars["FLOE_SECURITY_ROLES_CLAIM"] == "groups"
 
     def test_env_vars_includes_filter_claims_as_csv(self) -> None:
         """Filter claims should be comma-separated."""
-        generator = CubeSecurityGenerator({
-            "row_level": True,
-            "filter_claims": ["organization_id", "department"],
-        })
+        generator = CubeSecurityGenerator(
+            {
+                "row_level": True,
+                "filter_claims": ["organization_id", "department"],
+            }
+        )
         env_vars = generator.generate_env_vars()
 
         assert env_vars["FLOE_SECURITY_FILTER_CLAIMS"] == "organization_id,department"
 
     def test_env_vars_includes_jwt_secret_ref(self) -> None:
         """JWT secret should use K8s secret reference syntax."""
-        generator = CubeSecurityGenerator({
-            "row_level": True,
-            "jwt_secret_ref": "cube-jwt-secret",
-        })
+        generator = CubeSecurityGenerator(
+            {
+                "row_level": True,
+                "jwt_secret_ref": "cube-jwt-secret",
+            }
+        )
         env_vars = generator.generate_env_vars()
 
         assert env_vars["CUBEJS_JWT_SECRET"] == "${cube-jwt-secret}"
 
     def test_env_vars_includes_jwt_audience(self) -> None:
         """JWT audience should be included if configured."""
-        generator = CubeSecurityGenerator({
-            "row_level": True,
-            "jwt_audience": "my-api",
-        })
+        generator = CubeSecurityGenerator(
+            {
+                "row_level": True,
+                "jwt_audience": "my-api",
+            }
+        )
         env_vars = generator.generate_env_vars()
 
         assert env_vars["CUBEJS_JWT_AUDIENCE"] == "my-api"
 
     def test_env_vars_includes_jwt_issuer(self) -> None:
         """JWT issuer should be included if configured."""
-        generator = CubeSecurityGenerator({
-            "row_level": True,
-            "jwt_issuer": "https://auth.example.com",
-        })
+        generator = CubeSecurityGenerator(
+            {
+                "row_level": True,
+                "jwt_issuer": "https://auth.example.com",
+            }
+        )
         env_vars = generator.generate_env_vars()
 
         assert env_vars["CUBEJS_JWT_ISSUER"] == "https://auth.example.com"

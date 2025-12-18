@@ -1600,6 +1600,7 @@ dev = [
     { name = "pytest-cov" },
     { name = "ruff" },
     { name = "safety" },
+    { name = "types-pyyaml" },
 ]
 
 [package.metadata]
@@ -1620,6 +1621,7 @@ dev = [
     { name = "pytest-cov", specifier = ">=6.0" },
     { name = "ruff", specifier = ">=0.8" },
     { name = "safety", specifier = ">=3.2" },
+    { name = "types-pyyaml", specifier = ">=6.0" },
 ]
 
 [[package]]

@@ -28,7 +28,8 @@ Cube SQL API Reference:
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, Any, Generator
+from collections.abc import Generator
+from typing import TYPE_CHECKING
 
 import psycopg2
 import pytest
@@ -169,9 +170,7 @@ class TestSQLSelectQueries:
     expected data from the Orders cube.
     """
 
-    def test_select_from_orders_returns_data(
-        self, sql_connection: PsycopgConnection
-    ) -> None:
+    def test_select_from_orders_returns_data(self, sql_connection: PsycopgConnection) -> None:
         """SELECT from Orders cube should return data."""
         cursor = sql_connection.cursor()
         # Cube SQL API uses MEASURE() function for aggregates
@@ -189,9 +188,7 @@ class TestSQLSelectQueries:
         assert result[0] is not None, "Count should not be null"
         assert result[0] > 0, f"Expected positive count, got {result[0]}"
 
-    def test_select_with_dimensions(
-        self, sql_connection: PsycopgConnection
-    ) -> None:
+    def test_select_with_dimensions(self, sql_connection: PsycopgConnection) -> None:
         """SELECT with dimensions should work."""
         cursor = sql_connection.cursor()
         # Cube SQL API: dimensions referenced directly, measures with MEASURE()
@@ -212,9 +209,7 @@ class TestSQLSelectQueries:
         statuses = [row[0] for row in results]
         assert len(statuses) > 0, "No status values returned"
 
-    def test_select_with_multiple_measures(
-        self, sql_connection: PsycopgConnection
-    ) -> None:
+    def test_select_with_multiple_measures(self, sql_connection: PsycopgConnection) -> None:
         """SELECT with multiple measures should work."""
         cursor = sql_connection.cursor()
         cursor.execute(
@@ -234,9 +229,7 @@ class TestSQLSelectQueries:
         assert isinstance(result[0], (int, float)), f"Count type: {type(result[0])}"
         assert isinstance(result[1], (int, float)), f"Amount type: {type(result[1])}"
 
-    def test_select_with_region_dimension(
-        self, sql_connection: PsycopgConnection
-    ) -> None:
+    def test_select_with_region_dimension(self, sql_connection: PsycopgConnection) -> None:
         """SELECT with region dimension should work."""
         cursor = sql_connection.cursor()
         cursor.execute(
@@ -256,9 +249,7 @@ class TestSQLSelectQueries:
         # Should have region values (north, south, east, west)
         assert len(regions) > 0, "No region values returned"
 
-    def test_select_with_limit(
-        self, sql_connection: PsycopgConnection
-    ) -> None:
+    def test_select_with_limit(self, sql_connection: PsycopgConnection) -> None:
         """SELECT with LIMIT should respect row limit."""
         cursor = sql_connection.cursor()
         cursor.execute(
@@ -276,9 +267,7 @@ class TestSQLSelectQueries:
 
         assert len(results) <= 2, f"Expected max 2 rows, got {len(results)}"
 
-    def test_select_column_names(
-        self, sql_connection: PsycopgConnection
-    ) -> None:
+    def test_select_column_names(self, sql_connection: PsycopgConnection) -> None:
         """Column names in result should be correct."""
         cursor = sql_connection.cursor()
         cursor.execute(
@@ -393,7 +382,13 @@ class TestSQLAPIReadOnly:
             # Cube may say "does not exist" (because it can't drop) or "unsupported"
             assert any(
                 keyword in error_msg
-                for keyword in ["unsupported", "not supported", "does not exist", "permission", "denied"]
+                for keyword in [
+                    "unsupported",
+                    "not supported",
+                    "does not exist",
+                    "permission",
+                    "denied",
+                ]
             ), f"Unexpected error message: {e}"
         finally:
             cursor.close()
@@ -483,9 +478,7 @@ class TestSQLAPIQueryFeatures:
     Test various SQL features supported by Cube SQL API.
     """
 
-    def test_aggregate_functions(
-        self, sql_connection: PsycopgConnection
-    ) -> None:
+    def test_aggregate_functions(self, sql_connection: PsycopgConnection) -> None:
         """Aggregate functions should work through Cube measures."""
         cursor = sql_connection.cursor()
         cursor.execute(
@@ -501,9 +494,7 @@ class TestSQLAPIQueryFeatures:
         # Should have our 15,500 test rows
         assert result[0] > 10000, f"Expected >10k orders, got {result[0]}"
 
-    def test_order_by_clause(
-        self, sql_connection: PsycopgConnection
-    ) -> None:
+    def test_order_by_clause(self, sql_connection: PsycopgConnection) -> None:
         """ORDER BY clause should work."""
         cursor = sql_connection.cursor()
         # Note: Cube SQL API may aggregate differently than raw SQL
@@ -528,9 +519,7 @@ class TestSQLAPIQueryFeatures:
             counts = [row[1] for row in results]
             assert counts == sorted(counts, reverse=True), "Results not in DESC order"
 
-    def test_where_clause(
-        self, sql_connection: PsycopgConnection
-    ) -> None:
+    def test_where_clause(self, sql_connection: PsycopgConnection) -> None:
         """WHERE clause should filter results."""
         cursor = sql_connection.cursor()
         # Note: Cube SQL API WHERE clause support varies
@@ -555,9 +544,7 @@ class TestSQLAPIQueryFeatures:
             for row in results:
                 assert row[0] == "north", f"Expected 'north', got {row[0]}"
 
-    def test_null_handling(
-        self, sql_connection: PsycopgConnection
-    ) -> None:
+    def test_null_handling(self, sql_connection: PsycopgConnection) -> None:
         """NULL values should be handled correctly."""
         cursor = sql_connection.cursor()
         # Query that might return NULL (if no matching data)

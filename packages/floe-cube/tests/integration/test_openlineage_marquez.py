@@ -20,7 +20,8 @@ from __future__ import annotations
 import os
 import time
 import uuid
-from typing import TYPE_CHECKING, Any, Generator
+from collections.abc import Generator
+from typing import TYPE_CHECKING, Any
 
 import httpx
 import pytest
@@ -119,14 +120,10 @@ def emit_openlineage_event(
     }
 
     if inputs:
-        event["inputs"] = [
-            {"namespace": namespace, "name": name} for name in inputs
-        ]
+        event["inputs"] = [{"namespace": namespace, "name": name} for name in inputs]
 
     if outputs:
-        event["outputs"] = [
-            {"namespace": namespace, "name": name} for name in outputs
-        ]
+        event["outputs"] = [{"namespace": namespace, "name": name} for name in outputs]
 
     return client.post(
         "/api/v1/lineage",
@@ -155,9 +152,10 @@ class TestOpenLineageEventEmission:
             inputs=["orders"],
         )
 
-        assert response.status_code in (200, 201), (
-            f"Failed to emit START event: {response.status_code} - {response.text}"
-        )
+        assert response.status_code in (
+            200,
+            201,
+        ), f"Failed to emit START event: {response.status_code} - {response.text}"
 
         # Give Marquez time to process
         time.sleep(0.5)
@@ -167,9 +165,7 @@ class TestOpenLineageEventEmission:
             f"/api/v1/namespaces/{OPENLINEAGE_NAMESPACE}/jobs/{unique_job_name}/runs"
         )
 
-        assert run_response.status_code == 200, (
-            f"Failed to get runs: {run_response.status_code}"
-        )
+        assert run_response.status_code == 200, f"Failed to get runs: {run_response.status_code}"
 
         runs = run_response.json().get("runs", [])
         run_ids = [r["id"] for r in runs]
@@ -216,9 +212,9 @@ class TestOpenLineageEventEmission:
         run_data = next((r for r in runs if r["id"] == run_id), None)
         assert run_data is not None, f"Run {run_id} not found"
         # Marquez run states: NEW, RUNNING, COMPLETED, FAILED, ABORTED
-        assert run_data.get("state") == "COMPLETED", (
-            f"Expected COMPLETED, got {run_data.get('state')}"
-        )
+        assert (
+            run_data.get("state") == "COMPLETED"
+        ), f"Expected COMPLETED, got {run_data.get('state')}"
 
     def test_fail_event_marks_run_failed(
         self,
@@ -260,9 +256,7 @@ class TestOpenLineageEventEmission:
         runs = run_response.json().get("runs", [])
         run_data = next((r for r in runs if r["id"] == run_id), None)
         assert run_data is not None, f"Run {run_id} not found"
-        assert run_data.get("state") == "FAILED", (
-            f"Expected FAILED, got {run_data.get('state')}"
-        )
+        assert run_data.get("state") == "FAILED", f"Expected FAILED, got {run_data.get('state')}"
 
     def test_namespace_created(
         self,
@@ -284,9 +278,7 @@ class TestOpenLineageEventEmission:
         time.sleep(0.5)
 
         # Verify namespace exists
-        ns_response = marquez_client.get(
-            f"/api/v1/namespaces/{OPENLINEAGE_NAMESPACE}"
-        )
+        ns_response = marquez_client.get(f"/api/v1/namespaces/{OPENLINEAGE_NAMESPACE}")
 
         assert ns_response.status_code == 200
         assert ns_response.json()["name"] == OPENLINEAGE_NAMESPACE
@@ -320,9 +312,7 @@ class TestOpenLineageEventEmission:
         job_data = job_response.json()
         input_names = [i["name"] for i in job_data.get("inputs", [])]
         for expected_input in inputs:
-            assert expected_input in input_names, (
-                f"Input {expected_input} not found in job inputs"
-            )
+            assert expected_input in input_names, f"Input {expected_input} not found in job inputs"
 
 
 class TestQueryLineageEmitterIntegration:

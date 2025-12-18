@@ -25,7 +25,8 @@ Prerequisites:
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, Generator
+from collections.abc import Generator
+from typing import TYPE_CHECKING
 
 import httpx
 import pytest
@@ -112,9 +113,9 @@ class TestRestApiJsonResponse:
             },
         )
 
-        assert response.status_code == 200, (
-            f"Expected 200, got {response.status_code}: {response.text}"
-        )
+        assert (
+            response.status_code == 200
+        ), f"Expected 200, got {response.status_code}: {response.text}"
 
         data = response.json()
         assert "data" in data, f"Response missing 'data' key: {data}"
@@ -137,9 +138,9 @@ class TestRestApiJsonResponse:
 
         assert response.status_code == 200
         content_type = response.headers.get("content-type", "")
-        assert "application/json" in content_type, (
-            f"Expected JSON content-type, got: {content_type}"
-        )
+        assert (
+            "application/json" in content_type
+        ), f"Expected JSON content-type, got: {content_type}"
 
     def test_query_with_multiple_measures_and_dimensions(
         self,
@@ -249,9 +250,11 @@ class TestRestApiAuthentication:
 
         # In dev mode, invalid tokens may be ignored (returns 200)
         # In production mode, should return 401/403
-        assert response.status_code in (200, 401, 403), (
-            f"Expected 200 (dev mode) or 401/403 (prod mode), got {response.status_code}"
-        )
+        assert response.status_code in (
+            200,
+            401,
+            403,
+        ), f"Expected 200 (dev mode) or 401/403 (prod mode), got {response.status_code}"
 
     def test_expired_jwt_handled(
         self,
@@ -283,9 +286,11 @@ class TestRestApiAuthentication:
 
         # In dev mode, expired tokens may be ignored (returns 200)
         # In production mode, should return 401/403
-        assert response.status_code in (200, 401, 403), (
-            f"Expected 200 (dev mode) or 401/403 (prod mode), got {response.status_code}"
-        )
+        assert response.status_code in (
+            200,
+            401,
+            403,
+        ), f"Expected 200 (dev mode) or 401/403 (prod mode), got {response.status_code}"
 
     def test_malformed_auth_header_handled(
         self,
@@ -306,9 +311,12 @@ class TestRestApiAuthentication:
         )
 
         # Should handle gracefully (400/401/403 or 200 in dev mode)
-        assert response.status_code in (200, 400, 401, 403), (
-            f"Expected handled response, got {response.status_code}"
-        )
+        assert response.status_code in (
+            200,
+            400,
+            401,
+            403,
+        ), f"Expected handled response, got {response.status_code}"
 
     def test_missing_auth_handled(
         self,
@@ -327,9 +335,11 @@ class TestRestApiAuthentication:
 
         # In dev mode, missing auth is allowed (returns 200)
         # In production mode, should return 401/403
-        assert response.status_code in (200, 401, 403), (
-            f"Expected 200 (dev mode) or 401/403 (prod mode), got {response.status_code}"
-        )
+        assert response.status_code in (
+            200,
+            401,
+            403,
+        ), f"Expected 200 (dev mode) or 401/403 (prod mode), got {response.status_code}"
 
 
 class TestRestApiPagination:
@@ -477,9 +487,7 @@ class TestRestApiPagination:
                 timeout=60.0,
             )
 
-            assert response.status_code == 200, (
-                f"Page {pages_fetched} failed: {response.text}"
-            )
+            assert response.status_code == 200, f"Page {pages_fetched} failed: {response.text}"
 
             data = response.json()
             rows_returned = len(data.get("data", []))
@@ -514,9 +522,10 @@ class TestRestApiErrorHandling:
             },
         )
 
-        assert response.status_code in (400, 500), (
-            f"Expected error status, got {response.status_code}"
-        )
+        assert response.status_code in (
+            400,
+            500,
+        ), f"Expected error status, got {response.status_code}"
         data = response.json()
         assert "error" in data or "message" in data.get("error", {})
 
@@ -572,9 +581,10 @@ class TestPreAggregations:
         )
 
         # Should return 200 or 404 (if no jobs yet)
-        assert response.status_code in (200, 404), (
-            f"Pre-aggregation jobs API failed: {response.status_code}: {response.text}"
-        )
+        assert response.status_code in (
+            200,
+            404,
+        ), f"Pre-aggregation jobs API failed: {response.status_code}: {response.text}"
 
     def test_query_can_use_pre_aggregation(
         self,
@@ -608,9 +618,9 @@ class TestPreAggregations:
             timeout=120.0,  # Pre-aggregation build may take time
         )
 
-        assert response.status_code == 200, (
-            f"Pre-aggregation query failed: {response.status_code}: {response.text}"
-        )
+        assert (
+            response.status_code == 200
+        ), f"Pre-aggregation query failed: {response.status_code}: {response.text}"
         data = response.json()
         assert "data" in data, f"Response missing 'data' key: {data}"
 
@@ -625,9 +635,9 @@ class TestPreAggregations:
             headers=authenticated_headers,
         )
 
-        assert response.status_code == 200, (
-            f"Meta API failed: {response.status_code}: {response.text}"
-        )
+        assert (
+            response.status_code == 200
+        ), f"Meta API failed: {response.status_code}: {response.text}"
 
         meta = response.json()
         assert "cubes" in meta, f"Meta response missing 'cubes': {meta}"
@@ -665,8 +675,8 @@ class TestPreAggregations:
             },
         )
 
-        assert response.status_code == 200, (
-            f"Non-pre-agg query failed: {response.status_code}: {response.text}"
-        )
+        assert (
+            response.status_code == 200
+        ), f"Non-pre-agg query failed: {response.status_code}: {response.text}"
         data = response.json()
         assert "data" in data

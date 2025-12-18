@@ -39,9 +39,7 @@ pytestmark = pytest.mark.integration
 
 # Configuration from environment
 JAEGER_QUERY_URL = os.environ.get("JAEGER_QUERY_URL", "http://localhost:16686")
-OTEL_EXPORTER_OTLP_ENDPOINT = os.environ.get(
-    "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318"
-)
+OTEL_EXPORTER_OTLP_ENDPOINT = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318")
 
 # Service name for test traces (unique to avoid collision)
 TEST_SERVICE_NAME = "floe-cube-integration-test"

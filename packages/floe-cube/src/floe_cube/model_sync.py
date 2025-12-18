@@ -350,9 +350,7 @@ class ModelSynchronizer:
 
         if not measure_defs:
             # Default: add a count measure
-            measures.append(
-                CubeMeasure(name="count", type=MeasureType.COUNT)
-            )
+            measures.append(CubeMeasure(name="count", type=MeasureType.COUNT))
         else:
             for measure_def in measure_defs:
                 measure_type = get_cube_measure_type(measure_def.get("type", "count"))
@@ -381,9 +379,7 @@ class ModelSynchronizer:
         join_defs = cube_meta.get("joins", [])
 
         for join_def in join_defs:
-            relationship = get_cube_join_relationship(
-                join_def.get("relationship", "one_to_one")
-            )
+            relationship = get_cube_join_relationship(join_def.get("relationship", "one_to_one"))
 
             join = CubeJoin(
                 name=join_def["name"],
@@ -489,7 +485,8 @@ class ModelSynchronizer:
         if cube.description:
             cube_dict["cubes"][0]["description"] = cube.description
 
-        return yaml.dump(cube_dict, default_flow_style=False, sort_keys=False)
+        result: str = yaml.dump(cube_dict, default_flow_style=False, sort_keys=False)
+        return result
 
 
 # Alias for backwards compatibility

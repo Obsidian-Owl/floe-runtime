@@ -87,9 +87,7 @@ class CubeSecurityGenerator:
         for claim in filter_claims:
             # Sanitize claim name for JavaScript variable
             safe_name = self._sanitize_js_name(claim)
-            filter_extractions.append(
-                f"    const {safe_name} = claims['{claim}'];"
-            )
+            filter_extractions.append(f"    const {safe_name} = claims['{claim}'];")
 
         # Build security context object
         context_entries = [f"      user_id: claims['{user_id_claim}']"]
@@ -123,21 +121,25 @@ class CubeSecurityGenerator:
             lines.extend(filter_extractions)
 
         # Build security context
-        lines.extend([
-            "",
-            "  // Return security context for query filtering",
-            "  return {",
-            "    securityContext: {",
-        ])
+        lines.extend(
+            [
+                "",
+                "  // Return security context for query filtering",
+                "  return {",
+                "    securityContext: {",
+            ]
+        )
 
         for entry in context_entries:
             lines.append(entry + ",")
 
-        lines.extend([
-            "    }",
-            "  };",
-            "}",
-        ])
+        lines.extend(
+            [
+                "    }",
+                "  };",
+                "}",
+            ]
+        )
 
         self._log.info("check_auth_generated", claims_count=len(filter_claims))
         return "\n".join(lines)
@@ -173,40 +175,48 @@ class CubeSecurityGenerator:
 
         # Add filter conditions based on claims
         if filter_claims:
-            lines.extend([
-                "",
-                "  // Add row-level security filters",
-                "  const filters = [];",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "  // Add row-level security filters",
+                    "  const filters = [];",
+                ]
+            )
 
             for claim in filter_claims:
-                safe_name = self._sanitize_js_name(claim)
-                lines.extend([
-                    "",
-                    f"  // Filter by {claim} if present in security context",
-                    f"  if (securityContext.{claim}) {{",
-                    "    filters.push({",
-                    f"      member: `${{query.cube}}.{claim}`,",
-                    "      operator: 'equals',",
-                    f"      values: [securityContext.{claim}],",
-                    "    });",
-                    "  }",
-                ])
+                # Note: Using claim directly in JS as property names are quoted
+                lines.extend(
+                    [
+                        "",
+                        f"  // Filter by {claim} if present in security context",
+                        f"  if (securityContext.{claim}) {{",
+                        "    filters.push({",
+                        f"      member: `${{query.cube}}.{claim}`,",
+                        "      operator: 'equals',",
+                        f"      values: [securityContext.{claim}],",
+                        "    });",
+                        "  }",
+                    ]
+                )
 
-            lines.extend([
-                "",
-                "  // Merge filters with existing query filters",
-                "  return {",
-                "    ...query,",
-                "    filters: [...(query.filters || []), ...filters],",
-                "  };",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "  // Merge filters with existing query filters",
+                    "  return {",
+                    "    ...query,",
+                    "    filters: [...(query.filters || []), ...filters],",
+                    "  };",
+                ]
+            )
         else:
-            lines.extend([
-                "",
-                "  // No filter claims configured - pass query through",
-                "  return query;",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "  // No filter claims configured - pass query through",
+                    "  return query;",
+                ]
+            )
 
         lines.append("}")
 
