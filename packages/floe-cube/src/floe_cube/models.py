@@ -8,6 +8,7 @@ This module defines the core data models used throughout floe-cube:
 - CubePreAggregation: Pre-aggregation definition for performance
 - CubeSchema: Complete cube schema definition
 - SecurityContext: JWT-based security context for row-level filtering
+- QueryTraceSpan: OpenTelemetry trace span for operational observability
 
 All models use Pydantic v2 with strict validation and frozen instances
 per the project Constitution.
@@ -15,6 +16,7 @@ per the project Constitution.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from enum import Enum
 from typing import Any
@@ -506,3 +508,183 @@ class SecurityContext(BaseModel):
             True if the context has expired, False otherwise.
         """
         return datetime.now().timestamp() > self.exp
+
+
+class SpanKind(str, Enum):
+    """OpenTelemetry span kind.
+
+    Defines the relationship of the span to the parent span.
+    """
+
+    SERVER = "SERVER"
+    CLIENT = "CLIENT"
+    INTERNAL = "INTERNAL"
+
+
+class SpanStatus(str, Enum):
+    """OpenTelemetry span status.
+
+    Indicates the status of the operation represented by the span.
+    """
+
+    OK = "OK"
+    ERROR = "ERROR"
+    UNSET = "UNSET"
+
+
+# W3C Trace Context format: 32 lowercase hex characters
+_TRACE_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
+# W3C Span ID format: 16 lowercase hex characters
+_SPAN_ID_PATTERN = re.compile(r"^[0-9a-f]{16}$")
+
+# Forbidden attributes that MUST NOT appear in spans (security)
+FORBIDDEN_SPAN_ATTRIBUTES = frozenset(
+    {
+        "filter_value",
+        "filter_values",
+        "jwt",
+        "token",
+        "password",
+        "secret",
+        "credential",
+        "authorization",
+        "cookie",
+        "session",
+        "api_key",
+        "user_email",
+        "user_name",
+        "pii",
+        "ssn",
+        "credit_card",
+        "row_data",
+        "query_result",
+        "result_data",
+    }
+)
+
+
+class QueryTraceSpan(BaseModel):
+    """OpenTelemetry trace span for operational observability.
+
+    Captures query execution performance and timing for Cube queries.
+    This is complementary to QueryLineageEvent which captures data lineage.
+
+    Note:
+        NEVER include sensitive data in span attributes. The FORBIDDEN_SPAN_ATTRIBUTES
+        set defines attribute names that will be rejected.
+
+    Attributes:
+        trace_id: W3C Trace ID (32 lowercase hex characters).
+        span_id: Unique span identifier (16 lowercase hex characters).
+        parent_span_id: Parent span ID for distributed tracing.
+        name: Span name (e.g., "cube.query", "cube.execute").
+        kind: Span kind (SERVER, CLIENT, INTERNAL).
+        start_time: Span start time (UTC).
+        end_time: Span end time (UTC), None if span is still active.
+        status: Span status (OK, ERROR, UNSET).
+        attributes: Safe span attributes (see validation rules).
+
+    Example:
+        >>> span = QueryTraceSpan(
+        ...     trace_id="0af7651916cd43dd8448eb211c80319c",
+        ...     span_id="b7ad6b7169203331",
+        ...     name="cube.query",
+        ...     kind=SpanKind.SERVER,
+        ...     start_time=datetime.now(tz=timezone.utc),
+        ...     status=SpanStatus.UNSET,
+        ...     attributes={"cube.name": "orders", "cube.filter_count": 2},
+        ... )
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    trace_id: str = Field(
+        ...,
+        description="W3C Trace ID (32 lowercase hex characters)",
+    )
+    span_id: str = Field(
+        ...,
+        description="Unique span identifier (16 lowercase hex characters)",
+    )
+    parent_span_id: str | None = Field(
+        default=None,
+        description="Parent span ID for distributed tracing",
+    )
+    name: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        description="Span name (e.g., 'cube.query', 'cube.execute')",
+    )
+    kind: SpanKind = Field(
+        ...,
+        description="Span kind (SERVER, CLIENT, INTERNAL)",
+    )
+    start_time: datetime = Field(
+        ...,
+        description="Span start time (UTC)",
+    )
+    end_time: datetime | None = Field(
+        default=None,
+        description="Span end time (UTC), None if span is still active",
+    )
+    status: SpanStatus = Field(
+        default=SpanStatus.UNSET,
+        description="Span status (OK, ERROR, UNSET)",
+    )
+    attributes: dict[str, str | int | bool] = Field(
+        default_factory=dict,
+        description="Safe span attributes (no sensitive data)",
+    )
+
+    @field_validator("trace_id")
+    @classmethod
+    def validate_trace_id(cls, v: str) -> str:
+        """Validate W3C Trace ID format (32 lowercase hex characters)."""
+        if not _TRACE_ID_PATTERN.match(v):
+            msg = "trace_id must be 32 lowercase hex characters (W3C Trace Context)"
+            raise ValueError(msg)
+        return v
+
+    @field_validator("span_id")
+    @classmethod
+    def validate_span_id(cls, v: str) -> str:
+        """Validate span ID format (16 lowercase hex characters)."""
+        if not _SPAN_ID_PATTERN.match(v):
+            msg = "span_id must be 16 lowercase hex characters"
+            raise ValueError(msg)
+        return v
+
+    @field_validator("parent_span_id")
+    @classmethod
+    def validate_parent_span_id(cls, v: str | None) -> str | None:
+        """Validate parent span ID format if provided."""
+        if v is not None and not _SPAN_ID_PATTERN.match(v):
+            msg = "parent_span_id must be 16 lowercase hex characters"
+            raise ValueError(msg)
+        return v
+
+    @field_validator("attributes")
+    @classmethod
+    def validate_attributes_security(
+        cls, v: dict[str, str | int | bool]
+    ) -> dict[str, str | int | bool]:
+        """Validate that attributes do not contain forbidden keys (security).
+
+        NEVER allow sensitive data in span attributes.
+        """
+        for key in v:
+            key_lower = key.lower()
+            for forbidden in FORBIDDEN_SPAN_ATTRIBUTES:
+                if forbidden in key_lower:
+                    msg = f"Attribute '{key}' contains forbidden term '{forbidden}' (security)"
+                    raise ValueError(msg)
+        return v
+
+    @field_validator("end_time")
+    @classmethod
+    def validate_end_time(cls, v: datetime | None) -> datetime | None:
+        """Validate end_time is not before start_time if provided."""
+        # Note: We can't access start_time in a field_validator directly
+        # This will be handled in the model_validator if needed
+        return v

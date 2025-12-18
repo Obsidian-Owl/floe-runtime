@@ -57,6 +57,10 @@ __all__ = [
     "SecurityContext",
     # Tracing (US7)
     "QueryTracer",
+    "QueryTraceSpan",
+    "SpanKind",
+    "SpanStatus",
+    "FORBIDDEN_SPAN_ATTRIBUTES",
     # Lineage (US8)
     "QueryLineageEmitter",
     "QueryLineageEvent",
@@ -118,6 +122,11 @@ def __getattr__(name: str) -> object:
         "CubeJoin",
         "CubePreAggregation",
         "SecurityContext",
+        # Tracing models (US7)
+        "QueryTraceSpan",
+        "SpanKind",
+        "SpanStatus",
+        "FORBIDDEN_SPAN_ATTRIBUTES",
     ):
         from floe_cube import models as models_module
 
