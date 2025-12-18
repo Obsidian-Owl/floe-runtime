@@ -89,6 +89,9 @@ filterwarnings = [
     "ignore:Property `InputContext.metadata` is deprecated:DeprecationWarning",
     "ignore:Parameter `metadata` of function `build_input_context` is deprecated:DeprecationWarning",
     "ignore:Parameter `metadata` of function `build_output_context` is deprecated:DeprecationWarning",
+    # Hypothesis database location warning in Docker containers with read-only mounts
+    # The in-memory fallback works fine for CI
+    "ignore:The database setting is not configured:hypothesis.errors.HypothesisWarning",
 ]
 pythonpath = ["."]
 markers = [
