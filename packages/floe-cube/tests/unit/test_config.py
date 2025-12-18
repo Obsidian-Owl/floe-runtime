@@ -449,3 +449,178 @@ class TestConfigGeneratorWithCompiledArtifacts:
         artifacts_mock.consumption = consumption_mock
 
         return artifacts_mock
+
+
+class TestObservabilityConfig:
+    """Tests for observability configuration (T088)."""
+
+    def test_openlineage_endpoint_configuration(self) -> None:
+        """OpenLineage endpoint should be configured when provided."""
+        from floe_cube.config import CubeConfigGenerator
+
+        config = {
+            "database_type": "postgres",
+            "observability": {
+                "openlineage_endpoint": "http://localhost:5000",
+            },
+        }
+        generator = CubeConfigGenerator(config)
+        result = generator.generate()
+
+        assert result["FLOE_OPENLINEAGE_ENDPOINT"] == "http://localhost:5000"
+        assert result["FLOE_OPENLINEAGE_ENABLED"] == "true"
+
+    def test_openlineage_namespace_configuration(self) -> None:
+        """OpenLineage namespace should be configurable."""
+        from floe_cube.config import CubeConfigGenerator
+
+        config = {
+            "database_type": "postgres",
+            "observability": {
+                "openlineage_endpoint": "http://localhost:5000",
+                "openlineage_namespace": "my-custom-namespace",
+            },
+        }
+        generator = CubeConfigGenerator(config)
+        result = generator.generate()
+
+        assert result["FLOE_OPENLINEAGE_NAMESPACE"] == "my-custom-namespace"
+
+    def test_openlineage_not_configured_when_no_endpoint(self) -> None:
+        """OpenLineage should not be configured when endpoint is not provided."""
+        from floe_cube.config import CubeConfigGenerator
+
+        config = {
+            "database_type": "postgres",
+        }
+        generator = CubeConfigGenerator(config)
+        result = generator.generate()
+
+        assert "FLOE_OPENLINEAGE_ENDPOINT" not in result
+        assert "FLOE_OPENLINEAGE_ENABLED" not in result
+
+    def test_openlineage_not_enabled_with_only_namespace(self) -> None:
+        """OpenLineage should not be enabled with only namespace (no endpoint)."""
+        from floe_cube.config import CubeConfigGenerator
+
+        config = {
+            "database_type": "postgres",
+            "observability": {
+                "openlineage_namespace": "my-namespace",
+            },
+        }
+        generator = CubeConfigGenerator(config)
+        result = generator.generate()
+
+        # Namespace is set but endpoint is not, so OpenLineage is not enabled
+        assert "FLOE_OPENLINEAGE_ENABLED" not in result
+        # Namespace should still be set for when endpoint is provided via env var
+        assert result.get("FLOE_OPENLINEAGE_NAMESPACE") == "my-namespace"
+
+
+class TestCubeStoreConfig:
+    """Tests for Cube Store configuration (T094)."""
+
+    def test_cube_store_s3_bucket_configuration(self) -> None:
+        """S3 bucket should configure Cube Store."""
+        from floe_cube.config import CubeConfigGenerator
+
+        config = {
+            "database_type": "postgres",
+            "cube_store": {
+                "s3_bucket": "my-pre-aggregations-bucket",
+            },
+        }
+        generator = CubeConfigGenerator(config)
+        result = generator.generate()
+
+        assert result["CUBEJS_EXT_DB_TYPE"] == "cubestore"
+        assert result["CUBEJS_CUBESTORE_S3_BUCKET"] == "my-pre-aggregations-bucket"
+
+    def test_cube_store_s3_region_configuration(self) -> None:
+        """S3 region should be configurable."""
+        from floe_cube.config import CubeConfigGenerator
+
+        config = {
+            "database_type": "postgres",
+            "cube_store": {
+                "s3_bucket": "my-bucket",
+                "s3_region": "us-west-2",
+            },
+        }
+        generator = CubeConfigGenerator(config)
+        result = generator.generate()
+
+        assert result["CUBEJS_CUBESTORE_S3_REGION"] == "us-west-2"
+
+    def test_cube_store_s3_credentials_use_secret_refs(self) -> None:
+        """S3 credentials should reference K8s secrets."""
+        from floe_cube.config import CubeConfigGenerator
+
+        config = {
+            "database_type": "postgres",
+            "cube_store": {
+                "s3_bucket": "my-bucket",
+                "s3_access_key_ref": "aws-access-key",
+                "s3_secret_key_ref": "aws-secret-key",
+            },
+        }
+        generator = CubeConfigGenerator(config)
+        result = generator.generate()
+
+        # Credentials should be secret references, not plaintext
+        assert result["CUBEJS_CUBESTORE_AWS_ACCESS_KEY_ID"] == "${aws-access-key}"
+        assert result["CUBEJS_CUBESTORE_AWS_SECRET_ACCESS_KEY"] == "${aws-secret-key}"
+
+    def test_cube_store_custom_s3_endpoint(self) -> None:
+        """Custom S3 endpoint for MinIO/LocalStack should be configurable."""
+        from floe_cube.config import CubeConfigGenerator
+
+        config = {
+            "database_type": "postgres",
+            "cube_store": {
+                "s3_bucket": "my-bucket",
+                "s3_endpoint": "http://localhost:4566",
+            },
+        }
+        generator = CubeConfigGenerator(config)
+        result = generator.generate()
+
+        assert result["CUBEJS_CUBESTORE_S3_ENDPOINT"] == "http://localhost:4566"
+
+    def test_cube_store_not_configured_without_bucket(self) -> None:
+        """Cube Store should not be configured without S3 bucket."""
+        from floe_cube.config import CubeConfigGenerator
+
+        config = {
+            "database_type": "postgres",
+        }
+        generator = CubeConfigGenerator(config)
+        result = generator.generate()
+
+        assert "CUBEJS_EXT_DB_TYPE" not in result
+        assert "CUBEJS_CUBESTORE_S3_BUCKET" not in result
+
+    def test_cube_store_full_configuration(self) -> None:
+        """Full Cube Store configuration should include all settings."""
+        from floe_cube.config import CubeConfigGenerator
+
+        config = {
+            "database_type": "postgres",
+            "cube_store": {
+                "s3_bucket": "prod-preagg-bucket",
+                "s3_region": "eu-west-1",
+                "s3_access_key_ref": "cube-aws-access-key",
+                "s3_secret_key_ref": "cube-aws-secret-key",
+                "s3_endpoint": "https://s3.eu-west-1.amazonaws.com",
+            },
+        }
+        generator = CubeConfigGenerator(config)
+        result = generator.generate()
+
+        assert result["CUBEJS_EXT_DB_TYPE"] == "cubestore"
+        assert result["CUBEJS_CUBESTORE_S3_BUCKET"] == "prod-preagg-bucket"
+        assert result["CUBEJS_CUBESTORE_S3_REGION"] == "eu-west-1"
+        assert result["CUBEJS_CUBESTORE_AWS_ACCESS_KEY_ID"] == "${cube-aws-access-key}"
+        assert result["CUBEJS_CUBESTORE_AWS_SECRET_ACCESS_KEY"] == "${cube-aws-secret-key}"
+        assert result["CUBEJS_CUBESTORE_S3_ENDPOINT"] == "https://s3.eu-west-1.amazonaws.com"

@@ -730,3 +730,240 @@ class TestCubeSchemaYamlGeneration:
         assert "cubes" in parsed
         assert len(parsed["cubes"]) == 1
         assert parsed["cubes"][0]["name"] == "orders"
+
+
+class TestPreAggregationYamlGeneration:
+    """T090: Unit test pre-aggregation config generates correct YAML."""
+
+    def test_pre_aggregation_generates_yaml(self) -> None:
+        """Pre-aggregation should be included in generated YAML."""
+        import yaml
+
+        from floe_cube.model_sync import ModelSynchronizer
+        from floe_cube.models import (
+            CubeDimension,
+            CubeMeasure,
+            CubePreAggregation,
+            CubeSchema,
+            DimensionType,
+            MeasureType,
+            TimeGranularity,
+        )
+
+        # Create cube with pre-aggregation
+        cube = CubeSchema(
+            name="orders",
+            sql_table="public.orders",
+            dimensions=[
+                CubeDimension(
+                    name="created_at", sql="${CUBE}.created_at", type=DimensionType.TIME
+                ),
+                CubeDimension(name="status", sql="${CUBE}.status", type=DimensionType.STRING),
+            ],
+            measures=[
+                CubeMeasure(name="count", type=MeasureType.COUNT),
+                CubeMeasure(
+                    name="total_amount", type=MeasureType.SUM, sql="${CUBE}.amount"
+                ),
+            ],
+            pre_aggregations=[
+                CubePreAggregation(
+                    name="daily_orders",
+                    measures=["count", "total_amount"],
+                    dimensions=["status"],
+                    time_dimension="created_at",
+                    granularity=TimeGranularity.DAY,
+                    refresh_every="0 * * * *",
+                    external=True,
+                )
+            ],
+        )
+
+        # Use internal _cube_to_yaml method
+        sync = ModelSynchronizer.__new__(ModelSynchronizer)
+        yaml_content = sync._cube_to_yaml(cube)
+        parsed = yaml.safe_load(yaml_content)
+
+        # Verify pre_aggregations is in YAML
+        assert "pre_aggregations" in parsed["cubes"][0]
+        pre_aggs = parsed["cubes"][0]["pre_aggregations"]
+        assert len(pre_aggs) == 1
+        assert pre_aggs[0]["name"] == "daily_orders"
+
+    def test_pre_aggregation_measures_in_yaml(self) -> None:
+        """Pre-aggregation measures should be in YAML."""
+        import yaml
+
+        from floe_cube.model_sync import ModelSynchronizer
+        from floe_cube.models import (
+            CubeMeasure,
+            CubePreAggregation,
+            CubeSchema,
+            MeasureType,
+        )
+
+        cube = CubeSchema(
+            name="orders",
+            sql_table="public.orders",
+            measures=[
+                CubeMeasure(name="count", type=MeasureType.COUNT),
+                CubeMeasure(name="total", type=MeasureType.SUM, sql="${CUBE}.amount"),
+            ],
+            pre_aggregations=[
+                CubePreAggregation(
+                    name="main",
+                    measures=["count", "total"],
+                )
+            ],
+        )
+
+        sync = ModelSynchronizer.__new__(ModelSynchronizer)
+        yaml_content = sync._cube_to_yaml(cube)
+        parsed = yaml.safe_load(yaml_content)
+
+        pre_agg = parsed["cubes"][0]["pre_aggregations"][0]
+        assert pre_agg["measures"] == ["count", "total"]
+
+    def test_pre_aggregation_dimensions_in_yaml(self) -> None:
+        """Pre-aggregation dimensions should be in YAML."""
+        import yaml
+
+        from floe_cube.model_sync import ModelSynchronizer
+        from floe_cube.models import (
+            CubeDimension,
+            CubePreAggregation,
+            CubeSchema,
+            DimensionType,
+        )
+
+        cube = CubeSchema(
+            name="orders",
+            sql_table="public.orders",
+            dimensions=[
+                CubeDimension(name="status", sql="${CUBE}.status", type=DimensionType.STRING),
+                CubeDimension(name="region", sql="${CUBE}.region", type=DimensionType.STRING),
+            ],
+            pre_aggregations=[
+                CubePreAggregation(
+                    name="by_status_region",
+                    dimensions=["status", "region"],
+                )
+            ],
+        )
+
+        sync = ModelSynchronizer.__new__(ModelSynchronizer)
+        yaml_content = sync._cube_to_yaml(cube)
+        parsed = yaml.safe_load(yaml_content)
+
+        pre_agg = parsed["cubes"][0]["pre_aggregations"][0]
+        assert pre_agg["dimensions"] == ["status", "region"]
+
+    def test_pre_aggregation_granularity_in_yaml(self) -> None:
+        """Pre-aggregation granularity should be in YAML."""
+        import yaml
+
+        from floe_cube.model_sync import ModelSynchronizer
+        from floe_cube.models import (
+            CubeDimension,
+            CubePreAggregation,
+            CubeSchema,
+            DimensionType,
+            TimeGranularity,
+        )
+
+        cube = CubeSchema(
+            name="orders",
+            sql_table="public.orders",
+            dimensions=[
+                CubeDimension(
+                    name="created_at", sql="${CUBE}.created_at", type=DimensionType.TIME
+                ),
+            ],
+            pre_aggregations=[
+                CubePreAggregation(
+                    name="hourly",
+                    time_dimension="created_at",
+                    granularity=TimeGranularity.HOUR,
+                )
+            ],
+        )
+
+        sync = ModelSynchronizer.__new__(ModelSynchronizer)
+        yaml_content = sync._cube_to_yaml(cube)
+        parsed = yaml.safe_load(yaml_content)
+
+        pre_agg = parsed["cubes"][0]["pre_aggregations"][0]
+        assert pre_agg["time_dimension"] == "created_at"
+        assert pre_agg["granularity"] == "hour"
+
+    def test_pre_aggregation_refresh_key_in_yaml(self) -> None:
+        """Pre-aggregation refresh_key should contain cron expression."""
+        import yaml
+
+        from floe_cube.model_sync import ModelSynchronizer
+        from floe_cube.models import CubePreAggregation, CubeSchema
+
+        cube = CubeSchema(
+            name="orders",
+            sql_table="public.orders",
+            pre_aggregations=[
+                CubePreAggregation(
+                    name="hourly",
+                    refresh_every="0 * * * *",
+                )
+            ],
+        )
+
+        sync = ModelSynchronizer.__new__(ModelSynchronizer)
+        yaml_content = sync._cube_to_yaml(cube)
+        parsed = yaml.safe_load(yaml_content)
+
+        pre_agg = parsed["cubes"][0]["pre_aggregations"][0]
+        assert "refresh_key" in pre_agg
+        assert pre_agg["refresh_key"]["every"] == "0 * * * *"
+
+    def test_pre_aggregation_external_flag_in_yaml(self) -> None:
+        """Pre-aggregation external flag should be in YAML."""
+        import yaml
+
+        from floe_cube.model_sync import ModelSynchronizer
+        from floe_cube.models import CubePreAggregation, CubeSchema
+
+        cube = CubeSchema(
+            name="orders",
+            sql_table="public.orders",
+            pre_aggregations=[
+                CubePreAggregation(name="external_agg", external=True),
+                CubePreAggregation(name="internal_agg", external=False),
+            ],
+        )
+
+        sync = ModelSynchronizer.__new__(ModelSynchronizer)
+        yaml_content = sync._cube_to_yaml(cube)
+        parsed = yaml.safe_load(yaml_content)
+
+        pre_aggs = parsed["cubes"][0]["pre_aggregations"]
+        external_agg = next(p for p in pre_aggs if p["name"] == "external_agg")
+        internal_agg = next(p for p in pre_aggs if p["name"] == "internal_agg")
+
+        assert external_agg["external"] is True
+        assert internal_agg["external"] is False
+
+    def test_cube_without_pre_aggregations_no_section(self) -> None:
+        """Cube without pre-aggregations should not have pre_aggregations section."""
+        import yaml
+
+        from floe_cube.model_sync import ModelSynchronizer
+        from floe_cube.models import CubeMeasure, CubeSchema, MeasureType
+
+        cube = CubeSchema(
+            name="orders",
+            sql_table="public.orders",
+            measures=[CubeMeasure(name="count", type=MeasureType.COUNT)],
+        )
+
+        sync = ModelSynchronizer.__new__(ModelSynchronizer)
+        yaml_content = sync._cube_to_yaml(cube)
+        parsed = yaml.safe_load(yaml_content)
+
+        assert "pre_aggregations" not in parsed["cubes"][0]

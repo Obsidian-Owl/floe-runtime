@@ -470,6 +470,21 @@ class ModelSynchronizer:
                 for j in cube.joins
             ]
 
+        # Add pre_aggregations if present (T092)
+        if cube.pre_aggregations:
+            cube_dict["cubes"][0]["pre_aggregations"] = [
+                {
+                    "name": pa.name,
+                    **({"measures": pa.measures} if pa.measures else {}),
+                    **({"dimensions": pa.dimensions} if pa.dimensions else {}),
+                    **({"time_dimension": pa.time_dimension} if pa.time_dimension else {}),
+                    **({"granularity": pa.granularity.value} if pa.granularity else {}),
+                    "refresh_key": {"every": pa.refresh_every},
+                    "external": pa.external,
+                }
+                for pa in cube.pre_aggregations
+            ]
+
         # Add description if present
         if cube.description:
             cube_dict["cubes"][0]["description"] = cube.description

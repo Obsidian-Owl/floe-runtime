@@ -58,6 +58,7 @@ __all__ = [
     "JWTValidator",
     "JWTValidationError",
     "extract_security_context",
+    "CubeSecurityGenerator",
     # Tracing (US7)
     "QueryTracer",
     "QueryTraceSpan",
@@ -140,6 +141,10 @@ def __getattr__(name: str) -> object:
         from floe_cube import security as security_module
 
         return getattr(security_module, name)
+    if name == "CubeSecurityGenerator":
+        from floe_cube.security_config import CubeSecurityGenerator
+
+        return CubeSecurityGenerator
 
     # Tracing (US7)
     if name == "QueryTracer":

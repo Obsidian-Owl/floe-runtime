@@ -165,6 +165,8 @@ class CubeConfigGenerator:
         self._add_dev_mode(config)
         self._add_pre_aggregation_config(config)
         self._add_security_config(config)
+        self._add_observability_config(config)
+        self._add_cube_store_config(config)
 
         # T018: Add secret references
         self._add_secret_refs(config)
@@ -212,6 +214,67 @@ class CubeConfigGenerator:
             # Row-level security is configured via checkAuth in cube.js
             # We just set a marker that security is enabled
             config["CUBEJS_SECURITY_ENABLED"] = "true"
+
+    def _add_observability_config(self, config: dict[str, str]) -> None:
+        """Add observability configuration (T088).
+
+        Configures OpenLineage endpoint for data lineage tracking.
+
+        Args:
+            config: Configuration dict to update
+        """
+        observability = self.config.get("observability", {})
+
+        # OpenLineage endpoint configuration
+        openlineage_endpoint = observability.get("openlineage_endpoint")
+        if openlineage_endpoint:
+            config["FLOE_OPENLINEAGE_ENDPOINT"] = openlineage_endpoint
+            config["FLOE_OPENLINEAGE_ENABLED"] = "true"
+            self._log.debug(
+                "openlineage_configured",
+                endpoint=openlineage_endpoint,
+            )
+
+        # OpenLineage namespace (optional, defaults to floe-cube)
+        openlineage_namespace = observability.get("openlineage_namespace")
+        if openlineage_namespace:
+            config["FLOE_OPENLINEAGE_NAMESPACE"] = openlineage_namespace
+
+    def _add_cube_store_config(self, config: dict[str, str]) -> None:
+        """Add Cube Store configuration for pre-aggregations (T094).
+
+        Configures S3 storage for external pre-aggregations via Cube Store.
+
+        Args:
+            config: Configuration dict to update
+        """
+        cube_store = self.config.get("cube_store", {})
+
+        # S3 bucket for pre-aggregation storage
+        s3_bucket = cube_store.get("s3_bucket")
+        if s3_bucket:
+            config["CUBEJS_EXT_DB_TYPE"] = "cubestore"
+            config["CUBEJS_CUBESTORE_S3_BUCKET"] = s3_bucket
+            self._log.debug("cube_store_s3_configured", bucket=s3_bucket)
+
+        # S3 region
+        s3_region = cube_store.get("s3_region")
+        if s3_region:
+            config["CUBEJS_CUBESTORE_S3_REGION"] = s3_region
+
+        # S3 credentials via K8s secret references (NEVER embed plaintext)
+        s3_access_key_ref = cube_store.get("s3_access_key_ref")
+        if s3_access_key_ref:
+            config["CUBEJS_CUBESTORE_AWS_ACCESS_KEY_ID"] = f"${{{s3_access_key_ref}}}"
+
+        s3_secret_key_ref = cube_store.get("s3_secret_key_ref")
+        if s3_secret_key_ref:
+            config["CUBEJS_CUBESTORE_AWS_SECRET_ACCESS_KEY"] = f"${{{s3_secret_key_ref}}}"
+
+        # Custom S3 endpoint (for MinIO, LocalStack, etc.)
+        s3_endpoint = cube_store.get("s3_endpoint")
+        if s3_endpoint:
+            config["CUBEJS_CUBESTORE_S3_ENDPOINT"] = s3_endpoint
 
     def _add_secret_refs(self, config: dict[str, str]) -> None:
         """Add Kubernetes secret references (T018).
