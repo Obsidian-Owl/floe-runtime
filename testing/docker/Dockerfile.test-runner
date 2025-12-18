@@ -37,6 +37,9 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 # Use copy mode for uv since we're mounting a volume
 ENV UV_LINK_MODE=copy
+# Put .venv in user's home to avoid permission issues with mounted volumes
+# The workspace is mounted read-only for source, venv goes to writable location
+ENV UV_PROJECT_ENVIRONMENT=/home/testrunner/.venv
 
 # Default entrypoint: sync dependencies and run command
 # This ensures local packages are installed before running tests
