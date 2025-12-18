@@ -5,8 +5,8 @@ T068: [US4] Unit tests for TracingConfig model
 
 from __future__ import annotations
 
-import pytest
 from pydantic import ValidationError
+import pytest
 
 
 class TestTracingConfig:

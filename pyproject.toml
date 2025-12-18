@@ -54,6 +54,9 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["floe_core", "floe_cli", "floe_dagster", "floe_dbt", "floe_iceberg", "floe_polaris", "floe_cube"]
+# Align with isort's black profile for consistent sorting
+force-sort-within-sections = true
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
 
 [tool.pytest.ini_options]
 testpaths = [

@@ -5,9 +5,9 @@ T075: [US4] Implement structured logging with trace_id/span_id injection
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
 import logging
-from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from opentelemetry import trace

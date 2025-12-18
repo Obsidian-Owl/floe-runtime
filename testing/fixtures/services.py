@@ -30,12 +30,12 @@ Requirements:
 
 from __future__ import annotations
 
-import os
-import subprocess
-import time
 from collections.abc import Generator
 from dataclasses import dataclass, field
+import os
 from pathlib import Path
+import subprocess
+import time
 from typing import Any
 
 import pytest

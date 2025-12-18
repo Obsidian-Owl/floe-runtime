@@ -46,12 +46,11 @@ from floe_iceberg.errors import (
 from floe_iceberg.observability import get_logger, get_tracer, table_operation
 
 if TYPE_CHECKING:
+    from floe_polaris.client import PolarisCatalog
     from opentelemetry.trace import Tracer
     from pyiceberg.catalog import Catalog
     from pyiceberg.table import Table
     from structlog.stdlib import BoundLogger
-
-    from floe_polaris.client import PolarisCatalog
 
     # Union type for catalog sources
     CatalogLike: TypeAlias = PolarisCatalog | Catalog

@@ -5,9 +5,9 @@ T070: [US4] Unit tests for structured logging with trace injection
 
 from __future__ import annotations
 
+from io import StringIO
 import json
 import logging
-from io import StringIO
 from typing import Any
 
 import pytest

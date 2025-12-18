@@ -7,9 +7,9 @@ T074: [US4] Implement NoOpTracerProvider for graceful degradation
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
+import logging
 from typing import TYPE_CHECKING, Any
 
 from opentelemetry import trace

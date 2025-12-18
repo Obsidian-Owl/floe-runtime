@@ -35,9 +35,8 @@ jobs:
 
       - name: Run ruff format
         run: uv run ruff format --check .
-
-      - name: Run isort
-        run: uv run isort --check packages/
+      # Note: ruff check (above) includes I001 import sorting via [tool.ruff.lint] select = ["I"]
+      # This replaces the need for a separate isort check
 
   typecheck:
     name: Type Check
