@@ -377,6 +377,10 @@ services:
       CUBEJS_EXTERNAL_DEFAULT: "true"
       # Telemetry
       CUBEJS_TELEMETRY: "false"
+      # SQL API (Postgres wire protocol) configuration
+      CUBEJS_PG_SQL_PORT: "15432"
+      CUBEJS_SQL_USER: ${CUBEJS_SQL_USER:-cube}
+      CUBEJS_SQL_PASSWORD: ${CUBEJS_SQL_PASSWORD:-cube_password}
       # Note: Pre-aggregations disabled - Trino driver doesn't support S3 export bucket
       # Pre-aggregation refresh would require GCS which isn't available in test environment
     volumes:

@@ -1363,8 +1363,10 @@ dependencies = [
 [package.optional-dependencies]
 dev = [
     { name = "black" },
+    { name = "httpx" },
     { name = "hypothesis" },
     { name = "mypy" },
+    { name = "psycopg2-binary" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
@@ -1374,12 +1376,14 @@ dev = [
 requires-dist = [
     { name = "black", marker = "extra == 'dev'", specifier = ">=24.0" },
     { name = "floe-core", editable = "packages/floe-core" },
+    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0" },
     { name = "openlineage-python", specifier = ">=1.24" },
     { name = "opentelemetry-api", specifier = ">=1.27" },
     { name = "opentelemetry-exporter-otlp", specifier = ">=1.27" },
     { name = "opentelemetry-sdk", specifier = ">=1.27" },
+    { name = "psycopg2-binary", marker = "extra == 'dev'", specifier = ">=2.9" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pydantic-settings", specifier = ">=2.0" },
     { name = "pyjwt", specifier = ">=2.8" },

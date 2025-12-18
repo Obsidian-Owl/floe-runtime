@@ -18,9 +18,15 @@ Run integration tests with:
     pytest -m integration packages/floe-cube/tests/integration/
 
 Prerequisites (started by full profile):
-- Cube server at http://localhost:4000
+- Cube server at http://localhost:4000 (REST/GraphQL)
+- Cube SQL API at localhost:15432 (Postgres wire protocol)
 - Trino server at http://localhost:8080
 - Polaris catalog at http://localhost:8181
 - LocalStack S3 at http://localhost:4566
 - Test data loaded via cube-init (15k+ orders rows)
+
+Test coverage:
+- T036-T039: REST API tests (21 tests)
+- T041-T043: GraphQL API tests (17 tests)
+- T044-T047: SQL API tests (26 tests)
 """

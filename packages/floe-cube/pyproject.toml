@@ -48,6 +48,10 @@ dev = [
     "mypy>=1.0",
     "ruff>=0.1",
     "black>=24.0",
+    # SQL API integration tests (T044-T047)
+    "psycopg2-binary>=2.9",
+    # HTTP client for REST/GraphQL tests
+    "httpx>=0.27",
 ]
 
 [project.urls]
