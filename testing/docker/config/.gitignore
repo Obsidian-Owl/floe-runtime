@@ -1,3 +1,9 @@
 # Auto-generated credentials file (contains secrets)
 # Created by polaris-init container on startup
 polaris-credentials.env
+
+# Auto-generated Trino Iceberg connector config (contains OAuth2 credentials)
+# Created by polaris-init container on startup
+# Note: A placeholder file must exist before docker-compose up to prevent
+# Docker from creating a directory when mounting the volume.
+trino-iceberg.properties
