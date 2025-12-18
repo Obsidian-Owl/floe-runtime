@@ -31,12 +31,21 @@ jobs:
           docker compose --profile storage up -d
 
           # Wait for polaris-init to complete (generates credentials)
+          # Use docker inspect for reliable status detection (same as run-integration-tests.sh)
           echo "Waiting for polaris-init to complete..."
-          timeout 120 sh -c 'until docker compose ps polaris-init 2>/dev/null | grep -q "exited"; do sleep 5; done' || {
+          timeout 120 sh -c 'until docker inspect -f "{{.State.Status}}" floe-polaris-init 2>/dev/null | grep -q "exited"; do sleep 2; done' || {
             echo "polaris-init did not complete in time"
             docker compose logs polaris-init
             exit 1
           }
+
+          # Check polaris-init exit code
+          EXIT_CODE=$(docker inspect -f "{{.State.ExitCode}}" floe-polaris-init 2>/dev/null || echo "1")
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "ERROR: polaris-init failed with exit code $EXIT_CODE"
+            docker compose logs polaris-init
+            exit 1
+          fi
 
           # Verify credentials file was generated
           if [ ! -f config/polaris-credentials.env ]; then
