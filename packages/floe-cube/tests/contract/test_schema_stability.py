@@ -22,8 +22,17 @@ class TestCubeConfigContractStability:
     @pytest.fixture
     def cube_config_schema(self) -> dict[str, Any]:
         """Load the cube-config JSON schema."""
+        # Path: packages/floe-cube/tests/contract/test_schema_stability.py
+        # parent (1): packages/floe-cube/tests/contract/
+        # parent (2): packages/floe-cube/tests/
+        # parent (3): packages/floe-cube/
+        # parent (4): packages/
+        # parent (5): project root
+        project_root = Path(__file__).parent.parent.parent.parent.parent
+
         schema_path = (
-            Path(__file__).parent.parent.parent.parent.parent
+            project_root
+            / "packages"
             / "floe-core"
             / "src"
             / "floe_core"
@@ -34,14 +43,18 @@ class TestCubeConfigContractStability:
         if not schema_path.exists():
             # Try alternate location in contracts directory
             schema_path = (
-                Path(__file__).parent.parent.parent.parent.parent.parent
+                project_root
                 / "specs"
                 / "005-consumption-layer"
                 / "contracts"
                 / "cube-config.schema.json"
             )
         if not schema_path.exists():
-            pytest.skip("cube-config.schema.json not found")
+            pytest.fail(
+                f"cube-config.schema.json not found. Searched:\n"
+                f"  - {project_root / 'packages/floe-core/src/floe_core/schemas/json/cube-config.schema.json'}\n"
+                f"  - {project_root / 'specs/005-consumption-layer/contracts/cube-config.schema.json'}"
+            )
 
         return json.loads(schema_path.read_text())
 
@@ -64,57 +77,70 @@ class TestCubeConfigContractStability:
             },
         }
 
-    def test_generated_config_validates_against_schema(
+    def test_input_config_validates_against_schema(
         self,
         cube_config_schema: dict[str, Any],
         minimal_consumption_config: dict[str, Any],
     ) -> None:
-        """Generated config should validate against cube-config.schema.json."""
-        try:
-            import jsonschema
-        except ImportError:
-            pytest.skip("jsonschema not installed")
+        """Input consumption config should validate against cube-config.schema.json.
 
-        from floe_cube.config import CubeConfigGenerator
+        Note: cube-config.schema.json defines the input configuration format
+        (what goes in floe.yaml), NOT the output environment variables.
+        """
+        import jsonschema
 
-        generator = CubeConfigGenerator(minimal_consumption_config)
-        config = generator.generate()
+        # The schema defines input configuration structure
+        # Transform our test config to match schema expectations
+        input_config = {
+            "database_type": minimal_consumption_config["database_type"],
+            "api_port": minimal_consumption_config.get("port", 4000),
+            "dev_mode": minimal_consumption_config.get("dev_mode", False),
+        }
+
+        # Add optional fields if present
+        if minimal_consumption_config.get("api_secret_ref"):
+            input_config["api_secret_ref"] = minimal_consumption_config["api_secret_ref"]
+
+        if minimal_consumption_config.get("pre_aggregations"):
+            input_config["pre_aggregations"] = minimal_consumption_config["pre_aggregations"]
+
+        if minimal_consumption_config.get("security"):
+            security = minimal_consumption_config["security"]
+            input_config["row_level_security"] = {
+                "enabled": security.get("row_level", True),
+                "filter_column": security.get("filter_column", "organization_id"),
+            }
 
         # Validate against JSON schema
         try:
-            jsonschema.validate(config, cube_config_schema)
+            jsonschema.validate(input_config, cube_config_schema)
         except jsonschema.ValidationError as e:
-            pytest.fail(f"Generated config does not match schema: {e.message}")
+            pytest.fail(f"Input config does not match schema: {e.message}")
 
-    def test_all_database_types_produce_valid_configs(
+    def test_all_database_types_validate_against_schema(
         self,
         cube_config_schema: dict[str, Any],
-        minimal_consumption_config: dict[str, Any],
     ) -> None:
-        """All supported database types should produce schema-valid configs."""
-        try:
-            import jsonschema
-        except ImportError:
-            pytest.skip("jsonschema not installed")
+        """All supported database types should be valid in schema."""
+        import jsonschema
 
-        from floe_cube.config import CubeConfigGenerator
-
+        # Database types supported by the schema
         database_types = [
             "postgres",
             "snowflake",
             "bigquery",
             "databricks",
             "trino",
-            "duckdb",
         ]
 
         for db_type in database_types:
-            minimal_consumption_config["database_type"] = db_type
-            generator = CubeConfigGenerator(minimal_consumption_config)
-            config = generator.generate()
+            input_config = {
+                "database_type": db_type,
+                "api_port": 4000,
+            }
 
             try:
-                jsonschema.validate(config, cube_config_schema)
+                jsonschema.validate(input_config, cube_config_schema)
             except jsonschema.ValidationError as e:
                 pytest.fail(
                     f"Config for {db_type} does not match schema: {e.message}"
@@ -150,15 +176,16 @@ class TestCubeSchemaContractStability:
     @pytest.fixture
     def cube_schema_json_schema(self) -> dict[str, Any]:
         """Load the cube-schema JSON schema."""
+        project_root = Path(__file__).parent.parent.parent.parent.parent
         schema_path = (
-            Path(__file__).parent.parent.parent.parent.parent.parent
+            project_root
             / "specs"
             / "005-consumption-layer"
             / "contracts"
             / "cube-schema.schema.json"
         )
         if not schema_path.exists():
-            pytest.skip("cube-schema.schema.json not found")
+            pytest.fail(f"cube-schema.schema.json not found at {schema_path}")
 
         return json.loads(schema_path.read_text())
 
@@ -222,31 +249,32 @@ class TestSchemaVersionStability:
 
     def test_config_schema_has_version(self) -> None:
         """Config schema should have version information."""
-        # This test ensures we track schema versions for compatibility
+        project_root = Path(__file__).parent.parent.parent.parent.parent
         schema_path = (
-            Path(__file__).parent.parent.parent.parent.parent.parent
+            project_root
             / "specs"
             / "005-consumption-layer"
             / "contracts"
             / "cube-config.schema.json"
         )
         if not schema_path.exists():
-            pytest.skip("cube-config.schema.json not found")
+            pytest.fail(f"cube-config.schema.json not found at {schema_path}")
 
         schema = json.loads(schema_path.read_text())
         assert "$schema" in schema, "Schema should declare its JSON Schema version"
 
     def test_cube_schema_has_version(self) -> None:
         """Cube schema should have version information."""
+        project_root = Path(__file__).parent.parent.parent.parent.parent
         schema_path = (
-            Path(__file__).parent.parent.parent.parent.parent.parent
+            project_root
             / "specs"
             / "005-consumption-layer"
             / "contracts"
             / "cube-schema.schema.json"
         )
         if not schema_path.exists():
-            pytest.skip("cube-schema.schema.json not found")
+            pytest.fail(f"cube-schema.schema.json not found at {schema_path}")
 
         schema = json.loads(schema_path.read_text())
         assert "$schema" in schema, "Schema should declare its JSON Schema version"

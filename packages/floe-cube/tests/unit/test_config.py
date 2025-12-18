@@ -428,27 +428,24 @@ class TestConfigGeneratorWithCompiledArtifacts:
 
     @pytest.fixture
     def sample_compiled_artifacts(self) -> Any:
-        """Sample CompiledArtifacts for testing."""
-        # This will be mocked or use actual schema
-        try:
-            from floe_core.schemas import CompiledArtifacts
+        """Sample CompiledArtifacts-like object for testing.
 
-            return CompiledArtifacts(
-                version="1.0.0",
-                metadata={
-                    "compiled_at": "2025-01-01T00:00:00Z",
-                    "floe_core_version": "0.1.0",
-                    "source_hash": "abc123",
-                },
-                compute={"target": "duckdb"},
-                transforms=[{"type": "dbt", "path": "./dbt"}],
-                consumption={
-                    "enabled": True,
-                    "database_type": "duckdb",
-                    "port": 4000,
-                },
-                governance={"classification_source": "dbt_meta"},
-                observability={"traces": True},
-            )
-        except ImportError:
-            pytest.skip("floe_core not available")
+        Uses a mock with model_dump() method since that's what
+        CubeConfigGenerator.from_compiled_artifacts expects.
+        """
+        from unittest.mock import MagicMock
+
+        # Create a mock object that has a consumption attribute with model_dump()
+        consumption_mock = MagicMock()
+        consumption_mock.model_dump.return_value = {
+            "enabled": True,
+            "database_type": "duckdb",
+            "port": 4000,
+            "dev_mode": False,
+            # Omit None values - the code handles missing keys with .get()
+        }
+
+        artifacts_mock = MagicMock()
+        artifacts_mock.consumption = consumption_mock
+
+        return artifacts_mock

@@ -70,6 +70,9 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+markers = [
+    "integration: marks tests as integration tests (require running infrastructure)",
+]
 
 [tool.coverage.run]
 source = ["src/floe_cube"]

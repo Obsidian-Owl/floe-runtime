@@ -290,10 +290,7 @@ class ModelSynchronizer:
         # Build sql_table reference
         schema = model.get("schema", "public")
         database = model.get("database")
-        if database:
-            sql_table = f"{database}.{schema}.{name}"
-        else:
-            sql_table = f"{schema}.{name}"
+        sql_table = f"{database}.{schema}.{name}" if database else f"{schema}.{name}"
 
         return CubeSchema(
             name=name,
@@ -323,10 +320,9 @@ class ModelSynchronizer:
 
             # First 'id' column of integer type becomes primary key
             is_pk = False
-            if not found_primary_key and col_name == "id":
-                if dim_type == DimensionType.NUMBER:
-                    is_pk = True
-                    found_primary_key = True
+            if not found_primary_key and col_name == "id" and dim_type == DimensionType.NUMBER:
+                is_pk = True
+                found_primary_key = True
 
             dimension = CubeDimension(
                 name=col_name,
@@ -479,3 +475,7 @@ class ModelSynchronizer:
             cube_dict["cubes"][0]["description"] = cube.description
 
         return yaml.dump(cube_dict, default_flow_style=False, sort_keys=False)
+
+
+# Alias for backwards compatibility
+ModelSync = ModelSynchronizer

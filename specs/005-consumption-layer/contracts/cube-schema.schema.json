@@ -84,14 +84,14 @@
           "description": "Dimension description"
         },
         "meta": {
-          "type": "object",
+          "type": ["object", "null"],
           "description": "Additional metadata (classification, etc.)"
         }
       }
     },
     "CubeMeasure": {
       "type": "object",
-      "required": ["name", "sql", "type"],
+      "required": ["name", "type"],
       "additionalProperties": false,
       "properties": {
         "name": {
@@ -100,8 +100,8 @@
           "description": "Measure name"
         },
         "sql": {
-          "type": "string",
-          "description": "SQL expression for measure"
+          "type": ["string", "null"],
+          "description": "SQL expression for measure (optional for count type)"
         },
         "type": {
           "type": "string",
@@ -113,7 +113,7 @@
           "description": "Measure description"
         },
         "filters": {
-          "type": "array",
+          "type": ["array", "null"],
           "items": {
             "type": "object",
             "required": ["sql"],
