@@ -1350,13 +1350,46 @@ source = { editable = "packages/floe-cube" }
 dependencies = [
     { name = "floe-core" },
     { name = "openlineage-python" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp" },
+    { name = "opentelemetry-sdk" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "pyjwt" },
+    { name = "structlog" },
+    { name = "watchdog" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "black" },
+    { name = "hypothesis" },
+    { name = "mypy" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "black", marker = "extra == 'dev'", specifier = ">=24.0" },
     { name = "floe-core", editable = "packages/floe-core" },
+    { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.0" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0" },
     { name = "openlineage-python", specifier = ">=1.24" },
+    { name = "opentelemetry-api", specifier = ">=1.27" },
+    { name = "opentelemetry-exporter-otlp", specifier = ">=1.27" },
+    { name = "opentelemetry-sdk", specifier = ">=1.27" },
+    { name = "pydantic", specifier = ">=2.0" },
+    { name = "pydantic-settings", specifier = ">=2.0" },
+    { name = "pyjwt", specifier = ">=2.8" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1" },
+    { name = "structlog", specifier = ">=24.0" },
+    { name = "watchdog", specifier = ">=4.0" },
 ]
+provides-extras = ["dev"]
 
 [[package]]
 name = "floe-dagster"
