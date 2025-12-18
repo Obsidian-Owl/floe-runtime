@@ -17,9 +17,10 @@ Prerequisites:
 - Test data loaded (15k+ rows via cube-init)
 
 Cube GraphQL API Reference:
-- Endpoint: POST /graphql
+- Endpoint: POST /cubejs-api/graphql
 - Query structure: query { cube { <cubeName> { <members> } } }
 - Introspection: Standard GraphQL __schema and __type queries
+- Docs: https://cube.dev/docs/product/apis-integrations/graphql-api
 """
 
 from __future__ import annotations
@@ -103,13 +104,17 @@ def execute_graphql(
 
     Returns:
         HTTP response from GraphQL endpoint
+
+    Note:
+        Cube's GraphQL endpoint is at /cubejs-api/graphql (not /graphql)
+        See: https://cube.dev/docs/product/apis-integrations/graphql-api
     """
     payload: dict[str, Any] = {"query": query}
     if variables:
         payload["variables"] = variables
 
     return client.post(
-        "/graphql",
+        "/cubejs-api/graphql",
         json=payload,
         headers=headers or {"Content-Type": "application/json"},
     )
@@ -366,11 +371,13 @@ class TestGraphQLNestedRelationships:
         cube_data = data["data"]["cube"]
         assert len(cube_data) > 0, "No data returned"
 
-        # Verify response structure
+        # Verify response structure - data is nested under 'orders' key
         first_row = cube_data[0]
-        assert "count" in first_row, f"Missing 'count' in row: {first_row}"
-        assert "status" in first_row, f"Missing 'status' in row: {first_row}"
-        assert "region" in first_row, f"Missing 'region' in row: {first_row}"
+        # Response format: {'orders': {'count': ..., 'status': ..., 'region': ...}}
+        orders_data = first_row.get("orders", first_row)  # Handle both formats
+        assert "count" in orders_data, f"Missing 'count' in row: {first_row}"
+        assert "status" in orders_data, f"Missing 'status' in row: {first_row}"
+        assert "region" in orders_data, f"Missing 'region' in row: {first_row}"
 
     def test_orders_query_with_time_dimension(
         self,
@@ -410,9 +417,11 @@ class TestGraphQLNestedRelationships:
         cube_data = data["data"]["cube"]
         assert len(cube_data) > 0, "No data returned"
 
-        # Verify time dimension structure
+        # Verify time dimension structure - data is nested under 'orders' key
         first_row = cube_data[0]
-        assert "createdAt" in first_row, f"Missing 'createdAt' in row: {first_row}"
+        # Response format: {'orders': {'count': ..., 'createdAt': {...}}}
+        orders_data = first_row.get("orders", first_row)  # Handle both formats
+        assert "createdAt" in orders_data, f"Missing 'createdAt' in row: {first_row}"
 
     def test_multi_cube_query(
         self,
@@ -554,7 +563,7 @@ class TestGraphQLEndpointConfiguration:
     ) -> None:
         """GraphQL endpoint should accept application/json content type."""
         response = cube_client.post(
-            "/graphql",
+            "/cubejs-api/graphql",
             json={"query": "{ __typename }"},
             headers={"Content-Type": "application/json"},
         )
@@ -635,7 +644,7 @@ class TestGraphQLEndpointConfiguration:
     ) -> None:
         """Empty GraphQL query should return error."""
         response = cube_client.post(
-            "/graphql",
+            "/cubejs-api/graphql",
             json={"query": ""},
             headers=authenticated_headers,
         )
@@ -658,7 +667,7 @@ class TestGraphQLEndpointConfiguration:
     ) -> None:
         """Missing query field should return error."""
         response = cube_client.post(
-            "/graphql",
+            "/cubejs-api/graphql",
             json={},
             headers=authenticated_headers,
         )
