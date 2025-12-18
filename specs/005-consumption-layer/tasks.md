@@ -25,10 +25,10 @@
 
 **Purpose**: Project initialization and package structure
 
-- [ ] T001 Update pyproject.toml with dependencies (openlineage-python>=1.24, opentelemetry-api>=1.27, opentelemetry-sdk>=1.27, opentelemetry-exporter-otlp>=1.27, pydantic>=2.0, pydantic-settings>=2.0, structlog>=24.0, watchdog>=4.0, PyJWT>=2.8) in packages/floe-cube/pyproject.toml
-- [ ] T002 [P] Create py.typed marker for PEP 561 in packages/floe-cube/src/floe_cube/py.typed
-- [ ] T003 [P] Configure package exports in packages/floe-cube/src/floe_cube/__init__.py
-- [ ] T004 [P] Create test conftest.py with shared fixtures in packages/floe-cube/tests/conftest.py
+- [x] T001 Update pyproject.toml with dependencies (openlineage-python>=1.24, opentelemetry-api>=1.27, opentelemetry-sdk>=1.27, opentelemetry-exporter-otlp>=1.27, pydantic>=2.0, pydantic-settings>=2.0, structlog>=24.0, watchdog>=4.0, PyJWT>=2.8) in packages/floe-cube/pyproject.toml
+- [x] T002 [P] Create py.typed marker for PEP 561 in packages/floe-cube/src/floe_cube/py.typed
+- [x] T003 [P] Configure package exports in packages/floe-cube/src/floe_cube/__init__.py
+- [x] T004 [P] Create test conftest.py with shared fixtures in packages/floe-cube/tests/conftest.py
 
 ---
 
@@ -40,16 +40,16 @@
 - Updating floe-core schema (FR-030)
 - Base Pydantic models shared across stories
 
-- [ ] T005 Update CubeSecurityConfig in floe-core: rename `tenant_column` to `filter_column`, change default from `"tenant_id"` to `"organization_id"` (FR-030) in packages/floe-core/src/floe_core/schemas/consumption.py
-- [ ] T006 [P] Implement CubeConfig Pydantic model (database_type, api_port, sql_port, api_secret_ref, dev_mode, jwt_audience, jwt_issuer) in packages/floe-cube/src/floe_cube/models.py
-- [ ] T007 [P] Implement CubeDimension Pydantic model (name, sql, type, primary_key, description, meta) in packages/floe-cube/src/floe_cube/models.py
-- [ ] T008 [P] Implement CubeMeasure Pydantic model (name, sql, type, description, filters) in packages/floe-cube/src/floe_cube/models.py
-- [ ] T009 [P] Implement CubeJoin Pydantic model (name, relationship, sql) in packages/floe-cube/src/floe_cube/models.py
-- [ ] T010 Implement CubeSchema Pydantic model (name, sql_table, description, dimensions, measures, joins, pre_aggregations, filter_column) in packages/floe-cube/src/floe_cube/models.py
-- [ ] T011 [P] Implement CubePreAggregation Pydantic model (name, measures, dimensions, time_dimension, granularity, refresh_every, external) in packages/floe-cube/src/floe_cube/models.py
-- [ ] T012 Write unit tests for all foundational models (>80% coverage) in packages/floe-cube/tests/unit/test_models.py
+- [x] T005 Update CubeSecurityConfig in floe-core: rename `tenant_column` to `filter_column`, change default from `"tenant_id"` to `"organization_id"` (FR-030) in packages/floe-core/src/floe_core/schemas/consumption.py
+- [x] T006 [P] Implement CubeConfig Pydantic model (database_type, api_port, sql_port, api_secret_ref, dev_mode, jwt_audience, jwt_issuer) in packages/floe-cube/src/floe_cube/models.py
+- [x] T007 [P] Implement CubeDimension Pydantic model (name, sql, type, primary_key, description, meta) in packages/floe-cube/src/floe_cube/models.py
+- [x] T008 [P] Implement CubeMeasure Pydantic model (name, sql, type, description, filters) in packages/floe-cube/src/floe_cube/models.py
+- [x] T009 [P] Implement CubeJoin Pydantic model (name, relationship, sql) in packages/floe-cube/src/floe_cube/models.py
+- [x] T010 Implement CubeSchema Pydantic model (name, sql_table, description, dimensions, measures, joins, pre_aggregations, filter_column) in packages/floe-cube/src/floe_cube/models.py
+- [x] T011 [P] Implement CubePreAggregation Pydantic model (name, measures, dimensions, time_dimension, granularity, refresh_every, external) in packages/floe-cube/src/floe_cube/models.py
+- [x] T012 Write unit tests for all foundational models (>80% coverage) in packages/floe-cube/tests/unit/test_models.py
 
-**Checkpoint**: Foundation ready - user story implementation can now begin in parallel
+**Checkpoint**: Foundation ready - user story implementation can now begin in parallel (COMPLETE: 67 tests, 98% coverage)
 
 ---
 
@@ -63,19 +63,19 @@
 
 ### Tests for User Story 1
 
-- [ ] T013 [P] [US1] Unit test: config generator creates valid cube.js for each database_type in packages/floe-cube/tests/unit/test_config.py
-- [ ] T014 [P] [US1] Unit test: config generator references K8s secrets (never embeds credentials) in packages/floe-cube/tests/unit/test_config.py
-- [ ] T015 [P] [US1] Contract test: generated config matches cube-config.schema.json in packages/floe-cube/tests/contract/test_schema_stability.py
+- [x] T013 [P] [US1] Unit test: config generator creates valid cube.js for each database_type in packages/floe-cube/tests/unit/test_config.py
+- [x] T014 [P] [US1] Unit test: config generator references K8s secrets (never embeds credentials) in packages/floe-cube/tests/unit/test_config.py
+- [x] T015 [P] [US1] Contract test: generated config matches cube-config.schema.json in packages/floe-cube/tests/contract/test_schema_stability.py
 
 ### Implementation for User Story 1
 
-- [ ] T016 [US1] Implement database driver template selection (postgres, snowflake, bigquery, databricks, trino) in packages/floe-cube/src/floe_cube/config.py
-- [ ] T017 [US1] Implement cube.js configuration generator from ConsumptionConfig in packages/floe-cube/src/floe_cube/config.py
-- [ ] T018 [US1] Implement K8s secret reference handling (api_secret_ref environment variable mapping) in packages/floe-cube/src/floe_cube/config.py
-- [ ] T019 [US1] Implement config file writer (output to .floe/cube/cube.js) in packages/floe-cube/src/floe_cube/config.py
-- [ ] T020 [US1] Add validation for unsupported database_type with clear error messages in packages/floe-cube/src/floe_cube/config.py
+- [x] T016 [US1] Implement database driver template selection (postgres, snowflake, bigquery, databricks, trino) in packages/floe-cube/src/floe_cube/config.py
+- [x] T017 [US1] Implement cube.js configuration generator from ConsumptionConfig in packages/floe-cube/src/floe_cube/config.py
+- [x] T018 [US1] Implement K8s secret reference handling (api_secret_ref environment variable mapping) in packages/floe-cube/src/floe_cube/config.py
+- [x] T019 [US1] Implement config file writer (output to .floe/cube/cube.js) in packages/floe-cube/src/floe_cube/config.py
+- [x] T020 [US1] Add validation for unsupported database_type with clear error messages in packages/floe-cube/src/floe_cube/config.py
 
-**Checkpoint**: User Story 1 complete - can generate valid Cube configuration from CompiledArtifacts
+**Checkpoint**: User Story 1 complete - can generate valid Cube configuration from CompiledArtifacts (COMPLETE: 25 tests passing)
 
 ---
 
@@ -89,26 +89,26 @@
 
 ### Tests for User Story 2
 
-- [ ] T021 [P] [US2] Unit test: model_sync extracts dimensions from dbt columns with correct type mapping in packages/floe-cube/tests/unit/test_model_sync.py
-- [ ] T022 [P] [US2] Unit test: model_sync extracts measures from meta.cube.measures tags in packages/floe-cube/tests/unit/test_model_sync.py
-- [ ] T023 [P] [US2] Unit test: model_sync creates joins from dbt relationships in packages/floe-cube/tests/unit/test_model_sync.py
-- [ ] T024 [P] [US2] Unit test: model_sync handles incremental updates without duplicating cubes in packages/floe-cube/tests/unit/test_model_sync.py
-- [ ] T025 [P] [US2] Contract test: generated schemas match cube-schema.schema.json in packages/floe-cube/tests/contract/test_schema_stability.py
+- [x] T021 [P] [US2] Unit test: model_sync extracts dimensions from dbt columns with correct type mapping in packages/floe-cube/tests/unit/test_model_sync.py
+- [x] T022 [P] [US2] Unit test: model_sync extracts measures from meta.cube.measures tags in packages/floe-cube/tests/unit/test_model_sync.py
+- [x] T023 [P] [US2] Unit test: model_sync creates joins from dbt relationships in packages/floe-cube/tests/unit/test_model_sync.py
+- [x] T024 [P] [US2] Unit test: model_sync handles incremental updates without duplicating cubes in packages/floe-cube/tests/unit/test_model_sync.py
+- [x] T025 [P] [US2] Contract test: generated schemas match cube-schema.schema.json in packages/floe-cube/tests/contract/test_schema_stability.py
 
 ### Implementation for User Story 2
 
-- [ ] T026 [US2] Implement dbt manifest.json parser (extract models, columns, meta tags) in packages/floe-cube/src/floe_cube/model_sync.py
-- [ ] T027 [US2] Implement dbt-to-Cube type mapping (text→string, integer→number, timestamp→time, etc.) in packages/floe-cube/src/floe_cube/model_sync.py
-- [ ] T028 [US2] Implement dimension extraction from dbt columns in packages/floe-cube/src/floe_cube/model_sync.py
-- [ ] T029 [US2] Implement measure extraction from meta.cube.measures tags in packages/floe-cube/src/floe_cube/model_sync.py
-- [ ] T030 [US2] Implement join extraction from dbt refs and meta.cube.joins in packages/floe-cube/src/floe_cube/model_sync.py
-- [ ] T031 [US2] Implement CubeSchema YAML generator (output to .floe/cube/schema/*.yaml) in packages/floe-cube/src/floe_cube/model_sync.py
-- [ ] T032 [US2] Implement incremental sync logic (update existing, detect removed models) in packages/floe-cube/src/floe_cube/model_sync.py
-- [ ] T033 [US2] Add manifest.json existence validation with clear error messages in packages/floe-cube/src/floe_cube/model_sync.py
+- [x] T026 [US2] Implement dbt manifest.json parser (extract models, columns, meta tags) in packages/floe-cube/src/floe_cube/model_sync.py
+- [x] T027 [US2] Implement dbt-to-Cube type mapping (text→string, integer→number, timestamp→time, etc.) in packages/floe-cube/src/floe_cube/model_sync.py
+- [x] T028 [US2] Implement dimension extraction from dbt columns in packages/floe-cube/src/floe_cube/model_sync.py
+- [x] T029 [US2] Implement measure extraction from meta.cube.measures tags in packages/floe-cube/src/floe_cube/model_sync.py
+- [x] T030 [US2] Implement join extraction from dbt refs and meta.cube.joins in packages/floe-cube/src/floe_cube/model_sync.py
+- [x] T031 [US2] Implement CubeSchema YAML generator (output to .floe/cube/schema/*.yaml) in packages/floe-cube/src/floe_cube/model_sync.py
+- [x] T032 [US2] Implement incremental sync logic (update existing, detect removed models) in packages/floe-cube/src/floe_cube/model_sync.py
+- [x] T033 [US2] Add manifest.json existence validation with clear error messages in packages/floe-cube/src/floe_cube/model_sync.py
 - [ ] T034 [US2] Implement watchdog file watcher for manifest.json changes (FR-028) in packages/floe-cube/src/floe_cube/watcher.py
 - [ ] T035 [P] [US2] Unit test: watcher triggers sync on manifest.json modification in packages/floe-cube/tests/unit/test_watcher.py
 
-**Checkpoint**: User Stories 1 AND 2 complete - can generate full Cube deployment configuration from CompiledArtifacts and dbt manifest
+**Checkpoint**: User Stories 1 AND 2 core implementation complete - 118 tests passing, 91% coverage. (T034-T035 watcher deferred)
 
 ---
 

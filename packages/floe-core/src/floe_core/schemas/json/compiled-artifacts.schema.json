@@ -279,7 +279,7 @@
     },
     "CubeSecurityConfig": {
       "additionalProperties": false,
-      "description": "Configuration for Cube row-level security.\n\nAttributes:\n    row_level: Enable row-level security filtering.\n    tenant_column: Column name used for tenant filtering.\n\nExample:\n    >>> config = CubeSecurityConfig(\n    ...     row_level=True,\n    ...     tenant_column=\"organization_id\"\n    ... )",
+      "description": "Configuration for Cube row-level security.\n\nRow-level security filters query results based on JWT claims.\nThe filter_column specifies which database column to filter on,\nand the corresponding claim value is extracted from the JWT token.\n\nNote:\n    This is USER-MANAGED row-level security, NOT SaaS tenant isolation.\n    Users define their own filter columns and claims for their use cases\n    (e.g., organization_id, department, region).\n\nAttributes:\n    row_level: Enable row-level security filtering.\n    filter_column: Column name used for row-level filtering.\n\nExample:\n    >>> config = CubeSecurityConfig(\n    ...     row_level=True,\n    ...     filter_column=\"organization_id\"\n    ... )",
       "properties": {
         "row_level": {
           "default": true,
@@ -287,10 +287,10 @@
           "title": "Row Level",
           "type": "boolean"
         },
-        "tenant_column": {
-          "default": "tenant_id",
-          "description": "Column for tenant filtering",
-          "title": "Tenant Column",
+        "filter_column": {
+          "default": "organization_id",
+          "description": "Column for row-level filtering (matches JWT claim name)",
+          "title": "Filter Column",
           "type": "string"
         }
       },
