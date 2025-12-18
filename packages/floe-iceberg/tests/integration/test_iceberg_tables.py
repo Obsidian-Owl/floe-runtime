@@ -40,19 +40,18 @@ ensure_polaris_credentials_in_env()
 
 import contextlib  # noqa: E402
 
-from floe_polaris import (  # noqa: E402
-    NamespaceNotFoundError,
-    PolarisCatalog,
-    PolarisCatalogConfig,
-    create_catalog,
-)
-
 from floe_iceberg import (  # noqa: E402
     IcebergTableManager,
     PartitionTransform,
     PartitionTransformType,
     TableExistsError,
     TableNotFoundError,
+)
+from floe_polaris import (  # noqa: E402
+    NamespaceNotFoundError,
+    PolarisCatalog,
+    PolarisCatalogConfig,
+    create_catalog,
 )
 
 # =============================================================================

@@ -35,11 +35,6 @@ from dagster import (
     build_output_context,
     materialize,
 )
-from floe_polaris import (
-    PolarisCatalog,
-    PolarisCatalogConfig,
-    create_catalog,
-)
 
 from floe_iceberg import (
     IcebergIOManager,
@@ -47,6 +42,11 @@ from floe_iceberg import (
     IcebergTableManager,
     WriteMode,
     create_io_manager,
+)
+from floe_polaris import (
+    PolarisCatalog,
+    PolarisCatalogConfig,
+    create_catalog,
 )
 
 # =============================================================================

@@ -12,18 +12,10 @@ from typing import TYPE_CHECKING, Any, cast
 
 from pyiceberg.catalog import Catalog
 from pyiceberg.catalog.rest import RestCatalog
-from pyiceberg.exceptions import (
-    NamespaceAlreadyExistsError as PyIcebergNamespaceExistsError,
-)
-from pyiceberg.exceptions import (
-    NamespaceNotEmptyError as PyIcebergNamespaceNotEmptyError,
-)
-from pyiceberg.exceptions import (
-    NoSuchNamespaceError as PyIcebergNamespaceNotFoundError,
-)
-from pyiceberg.exceptions import (
-    NoSuchTableError as PyIcebergTableNotFoundError,
-)
+from pyiceberg.exceptions import NamespaceAlreadyExistsError as PyIcebergNamespaceExistsError
+from pyiceberg.exceptions import NamespaceNotEmptyError as PyIcebergNamespaceNotEmptyError
+from pyiceberg.exceptions import NoSuchNamespaceError as PyIcebergNamespaceNotFoundError
+from pyiceberg.exceptions import NoSuchTableError as PyIcebergTableNotFoundError
 
 from floe_polaris.config import NamespaceInfo, PolarisCatalogConfig
 from floe_polaris.errors import (

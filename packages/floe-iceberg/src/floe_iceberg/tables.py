@@ -14,15 +14,9 @@ from typing import TYPE_CHECKING, Any, TypeAlias
 
 import pandas as pd
 import pyarrow as pa
-from pyiceberg.exceptions import (
-    NoSuchNamespaceError as PyIcebergNamespaceNotFoundError,
-)
-from pyiceberg.exceptions import (
-    NoSuchTableError as PyIcebergTableNotFoundError,
-)
-from pyiceberg.exceptions import (
-    TableAlreadyExistsError as PyIcebergTableExistsError,
-)
+from pyiceberg.exceptions import NoSuchNamespaceError as PyIcebergNamespaceNotFoundError
+from pyiceberg.exceptions import NoSuchTableError as PyIcebergTableNotFoundError
+from pyiceberg.exceptions import TableAlreadyExistsError as PyIcebergTableExistsError
 from pyiceberg.partitioning import PartitionField, PartitionSpec
 from pyiceberg.schema import Schema
 from pyiceberg.transforms import (
@@ -52,11 +46,12 @@ from floe_iceberg.errors import (
 from floe_iceberg.observability import get_logger, get_tracer, table_operation
 
 if TYPE_CHECKING:
-    from floe_polaris.client import PolarisCatalog
     from opentelemetry.trace import Tracer
     from pyiceberg.catalog import Catalog
     from pyiceberg.table import Table
     from structlog.stdlib import BoundLogger
+
+    from floe_polaris.client import PolarisCatalog
 
     # Union type for catalog sources
     CatalogLike: TypeAlias = PolarisCatalog | Catalog
