@@ -37,6 +37,16 @@ __all__ = [
     "CubeConfigGenerator",
     # Model sync (US2)
     "ModelSync",
+    "DbtManifestParser",
+    "ModelSynchronizer",
+    # Manifest sources (US2)
+    "ManifestSource",
+    "FileManifestSource",
+    "ManifestLoadError",
+    # File watcher (US2)
+    "ManifestWatcher",
+    "WatcherState",
+    "WatcherError",
     # Pydantic models (Foundational)
     "CubeSchema",
     "CubeDimension",
@@ -83,6 +93,22 @@ def __getattr__(name: str) -> object:
         from floe_cube.model_sync import ModelSync
 
         return ModelSync
+    if name in ("DbtManifestParser", "ModelSynchronizer"):
+        from floe_cube import model_sync as model_sync_module
+
+        return getattr(model_sync_module, name)
+
+    # Manifest sources (US2)
+    if name in ("ManifestSource", "FileManifestSource", "ManifestLoadError"):
+        from floe_cube import sources as sources_module
+
+        return getattr(sources_module, name)
+
+    # File watcher (US2)
+    if name in ("ManifestWatcher", "WatcherState", "WatcherError"):
+        from floe_cube import watcher as watcher_module
+
+        return getattr(watcher_module, name)
 
     # Pydantic models (Foundational)
     if name in (
