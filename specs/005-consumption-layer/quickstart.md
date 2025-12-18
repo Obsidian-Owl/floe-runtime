@@ -144,12 +144,14 @@ curl -X POST http://localhost:4000/cubejs-api/graphql \
 # Connect with psql (Postgres client)
 PGPASSWORD=$CUBE_TOKEN psql -h localhost -p 15432 -U cube -d cube
 
-# Run SQL query
-SELECT status, COUNT(*), SUM(amount) as total
-FROM orders
-WHERE created_at > NOW() - INTERVAL '7 days'
-GROUP BY status;
+# Run SQL query using Cube semantic layer columns
+# Note: Use Cube measure/dimension names, not raw SQL aggregations
+SELECT status, count, "totalAmount"
+FROM Orders
+WHERE "createdAt" > CURRENT_TIMESTAMP - INTERVAL '7 days';
 ```
+
+**Note**: Cube's SQL API uses the semantic layer's measures and dimensions, not raw SQL aggregations. Column names match your Cube schema (e.g., `totalAmount` instead of `SUM(amount)`).
 
 ## 8. Test Row-Level Security
 
@@ -179,7 +181,8 @@ curl -X POST http://localhost:4000/cubejs-api/v1/load \
 
 ```bash
 # Check Marquez for query lineage
-curl http://localhost:5000/api/v1/namespaces/floe-cube/jobs
+# Note: Marquez API is exposed on port 5002 (internal port 5000)
+curl http://localhost:5002/api/v1/namespaces/floe-cube/jobs
 
 # Should show cube.orders.query jobs with run events
 ```
@@ -230,7 +233,7 @@ aws --endpoint-url=http://localhost:4566 s3 ls s3://cube-preaggs/
 
 ### OpenLineage events not appearing
 
-1. Check Marquez is healthy: `curl http://localhost:5001/healthcheck`
+1. Check Marquez is healthy: `curl http://localhost:5002/api/v1/namespaces`
 2. Verify `observability.openlineage_enabled: true` in floe.yaml
 3. Check Cube logs for emission warnings
 
