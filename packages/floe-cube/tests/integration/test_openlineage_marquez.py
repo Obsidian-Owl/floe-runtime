@@ -172,7 +172,7 @@ class TestOpenLineageEventEmission:
         )
 
         runs = run_response.json().get("runs", [])
-        run_ids = [r["id"]["runId"] for r in runs]
+        run_ids = [r["id"] for r in runs]
         assert run_id in run_ids, f"Run {run_id} not found in Marquez"
 
     def test_complete_event_marks_run_finished(
@@ -206,13 +206,15 @@ class TestOpenLineageEventEmission:
         # Give Marquez time to process
         time.sleep(0.5)
 
-        # Verify run is marked as completed
+        # Verify run is marked as completed by getting runs list
         run_response = marquez_client.get(
-            f"/api/v1/namespaces/{OPENLINEAGE_NAMESPACE}/jobs/{unique_job_name}/runs/{run_id}"
+            f"/api/v1/namespaces/{OPENLINEAGE_NAMESPACE}/jobs/{unique_job_name}/runs"
         )
 
         assert run_response.status_code == 200
-        run_data = run_response.json()
+        runs = run_response.json().get("runs", [])
+        run_data = next((r for r in runs if r["id"] == run_id), None)
+        assert run_data is not None, f"Run {run_id} not found"
         # Marquez run states: NEW, RUNNING, COMPLETED, FAILED, ABORTED
         assert run_data.get("state") == "COMPLETED", (
             f"Expected COMPLETED, got {run_data.get('state')}"
@@ -249,13 +251,15 @@ class TestOpenLineageEventEmission:
         # Give Marquez time to process
         time.sleep(0.5)
 
-        # Verify run is marked as failed
+        # Verify run is marked as failed by getting runs list
         run_response = marquez_client.get(
-            f"/api/v1/namespaces/{OPENLINEAGE_NAMESPACE}/jobs/{unique_job_name}/runs/{run_id}"
+            f"/api/v1/namespaces/{OPENLINEAGE_NAMESPACE}/jobs/{unique_job_name}/runs"
         )
 
         assert run_response.status_code == 200
-        run_data = run_response.json()
+        runs = run_response.json().get("runs", [])
+        run_data = next((r for r in runs if r["id"] == run_id), None)
+        assert run_data is not None, f"Run {run_id} not found"
         assert run_data.get("state") == "FAILED", (
             f"Expected FAILED, got {run_data.get('state')}"
         )
