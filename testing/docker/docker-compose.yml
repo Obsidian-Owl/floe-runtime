@@ -1,0 +1,437 @@
+# floe-runtime E2E Test Infrastructure
+# Docker Compose configuration for local integration testing
+#
+# Usage:
+#   docker compose up -d                    # Start base services
+#   docker compose --profile storage up -d  # Include Polaris + LocalStack
+#   docker compose --profile compute up -d  # Include Spark + Trino
+#   docker compose --profile full up -d     # All services including Cube
+#
+# Services:
+#   Base:     PostgreSQL, Jaeger
+#   Storage:  LocalStack (S3 + STS), Polaris (Iceberg catalog)
+#   Compute:  Trino, Spark
+#   Full:     Cube (semantic layer), Marquez (lineage)
+#
+# Security Note:
+#   LocalStack provides AWS S3 + STS emulation, enabling production-aligned
+#   credential vending. This allows us to test the same authentication flows
+#   that would be used in production with real AWS.
+
+networks:
+  floe-network:
+    driver: bridge
+    name: floe-network
+
+volumes:
+  postgres-data:
+    name: floe-postgres-data
+  localstack-data:
+    name: floe-localstack-data
+  # Shared config volume for credential exchange between containers and host
+  # polaris-init writes credentials here, tests read them
+  polaris-credentials:
+    name: floe-polaris-credentials
+  # Cache for test runner to speed up repeated runs
+  test-cache:
+    name: floe-test-cache
+
+services:
+  # ==============================================================================
+  # BASE INFRASTRUCTURE (always started)
+  # ==============================================================================
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: floe-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - floe-network
+    restart: unless-stopped
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: floe-jaeger
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+      - "6831:6831/udp"  # Thrift compact (legacy)
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:16686"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - floe-network
+    restart: unless-stopped
+
+  # ==============================================================================
+  # STORAGE PROFILE (--profile storage)
+  # LocalStack provides S3 + STS emulation for production-aligned testing.
+  # This enables proper credential vending without the security shortcuts
+  # that would be needed with MinIO (which lacks STS support).
+  # ==============================================================================
+
+  localstack:
+    image: localstack/localstack:latest
+    container_name: floe-localstack
+    ports:
+      - "4566:4566"   # LocalStack Gateway (S3, STS, IAM, etc.)
+      - "4510-4559:4510-4559"  # External service ports
+    environment:
+      # Enable S3, STS, IAM services for credential vending
+      SERVICES: s3,sts,iam
+      # Persist data across restarts
+      PERSISTENCE: 1
+      # Debug logging (optional)
+      DEBUG: ${LOCALSTACK_DEBUG:-0}
+      # Default region
+      AWS_DEFAULT_REGION: ${AWS_REGION:-us-east-1}
+      # Ensure consistent endpoint behavior
+      LOCALSTACK_HOST: localstack
+    volumes:
+      - localstack-data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - floe-network
+    restart: unless-stopped
+    profiles:
+      - storage
+      - compute
+      - full
+
+  # Create S3 buckets and IAM roles on startup
+  # Bucket names are defined in config/buckets.env (single source of truth)
+  localstack-init:
+    image: amazon/aws-cli:latest
+    container_name: floe-localstack-init
+    depends_on:
+      localstack:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo 'Configuring LocalStack S3 buckets and IAM...'
+        sleep 5
+        # Create buckets from FLOE_BUCKETS environment variable (comma-separated)
+        echo "Creating buckets: $${FLOE_BUCKETS}"
+        for bucket in $$(echo "$${FLOE_BUCKETS}" | tr ',' ' '); do
+          aws --endpoint-url=http://localstack:4566 s3 mb s3://$${bucket} 2>/dev/null || true
+          echo "  - s3://$${bucket}"
+        done
+        echo 'Creating IAM role for Polaris credential vending...'
+        aws --endpoint-url=http://localstack:4566 iam create-role --role-name polaris-storage-role --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"polaris.amazonaws.com"},"Action":"sts:AssumeRole"}]}' 2>/dev/null || true
+        aws --endpoint-url=http://localstack:4566 iam attach-role-policy --role-name polaris-storage-role --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess 2>/dev/null || true
+        echo 'LocalStack initialization complete'
+        echo "Buckets: $${FLOE_BUCKETS}"
+        echo 'IAM Role: polaris-storage-role'
+    env_file:
+      - ./config/buckets.env
+    environment:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: ${AWS_REGION:-us-east-1}
+    networks:
+      - floe-network
+    profiles:
+      - storage
+      - compute
+      - full
+
+  polaris:
+    # LocalStack's pre-configured Polaris image - designed for LocalStack S3 compatibility
+    # See: https://docs.localstack.cloud/snowflake/features/polaris-catalog/
+    # NOTE: This image uses in-memory storage (data doesn't persist across restarts)
+    #       This is fine for dev/test but document for production planning.
+    image: localstack/polaris:latest
+    container_name: floe-polaris
+    ports:
+      - "8181:8181"   # REST API
+      - "8182:8182"   # Admin
+    environment:
+      # AWS credentials for LocalStack S3 access
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      # Point Polaris to LocalStack S3 endpoint
+      # LocalStack's Polaris image handles path-style access internally
+      AWS_ENDPOINT_URL: http://localstack:4566
+      # Disable OpenTelemetry to reduce startup noise (optional)
+      quarkus.otel.sdk.disabled: "true"
+    # NOTE: Polaris auto-generates root credentials on startup.
+    # The polaris-init container extracts them from logs dynamically.
+    # No volumes needed - LocalStack's Polaris image has built-in configuration
+    # No postgres dependency - uses in-memory storage by default
+    depends_on:
+      localstack:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8182/q/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - floe-network
+    restart: unless-stopped
+    profiles:
+      - storage
+      - compute
+      - full
+
+  # Initialize Polaris catalog on startup
+  # This container extracts auto-generated credentials from Polaris logs
+  # and creates the warehouse catalog with proper permissions.
+  polaris-init:
+    image: docker:cli
+    container_name: floe-polaris-init
+    depends_on:
+      polaris:
+        condition: service_healthy
+      localstack-init:
+        condition: service_completed_successfully
+    environment:
+      POLARIS_URI: http://polaris:8181
+      # Realm is always 'POLARIS' - the default realm name
+      POLARIS_REALM: ${POLARIS_REALM:-POLARIS}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      # LocalStack credentials
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      # LocalStack endpoint for S3 (single endpoint - LocalStack's Polaris handles it)
+      S3_ENDPOINT: http://localstack:4566
+    volumes:
+      - ./init-scripts/02-init-polaris.sh:/init-polaris.sh:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Mount config directory to write credentials for tests to read
+      - ./config:/config:rw
+    entrypoint: ["/bin/sh", "/init-polaris.sh"]
+    networks:
+      - floe-network
+    profiles:
+      - storage
+      - compute
+      - full
+
+  # ==============================================================================
+  # COMPUTE PROFILE (--profile compute)
+  # ==============================================================================
+
+  trino:
+    image: trinodb/trino:443
+    container_name: floe-trino
+    ports:
+      - "8080:8080"   # HTTP API / UI
+    environment:
+      # LocalStack credentials
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+    volumes:
+      - ./trino-config/catalog:/etc/trino/catalog:ro
+    depends_on:
+      polaris:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "trino", "--execute", "SELECT 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - floe-network
+    restart: unless-stopped
+    profiles:
+      - compute
+      - full
+
+  spark-iceberg:
+    image: tabulario/spark-iceberg:3.5.1_1.5.2
+    container_name: floe-spark
+    ports:
+      - "8888:8888"   # Jupyter Notebook
+      - "10000:10000" # Spark Thrift Server
+      - "4040:4040"   # Spark UI (when running)
+    environment:
+      # LocalStack credentials
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+    volumes:
+      - ./spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
+    depends_on:
+      polaris:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    networks:
+      - floe-network
+    restart: unless-stopped
+    profiles:
+      - compute
+      - full
+
+  # ==============================================================================
+  # FULL PROFILE (--profile full)
+  # ==============================================================================
+
+  marquez:
+    image: marquezproject/marquez:0.49.0
+    container_name: floe-marquez
+    ports:
+      - "5000:5000"   # API (OpenLineage endpoint)
+      - "5001:5001"   # Admin
+    environment:
+      MARQUEZ_PORT: "5000"
+      MARQUEZ_ADMIN_PORT: "5001"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: marquez
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - floe-network
+    restart: unless-stopped
+    profiles:
+      - full
+
+  marquez-web:
+    image: marquezproject/marquez-web:0.49.0
+    container_name: floe-marquez-web
+    ports:
+      - "3001:3000"   # Web UI
+    environment:
+      MARQUEZ_HOST: marquez
+      MARQUEZ_PORT: "5000"
+    depends_on:
+      marquez:
+        condition: service_healthy
+    networks:
+      - floe-network
+    restart: unless-stopped
+    profiles:
+      - full
+
+  cube:
+    image: cubejs/cube:v0.36
+    container_name: floe-cube
+    ports:
+      - "4000:4000"   # REST API / GraphQL
+      - "15432:15432" # SQL API (Postgres wire protocol)
+    environment:
+      # Connect to Trino for Iceberg queries
+      CUBEJS_DB_TYPE: trino
+      CUBEJS_DB_HOST: trino
+      CUBEJS_DB_PORT: "8080"
+      CUBEJS_DB_CATALOG: iceberg
+      CUBEJS_DB_SCHEMA: default
+      # API configuration
+      CUBEJS_API_SECRET: ${CUBEJS_API_SECRET:-floe-cube-secret}
+      CUBEJS_DEV_MODE: "true"
+      CUBEJS_EXTERNAL_DEFAULT: "true"
+      # Telemetry
+      CUBEJS_TELEMETRY: "false"
+      # Pre-aggregation storage (LocalStack S3)
+      CUBEJS_DB_EXPORT_BUCKET_TYPE: s3
+      CUBEJS_DB_EXPORT_BUCKET: s3://cube-preaggs
+      CUBEJS_DB_EXPORT_BUCKET_AWS_KEY: test
+      CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET: test
+      CUBEJS_DB_EXPORT_BUCKET_AWS_REGION: ${AWS_REGION:-us-east-1}
+      # Point to LocalStack S3
+      AWS_ENDPOINT_URL: http://localstack:4566
+    volumes:
+      - ./cube-schema:/cube/conf/schema:ro
+    depends_on:
+      trino:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - floe-network
+    restart: unless-stopped
+    profiles:
+      - full
+
+  # ==============================================================================
+  # TEST PROFILE (--profile test)
+  # Runs integration tests inside Docker network for proper hostname resolution.
+  # This eliminates the need for /etc/hosts configuration on the host machine.
+  # ==============================================================================
+
+  test-runner:
+    build:
+      context: ../..
+      dockerfile: testing/docker/Dockerfile.test-runner
+    container_name: floe-test-runner
+    working_dir: /workspace
+    volumes:
+      # Mount workspace as read-write for pytest cache and coverage
+      - ../..:/workspace
+      # Mount credentials from polaris-init
+      - ./config:/workspace/testing/docker/config:ro
+      # Persist test cache across runs
+      - test-cache:/workspace/.pytest_cache
+    # Load credentials generated by polaris-init
+    env_file:
+      - ./config/polaris-credentials.env
+    environment:
+      # Docker context detection
+      DOCKER_CONTAINER: "1"
+      # Override POLARIS_URI to use internal hostname (file has localhost)
+      POLARIS_URI: http://polaris:8181/api/catalog
+      POLARIS_WAREHOUSE: warehouse
+      # LocalStack S3 configuration (internal Docker hostname)
+      LOCALSTACK_ENDPOINT: http://localstack:4566
+      # Override credentials from file with LocalStack values
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      # Python settings
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      polaris-init:
+        condition: service_completed_successfully
+    networks:
+      - floe-network
+    profiles:
+      - test

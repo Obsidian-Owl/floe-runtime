@@ -1455,15 +1455,50 @@ name = "floe-iceberg"
 version = "0.1.0"
 source = { editable = "packages/floe-iceberg" }
 dependencies = [
+    { name = "dagster" },
     { name = "floe-core" },
+    { name = "floe-polaris" },
+    { name = "opentelemetry-api" },
+    { name = "pandas" },
+    { name = "pyarrow" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
     { name = "pyiceberg" },
+    { name = "structlog" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "black" },
+    { name = "dagster-webserver" },
+    { name = "hypothesis" },
+    { name = "mypy" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "black", marker = "extra == 'dev'", specifier = ">=24.0" },
+    { name = "dagster", specifier = ">=1.9" },
+    { name = "dagster-webserver", marker = "extra == 'dev'", specifier = ">=1.9" },
     { name = "floe-core", editable = "packages/floe-core" },
+    { name = "floe-polaris", editable = "packages/floe-polaris" },
+    { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.0" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0" },
+    { name = "opentelemetry-api", specifier = ">=1.28" },
+    { name = "pandas", specifier = ">=2.0" },
+    { name = "pyarrow", specifier = ">=14.0" },
+    { name = "pydantic", specifier = ">=2.0" },
+    { name = "pydantic-settings", specifier = ">=2.0" },
     { name = "pyiceberg", specifier = ">=0.8" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1" },
+    { name = "structlog", specifier = ">=24.0" },
 ]
+provides-extras = ["dev"]
 
 [[package]]
 name = "floe-polaris"
@@ -1471,14 +1506,41 @@ version = "0.1.0"
 source = { editable = "packages/floe-polaris" }
 dependencies = [
     { name = "floe-core" },
+    { name = "opentelemetry-api" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
     { name = "pyiceberg" },
+    { name = "structlog" },
+    { name = "tenacity" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "black" },
+    { name = "hypothesis" },
+    { name = "mypy" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "black", marker = "extra == 'dev'", specifier = ">=24.0" },
     { name = "floe-core", editable = "packages/floe-core" },
-    { name = "pyiceberg", specifier = ">=0.7" },
+    { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.0" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0" },
+    { name = "opentelemetry-api", specifier = ">=1.28" },
+    { name = "pydantic", specifier = ">=2.0" },
+    { name = "pydantic-settings", specifier = ">=2.0" },
+    { name = "pyiceberg", specifier = ">=0.8" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1" },
+    { name = "structlog", specifier = ">=24.0" },
+    { name = "tenacity", specifier = ">=8.0" },
 ]
+provides-extras = ["dev"]
 
 [[package]]
 name = "floe-runtime"

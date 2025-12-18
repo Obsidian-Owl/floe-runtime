@@ -10,7 +10,7 @@ readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
 authors = [{ name = "Floe Team" }]
-keywords = ["data", "iceberg", "storage", "lake"]
+keywords = ["data", "iceberg", "storage", "lake", "dagster"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -22,7 +22,26 @@ classifiers = [
 ]
 dependencies = [
     "pyiceberg>=0.8",
+    "dagster>=1.9",
+    "pyarrow>=14.0",
+    "pandas>=2.0",
+    "structlog>=24.0",
+    "opentelemetry-api>=1.28",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
     "floe-core",
+    "floe-polaris",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "hypothesis>=6.0",
+    "mypy>=1.0",
+    "ruff>=0.1",
+    "black>=24.0",
+    "dagster-webserver>=1.9",
 ]
 
 [project.urls]
@@ -35,3 +54,43 @@ packages = ["src/floe_iceberg"]
 
 [tool.uv.sources]
 floe-core = { workspace = true }
+floe-polaris = { workspace = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["src/floe_iceberg"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
+fail_under = 80
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = ["pandas.*", "pyarrow.*", "pyiceberg.*", "dagster.*"]
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]

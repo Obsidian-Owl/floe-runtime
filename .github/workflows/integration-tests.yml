@@ -1,0 +1,90 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Allow manual trigger
+  workflow_dispatch:
+
+# Cancel in-progress runs on the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      # Pin to full SHA for security (immutable reference)
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435  # v3
+
+      - name: Start Docker services
+        working-directory: testing/docker
+        run: |
+          # Start storage profile services
+          docker compose --profile storage up -d
+
+          # Wait for polaris-init to complete (generates credentials)
+          # Use docker inspect for reliable status detection (same as run-integration-tests.sh)
+          echo "Waiting for polaris-init to complete..."
+          timeout 120 sh -c 'until docker inspect -f "{{.State.Status}}" floe-polaris-init 2>/dev/null | grep -q "exited"; do sleep 2; done' || {
+            echo "polaris-init did not complete in time"
+            docker compose logs polaris-init
+            exit 1
+          }
+
+          # Check polaris-init exit code
+          EXIT_CODE=$(docker inspect -f "{{.State.ExitCode}}" floe-polaris-init 2>/dev/null || echo "1")
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "ERROR: polaris-init failed with exit code $EXIT_CODE"
+            docker compose logs polaris-init
+            exit 1
+          fi
+
+          # Verify credentials file was generated
+          if [ ! -f config/polaris-credentials.env ]; then
+            echo "ERROR: Credentials file not generated"
+            docker compose logs polaris-init
+            exit 1
+          fi
+
+          echo "Services ready!"
+
+      - name: Build test runner
+        working-directory: testing/docker
+        run: |
+          # Need both profiles since test-runner depends on storage services
+          docker compose --profile storage --profile test build test-runner
+
+      - name: Run integration tests
+        working-directory: testing/docker
+        run: |
+          # Run tests inside Docker network (need both profiles for dependencies)
+          # Use -p no:cacheprovider to avoid permission errors writing to /workspace/.pytest_cache
+          docker compose --profile storage --profile test run --rm test-runner \
+            uv run pytest -m integration packages/floe-polaris/tests/ packages/floe-iceberg/tests/ -v --tb=short -p no:cacheprovider
+
+      - name: Show logs on failure
+        if: failure()
+        working-directory: testing/docker
+        run: |
+          echo "=== Polaris logs ==="
+          docker compose logs polaris || true
+          echo "=== Polaris-init logs ==="
+          docker compose logs polaris-init || true
+          echo "=== LocalStack logs ==="
+          docker compose logs localstack || true
+          echo "=== Test runner logs ==="
+          docker compose logs test-runner || true
+
+      - name: Cleanup
+        if: always()
+        working-directory: testing/docker
+        run: |
+          docker compose --profile storage --profile test down -v

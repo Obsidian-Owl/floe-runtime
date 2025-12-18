@@ -8,10 +8,10 @@ T065: [US3] Implement graceful degradation (NoOp) when endpoint unavailable
 
 from __future__ import annotations
 
-import logging
-import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
+import logging
+import uuid
 
 from floe_dagster.lineage.config import OpenLineageConfig
 from floe_dagster.lineage.events import LineageDataset, LineageEvent, LineageEventType

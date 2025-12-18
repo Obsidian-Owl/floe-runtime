@@ -5,7 +5,23 @@ This document describes the testing strategy, patterns, and workflows for floe-r
 ## Quick Start
 
 ```bash
-# Run ALL unit tests across all packages (669 tests)
+# Run unit tests (fast, no Docker required)
+make test-unit
+
+# Run integration tests in Docker (zero-config, recommended)
+make test-integration
+
+# Run all CI checks (lint, type, security, test)
+make check
+
+# See all available commands
+make help
+```
+
+### Manual pytest Commands
+
+```bash
+# Run ALL unit tests across all packages
 uv run pytest packages/floe-core/tests/ packages/floe-dbt/tests/unit/ packages/floe-dagster/tests/unit/ tests/contract/ -v
 
 # Run all unit tests for a single package
@@ -48,12 +64,19 @@ floe-runtime/
 │   ├── __init__.py
 │   ├── fixtures/
 │   │   ├── __init__.py
-│   │   └── artifacts.py               # CompiledArtifacts factory
+│   │   ├── artifacts.py               # CompiledArtifacts factory
+│   │   └── services.py                # Docker service lifecycle
 │   ├── base_classes/
 │   │   ├── __init__.py
 │   │   └── adapter_test_base.py       # Base test classes
-│   └── markers/
-│       └── __init__.py                # Marker documentation
+│   ├── markers/
+│   │   └── __init__.py                # Marker documentation
+│   └── docker/                        # Docker Compose E2E infrastructure
+│       ├── docker-compose.yml         # Multi-profile service definitions
+│       ├── init-scripts/              # Database initialization
+│       ├── trino-config/              # Trino catalog configs
+│       ├── cube-schema/               # Cube semantic layer schemas
+│       └── README.md                  # Infrastructure documentation
 ├── tests/                             # Root-level tests
 │   └── conftest.py
 └── packages/
@@ -64,9 +87,15 @@ floe-runtime/
     │   ├── unit/                      # Profile generator tests
     │   │   └── test_profiles/         # Adapter-specific tests
     │   └── integration/               # Real dbt execution tests
-    └── floe-dagster/tests/
-        ├── unit/                      # Asset factory tests
-        └── integration/               # Real Dagster tests
+    ├── floe-dagster/tests/
+    │   ├── unit/                      # Asset factory tests
+    │   └── integration/               # Real Dagster tests
+    ├── floe-polaris/tests/
+    │   ├── unit/                      # Catalog wrapper tests
+    │   └── integration/               # Real Polaris catalog tests
+    └── floe-iceberg/tests/
+        ├── unit/                      # Table manager tests
+        └── integration/               # Real Iceberg table tests
 ```
 
 ## Testing Pyramid
@@ -300,6 +329,261 @@ def test_requires_dbt():
     ...
 ```
 
+## Docker E2E Test Infrastructure
+
+The `testing/docker/` directory provides a complete local testing environment using Docker Compose
+with layered profiles for different testing scenarios.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         floe-runtime Test Stack                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐              │
+│  │   Cube       │    │    Trino     │    │    Spark     │  Consumption │
+│  │  (Port 4000) │    │ (Port 8080)  │    │ (Port 10000) │  & Compute   │
+│  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘              │
+│         │                   │                   │                       │
+│         └───────────────────┼───────────────────┘                       │
+│                             │                                           │
+│                     ┌───────┴───────┐                                  │
+│                     │    Polaris    │  Iceberg REST Catalog            │
+│                     │  (Port 8181)  │                                  │
+│                     └───────┬───────┘                                  │
+│                             │                                           │
+│         ┌───────────────────┼───────────────────┐                      │
+│         │                   │                   │                       │
+│  ┌──────┴───────┐    ┌──────┴───────┐    ┌──────┴───────┐              │
+│  │  PostgreSQL  │    │  LocalStack  │    │   Marquez    │  Storage &   │
+│  │ (Port 5432)  │    │ (Port 4566)  │    │ (Port 5000)  │  Lineage     │
+│  └──────────────┘    └──────────────┘    └──────────────┘              │
+│                                                                         │
+│  ┌──────────────┐                                                      │
+│  │   Jaeger     │  Observability                                       │
+│  │ (Port 16686) │                                                      │
+│  └──────────────┘                                                      │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Docker Compose Profiles
+
+| Profile | Services | Use Case |
+|---------|----------|----------|
+| (none) | PostgreSQL, Jaeger | Unit tests, dbt-postgres target |
+| `storage` | + LocalStack (S3+STS+IAM), Polaris | Iceberg storage tests |
+| `compute` | + Trino, Spark | Compute engine tests |
+| `full` | + Cube, Marquez | E2E tests, semantic layer |
+
+### Zero-Config Integration Testing (Recommended)
+
+Integration tests run inside Docker containers on the same network as the services.
+This eliminates hostname resolution issues and provides a consistent, reproducible
+environment on any machine.
+
+```bash
+# Run all integration tests (zero-config, works anywhere)
+make test-integration
+
+# Or use the script directly
+./testing/docker/scripts/run-integration-tests.sh
+```
+
+This approach:
+- **Zero configuration** - Works on any machine with Docker
+- **Production parity** - Tests run in same network topology as production
+- **Reproducible** - Same environment locally and in CI
+- **No /etc/hosts modification** - Internal Docker hostnames resolve automatically
+
+### Manual Testing (Alternative)
+
+For development iteration, you can start services and run tests from your host:
+
+```bash
+# Start services
+make docker-up
+
+# Run tests (from host - may have hostname resolution limitations)
+uv run pytest -m integration packages/floe-iceberg/tests/
+```
+
+**Note**: Some write operations may fail with `Could not resolve host: localstack`
+when running from host. Use `make test-integration` for full compatibility.
+
+### Quick Start
+
+```bash
+# Navigate to testing directory
+cd testing/docker
+
+# Copy environment template
+cp env.example .env
+
+# Start base services (PostgreSQL + Jaeger)
+docker compose up -d
+
+# Start with storage profile (adds LocalStack + Polaris)
+docker compose --profile storage up -d
+
+# Wait for polaris-init to complete (extracts credentials automatically)
+# Credentials are written to testing/docker/config/polaris-credentials.env
+
+# Start with compute profile (adds Trino + Spark)
+docker compose --profile compute up -d
+
+# Start all services (full profile)
+docker compose --profile full up -d
+```
+
+### Service URLs
+
+After starting services, access UIs at:
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| LocalStack Health | http://localhost:4566/_localstack/health | - |
+| Polaris API | http://localhost:8181 | - |
+| Trino UI | http://localhost:8080 | - |
+| Jaeger UI | http://localhost:16686 | - |
+| Spark Notebooks | http://localhost:8888 | - |
+| Cube Playground | http://localhost:3000 | - |
+| Marquez UI | http://localhost:3001 | - |
+
+### Automatic Credential Management
+
+Polaris auto-generates OAuth2 credentials on each container startup. These are automatically
+extracted by the `polaris-init` container and written to:
+
+```
+testing/docker/config/polaris-credentials.env
+```
+
+**For integration tests**, credentials are loaded automatically by importing from `testing.fixtures.services`:
+
+```python
+# At the top of your test file:
+from testing.fixtures.services import ensure_polaris_credentials_in_env
+ensure_polaris_credentials_in_env()
+
+# Now environment variables are set:
+# - POLARIS_CLIENT_ID
+# - POLARIS_CLIENT_SECRET
+# - POLARIS_URI
+# - POLARIS_WAREHOUSE
+# - AWS_ACCESS_KEY_ID (for LocalStack S3)
+# - AWS_SECRET_ACCESS_KEY
+```
+
+**For manual testing**, source the file before running tests:
+
+```bash
+source testing/docker/config/polaris-credentials.env
+uv run pytest -m integration packages/floe-iceberg/tests/
+```
+
+The credentials file is git-ignored and regenerated on each `docker compose up`.
+
+### Using Docker Services in Tests
+
+#### With pytest fixtures
+
+```python
+import pytest
+from testing.fixtures.services import DockerServices
+
+@pytest.fixture(scope="module")
+def docker_services():
+    """Start Docker services for integration tests."""
+    services = DockerServices(
+        compose_file=Path("testing/docker/docker-compose.yml"),
+        profile="storage",
+    )
+    services.start()
+    yield services
+    services.stop()
+
+@pytest.mark.integration
+def test_polaris_catalog(docker_services):
+    """Test Polaris catalog connection."""
+    config = docker_services.get_polaris_config()
+    # config = {"uri": "http://localhost:8181/api/catalog", "warehouse": "warehouse"}
+
+    from pyiceberg.catalog import load_catalog
+    catalog = load_catalog("polaris", **config)
+    assert catalog is not None
+```
+
+#### Auto-start fixtures
+
+Pre-configured fixtures that automatically manage service lifecycle:
+
+```python
+from testing.fixtures.services import docker_services_storage
+
+@pytest.mark.integration
+def test_iceberg_table(docker_services_storage):
+    """Test with storage profile (LocalStack + Polaris)."""
+    polaris_config = docker_services_storage.get_polaris_config()
+    s3_config = docker_services_storage.get_s3_config()
+    # ...
+```
+
+Available fixtures:
+- `docker_services_base` - PostgreSQL, Jaeger
+- `docker_services_storage` - + LocalStack (S3+STS+IAM), Polaris
+- `docker_services_compute` - + Trino, Spark
+- `docker_services_full` - All services
+
+### Health Checks
+
+```bash
+# Check Polaris
+curl -f http://localhost:8181/api/catalog/v1/config
+
+# Check LocalStack
+curl -f http://localhost:4566/_localstack/health
+
+# Check Cube
+curl -f http://localhost:4000/readyz
+```
+
+### Pre-configured Databases
+
+PostgreSQL is initialized with multiple databases:
+
+| Database | Purpose |
+|----------|---------|
+| polaris | Iceberg catalog metadata |
+| marquez | OpenLineage data |
+| floe_dev | Development/testing |
+| floe_dbt | dbt compute target |
+
+### Pre-configured S3 Buckets
+
+LocalStack is initialized with buckets:
+
+| Bucket | Purpose |
+|--------|---------|
+| warehouse | Iceberg table data |
+| iceberg | Alternative Iceberg location |
+| cube-preaggs | Cube pre-aggregation storage |
+| dbt-artifacts | dbt artifacts storage |
+
+### Cleanup
+
+```bash
+# Stop all containers
+docker compose --profile full down
+
+# Remove volumes (fresh start)
+docker compose --profile full down -v
+
+# Remove everything including images
+docker compose --profile full down -v --rmi all
+```
+
 ## Mock vs Real Services Matrix
 
 | Service | Unit Tests | Integration | E2E |
@@ -307,7 +591,13 @@ def test_requires_dbt():
 | dbt | Mock dbtRunner | Real subprocess | Real |
 | DuckDB | Real (fast) | Real | Real |
 | Snowflake | Mock adapter | Skip (no creds) | Skip |
-| PostgreSQL | Mock adapter | Testcontainer | Real |
+| PostgreSQL | Mock adapter | Docker Compose | Real |
+| Polaris | Mock catalog | Docker Compose | Real |
+| LocalStack (S3) | Mock client | Docker Compose | Real |
+| Iceberg | Mock PyIceberg | Docker Compose | Real |
+| Trino | Mock connector | Docker Compose | Real |
+| Spark | Mock session | Docker Compose | Real |
+| Cube | Mock API | Docker Compose | Real |
 | OpenLineage | Mock emit() | Local HTTP | Marquez |
 | OpenTelemetry | InMemorySpanExporter | InMemory | Jaeger |
 

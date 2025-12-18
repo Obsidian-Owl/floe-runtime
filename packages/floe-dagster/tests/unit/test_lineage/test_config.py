@@ -5,8 +5,8 @@ T051: [US3] Unit tests for OpenLineageConfig model
 
 from __future__ import annotations
 
-import pytest
 from pydantic import ValidationError
+import pytest
 
 
 class TestOpenLineageConfig:

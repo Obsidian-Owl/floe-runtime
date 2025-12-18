@@ -21,8 +21,23 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "pyiceberg>=0.7",
+    "pyiceberg>=0.8",
+    "tenacity>=8.0",
+    "structlog>=24.0",
+    "opentelemetry-api>=1.28",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
     "floe-core",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "hypothesis>=6.0",
+    "mypy>=1.0",
+    "ruff>=0.1",
+    "black>=24.0",
 ]
 
 [project.urls]
@@ -35,3 +50,42 @@ packages = ["src/floe_polaris"]
 
 [tool.uv.sources]
 floe-core = { workspace = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["src/floe_polaris"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
+fail_under = 80
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = ["pyiceberg.*"]
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
