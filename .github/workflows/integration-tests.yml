@@ -59,13 +59,14 @@ jobs:
       - name: Build test runner
         working-directory: testing/docker
         run: |
-          docker compose --profile test build test-runner
+          # Need both profiles since test-runner depends on storage services
+          docker compose --profile storage --profile test build test-runner
 
       - name: Run integration tests
         working-directory: testing/docker
         run: |
-          # Run tests inside Docker network
-          docker compose --profile test run --rm test-runner \
+          # Run tests inside Docker network (need both profiles for dependencies)
+          docker compose --profile storage --profile test run --rm test-runner \
             uv run pytest -m integration packages/floe-polaris/tests/ packages/floe-iceberg/tests/ -v --tb=short
 
       - name: Show logs on failure
