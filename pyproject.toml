@@ -11,17 +11,24 @@ members = ["packages/*"]
 
 [tool.uv]
 dev-dependencies = [
+    # Code quality
     "black>=25.0",
     "isort>=6.0",
     "mypy>=1.14",
     "ruff>=0.8",
+    # Testing
     "pytest>=8.3",
     "pytest-cov>=6.0",
     "hypothesis>=6.120",
+    # Security
     "bandit>=1.8",
     "pip-audit>=2.8",
     "safety>=3.2",
     "pre-commit>=4.0",
+    # Integration test dependencies (floe-cube)
+    "psycopg2-binary>=2.9",  # SQL API integration tests
+    "httpx>=0.27",           # REST/GraphQL integration tests
+    "jsonschema>=4.0",       # Schema validation tests
 ]
 
 [tool.black]
