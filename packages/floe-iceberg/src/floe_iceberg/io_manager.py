@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 import pandas as pd
 import pyarrow as pa
 from dagster import ConfigurableIOManager, InputContext, OutputContext
+from dagster._core.errors import DagsterInvalidMetadata
 
 from floe_iceberg.config import (
     IcebergIOManagerConfig,
@@ -305,17 +306,23 @@ class IcebergIOManager(ConfigurableIOManager):
             tid = TableIdentifier.from_string(table_id)
 
             # Attach metadata to context
-            context.add_output_metadata(
-                {
-                    "table": table_id,
-                    "namespace": tid.namespace,
-                    "table_name": tid.name,
-                    "snapshot_id": snapshot_id,
-                    "num_rows": num_rows,
-                    "write_mode": write_mode.value,
-                    "schema_evolved": schema_evolved,
-                }
-            )
+            # Note: In append mode, multiple handle_output calls may occur with same context
+            # In that case, metadata keys already exist and we skip adding them again
+            try:
+                context.add_output_metadata(
+                    {
+                        "table": table_id,
+                        "namespace": tid.namespace,
+                        "table_name": tid.name,
+                        "snapshot_id": snapshot_id,
+                        "num_rows": num_rows,
+                        "write_mode": write_mode.value,
+                        "schema_evolved": schema_evolved,
+                    }
+                )
+            except DagsterInvalidMetadata:
+                # Metadata already exists from a previous call (e.g., append mode)
+                pass
 
             # Log materialization
             log_materialization(

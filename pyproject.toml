@@ -75,9 +75,14 @@ filterwarnings = [
     # PyIceberg falls back to pure Python Avro decoder when Cython is not available
     # This is expected in container environments without compiled extensions
     "ignore:Falling back to pure Python Avro decoder:UserWarning",
-    # Dagster OutputContext.metadata deprecation - use definition_metadata in 2.0
+    # PyIceberg overwrite on empty table raises a warning (not an error)
+    "ignore:Delete operation did not match any records:UserWarning",
+    # Dagster context.metadata deprecation - use definition_metadata in 2.0
     # This is in dagster library code, not our code
     "ignore:Property `OutputContext.metadata` is deprecated:DeprecationWarning",
+    "ignore:Property `InputContext.metadata` is deprecated:DeprecationWarning",
+    "ignore:Parameter `metadata` of function `build_input_context` is deprecated:DeprecationWarning",
+    "ignore:Parameter `metadata` of function `build_output_context` is deprecated:DeprecationWarning",
 ]
 pythonpath = ["."]
 markers = [

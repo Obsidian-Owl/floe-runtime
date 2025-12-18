@@ -52,7 +52,7 @@ else
 fi
 
 echo "==> Building test runner..."
-docker compose --profile test build test-runner
+docker compose --profile storage --profile test build test-runner
 
 echo "==> Running integration tests..."
 # Pass through any arguments to pytest
