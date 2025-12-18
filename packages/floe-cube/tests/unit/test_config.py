@@ -249,9 +249,9 @@ class TestCubeConfigGenerator:
         # but rather a reference to retrieve it
         for key, value in config.items():
             if ("SECRET" in key or "PASSWORD" in key or "KEY" in key) and value is not None:
-                assert (
-                    value.startswith("${") or value == ""
-                ), f"Secret {key} appears to contain plaintext value"
+                assert value.startswith("${") or value == "", (
+                    f"Secret {key} appears to contain plaintext value"
+                )
 
     def test_database_credentials_use_secret_refs(
         self,
@@ -270,9 +270,9 @@ class TestCubeConfigGenerator:
             if "PASS" in key or "SECRET" in key:
                 value = config.get(key)
                 if value:
-                    assert value.startswith(
-                        "${"
-                    ), f"{key} should reference secret, not contain value"
+                    assert value.startswith("${"), (
+                        f"{key} should reference secret, not contain value"
+                    )
 
     def test_no_hardcoded_credentials_in_config(
         self,
@@ -293,9 +293,9 @@ class TestCubeConfigGenerator:
             "-----BEGIN",  # PEM keys
         ]
         for pattern in sensitive_patterns:
-            assert (
-                pattern.lower() not in config_str.lower()
-            ), f"Sensitive pattern '{pattern}' found in config"
+            assert pattern.lower() not in config_str.lower(), (
+                f"Sensitive pattern '{pattern}' found in config"
+            )
 
 
 class TestCubeConfigFileWriter:

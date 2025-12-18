@@ -212,9 +212,9 @@ class TestOpenLineageEventEmission:
         run_data = next((r for r in runs if r["id"] == run_id), None)
         assert run_data is not None, f"Run {run_id} not found"
         # Marquez run states: NEW, RUNNING, COMPLETED, FAILED, ABORTED
-        assert (
-            run_data.get("state") == "COMPLETED"
-        ), f"Expected COMPLETED, got {run_data.get('state')}"
+        assert run_data.get("state") == "COMPLETED", (
+            f"Expected COMPLETED, got {run_data.get('state')}"
+        )
 
     def test_fail_event_marks_run_failed(
         self,

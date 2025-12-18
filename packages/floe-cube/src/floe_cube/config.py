@@ -63,7 +63,7 @@ def get_cube_driver_type(database_type: str) -> str:
     """
     if database_type not in DATABASE_DRIVER_MAP:
         supported = ", ".join(sorted(SUPPORTED_DATABASE_TYPES))
-        msg = f"Unsupported database_type: '{database_type}'. " f"Supported types: {supported}"
+        msg = f"Unsupported database_type: '{database_type}'. Supported types: {supported}"
         raise ValueError(msg)
 
     return DATABASE_DRIVER_MAP[database_type]

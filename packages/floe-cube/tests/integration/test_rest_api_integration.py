@@ -113,9 +113,9 @@ class TestRestApiJsonResponse:
             },
         )
 
-        assert (
-            response.status_code == 200
-        ), f"Expected 200, got {response.status_code}: {response.text}"
+        assert response.status_code == 200, (
+            f"Expected 200, got {response.status_code}: {response.text}"
+        )
 
         data = response.json()
         assert "data" in data, f"Response missing 'data' key: {data}"
@@ -138,9 +138,9 @@ class TestRestApiJsonResponse:
 
         assert response.status_code == 200
         content_type = response.headers.get("content-type", "")
-        assert (
-            "application/json" in content_type
-        ), f"Expected JSON content-type, got: {content_type}"
+        assert "application/json" in content_type, (
+            f"Expected JSON content-type, got: {content_type}"
+        )
 
     def test_query_with_multiple_measures_and_dimensions(
         self,
@@ -618,9 +618,9 @@ class TestPreAggregations:
             timeout=120.0,  # Pre-aggregation build may take time
         )
 
-        assert (
-            response.status_code == 200
-        ), f"Pre-aggregation query failed: {response.status_code}: {response.text}"
+        assert response.status_code == 200, (
+            f"Pre-aggregation query failed: {response.status_code}: {response.text}"
+        )
         data = response.json()
         assert "data" in data, f"Response missing 'data' key: {data}"
 
@@ -635,9 +635,9 @@ class TestPreAggregations:
             headers=authenticated_headers,
         )
 
-        assert (
-            response.status_code == 200
-        ), f"Meta API failed: {response.status_code}: {response.text}"
+        assert response.status_code == 200, (
+            f"Meta API failed: {response.status_code}: {response.text}"
+        )
 
         meta = response.json()
         assert "cubes" in meta, f"Meta response missing 'cubes': {meta}"
@@ -675,8 +675,8 @@ class TestPreAggregations:
             },
         )
 
-        assert (
-            response.status_code == 200
-        ), f"Non-pre-agg query failed: {response.status_code}: {response.text}"
+        assert response.status_code == 200, (
+            f"Non-pre-agg query failed: {response.status_code}: {response.text}"
+        )
         data = response.json()
         assert "data" in data

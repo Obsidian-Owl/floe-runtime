@@ -146,9 +146,9 @@ class TestGraphQLSchemaIntrospection:
             headers=authenticated_headers,
         )
 
-        assert (
-            response.status_code == 200
-        ), f"GraphQL endpoint not accessible: {response.status_code}: {response.text}"
+        assert response.status_code == 200, (
+            f"GraphQL endpoint not accessible: {response.status_code}: {response.text}"
+        )
 
         data = response.json()
         # GraphQL should return either data or errors, not both empty
@@ -177,9 +177,9 @@ class TestGraphQLSchemaIntrospection:
             headers=authenticated_headers,
         )
 
-        assert (
-            response.status_code == 200
-        ), f"Introspection failed: {response.status_code}: {response.text}"
+        assert response.status_code == 200, (
+            f"Introspection failed: {response.status_code}: {response.text}"
+        )
 
         data = response.json()
         assert "data" in data, f"No data in response: {data}"
@@ -215,9 +215,9 @@ class TestGraphQLSchemaIntrospection:
             headers=authenticated_headers,
         )
 
-        assert (
-            response.status_code == 200
-        ), f"Query type introspection failed: {response.status_code}: {response.text}"
+        assert response.status_code == 200, (
+            f"Query type introspection failed: {response.status_code}: {response.text}"
+        )
 
         data = response.json()
         assert "data" in data, f"No data in response: {data}"
@@ -260,9 +260,9 @@ class TestGraphQLSchemaIntrospection:
             headers=authenticated_headers,
         )
 
-        assert (
-            response.status_code == 200
-        ), f"Schema introspection failed: {response.status_code}: {response.text}"
+        assert response.status_code == 200, (
+            f"Schema introspection failed: {response.status_code}: {response.text}"
+        )
 
         data = response.json()
         types = data["data"]["__schema"]["types"]
@@ -313,9 +313,9 @@ class TestGraphQLNestedRelationships:
             headers=authenticated_headers,
         )
 
-        assert (
-            response.status_code == 200
-        ), f"Orders query failed: {response.status_code}: {response.text}"
+        assert response.status_code == 200, (
+            f"Orders query failed: {response.status_code}: {response.text}"
+        )
 
         data = response.json()
 
@@ -356,9 +356,9 @@ class TestGraphQLNestedRelationships:
             headers=authenticated_headers,
         )
 
-        assert (
-            response.status_code == 200
-        ), f"Orders query with dimensions failed: {response.status_code}: {response.text}"
+        assert response.status_code == 200, (
+            f"Orders query with dimensions failed: {response.status_code}: {response.text}"
+        )
 
         data = response.json()
 
@@ -402,9 +402,9 @@ class TestGraphQLNestedRelationships:
             headers=authenticated_headers,
         )
 
-        assert (
-            response.status_code == 200
-        ), f"Time dimension query failed: {response.status_code}: {response.text}"
+        assert response.status_code == 200, (
+            f"Time dimension query failed: {response.status_code}: {response.text}"
+        )
 
         data = response.json()
 
@@ -449,9 +449,9 @@ class TestGraphQLNestedRelationships:
             headers=authenticated_headers,
         )
 
-        assert (
-            response.status_code == 200
-        ), f"Multi-cube query failed: {response.status_code}: {response.text}"
+        assert response.status_code == 200, (
+            f"Multi-cube query failed: {response.status_code}: {response.text}"
+        )
 
         data = response.json()
 
@@ -488,9 +488,9 @@ class TestGraphQLNestedRelationships:
             headers=authenticated_headers,
         )
 
-        assert (
-            response.status_code == 200
-        ), f"Filtered query failed: {response.status_code}: {response.text}"
+        assert response.status_code == 200, (
+            f"Filtered query failed: {response.status_code}: {response.text}"
+        )
 
         data = response.json()
 
@@ -502,9 +502,9 @@ class TestGraphQLNestedRelationships:
         # All returned rows should have status = "completed"
         for row in cube_data:
             if row.get("status") is not None:
-                assert (
-                    row["status"] == "completed"
-                ), f"Filter not applied correctly. Expected 'completed', got: {row['status']}"
+                assert row["status"] == "completed", (
+                    f"Filter not applied correctly. Expected 'completed', got: {row['status']}"
+                )
 
     def test_orders_with_limit(
         self,
@@ -529,9 +529,9 @@ class TestGraphQLNestedRelationships:
             headers=authenticated_headers,
         )
 
-        assert (
-            response.status_code == 200
-        ), f"Limited query failed: {response.status_code}: {response.text}"
+        assert response.status_code == 200, (
+            f"Limited query failed: {response.status_code}: {response.text}"
+        )
 
         data = response.json()
 
@@ -565,9 +565,9 @@ class TestGraphQLEndpointConfiguration:
             headers={"Content-Type": "application/json"},
         )
 
-        assert (
-            response.status_code == 200
-        ), f"JSON content type not accepted: {response.status_code}: {response.text}"
+        assert response.status_code == 200, (
+            f"JSON content type not accepted: {response.status_code}: {response.text}"
+        )
 
     def test_graphql_returns_json_response(
         self,
@@ -582,9 +582,9 @@ class TestGraphQLEndpointConfiguration:
         )
 
         content_type = response.headers.get("content-type", "")
-        assert (
-            "application/json" in content_type.lower()
-        ), f"Expected JSON content type, got: {content_type}"
+        assert "application/json" in content_type.lower(), (
+            f"Expected JSON content type, got: {content_type}"
+        )
 
         # Verify it's valid JSON
         try:
@@ -656,9 +656,9 @@ class TestGraphQLEndpointConfiguration:
 
         data = response.json()
         # Should either have errors or empty data
-        assert (
-            "errors" in data or data.get("data") is None
-        ), f"Expected errors or null data for empty query: {data}"
+        assert "errors" in data or data.get("data") is None, (
+            f"Expected errors or null data for empty query: {data}"
+        )
 
     def test_graphql_missing_query_returns_error(
         self,
@@ -703,9 +703,9 @@ class TestGraphQLEndpointConfiguration:
             headers=authenticated_headers,
         )
 
-        assert (
-            response.status_code == 200
-        ), f"Variables query failed: {response.status_code}: {response.text}"
+        assert response.status_code == 200, (
+            f"Variables query failed: {response.status_code}: {response.text}"
+        )
 
         data = response.json()
 
