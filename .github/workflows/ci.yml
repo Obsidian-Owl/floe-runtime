@@ -103,7 +103,8 @@ jobs:
         run: uv sync --all-packages
 
       - name: Run tests
-        run: uv run pytest packages/*/tests/ --cov=packages --cov-report=xml
+        # Exclude integration tests (require Docker infrastructure)
+        run: uv run pytest packages/*/tests/ --cov=packages --cov-report=xml -m "not integration"
 
       - name: Upload coverage
         uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238  # v4
