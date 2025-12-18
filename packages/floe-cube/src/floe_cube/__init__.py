@@ -55,6 +55,9 @@ __all__ = [
     "CubePreAggregation",
     # Security (US6)
     "SecurityContext",
+    "JWTValidator",
+    "JWTValidationError",
+    "extract_security_context",
     # Tracing (US7)
     "QueryTracer",
     "QueryTraceSpan",
@@ -131,6 +134,12 @@ def __getattr__(name: str) -> object:
         from floe_cube import models as models_module
 
         return getattr(models_module, name)
+
+    # Security (US6)
+    if name in ("JWTValidator", "JWTValidationError", "extract_security_context"):
+        from floe_cube import security as security_module
+
+        return getattr(security_module, name)
 
     # Tracing (US7)
     if name == "QueryTracer":
