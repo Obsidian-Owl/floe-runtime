@@ -11,10 +11,14 @@ This guide demonstrates the core functionality of the storage layer in 5 minutes
 
 ```bash
 # Install packages (from monorepo root)
-pip install -e packages/floe-polaris -e packages/floe-iceberg
+uv sync
 
-# Start local Polaris (optional - for integration testing)
-docker run -d --name polaris -p 8181:8181 apache/polaris:latest
+# Start local test infrastructure (Polaris + LocalStack)
+cd testing/docker
+docker compose --profile storage up -d
+
+# Or use the zero-config test script
+./testing/docker/scripts/run-integration-tests.sh
 ```
 
 ---
@@ -77,13 +81,13 @@ schema = pa.schema([
 manager.create_table_if_not_exists("bronze.customers", schema)
 
 # Write data
-from datetime import datetime
+from datetime import datetime, timezone
 
 data = pa.Table.from_pydict({
     "id": [1, 2, 3],
     "name": ["Alice", "Bob", "Charlie"],
     "email": ["alice@ex.com", "bob@ex.com", "charlie@ex.com"],
-    "created_at": [datetime.now()] * 3,
+    "created_at": [datetime.now(timezone.utc)] * 3,
 })
 
 snapshot = manager.append("bronze.customers", data)
@@ -173,7 +177,7 @@ data_with_status = pa.Table.from_pydict({
     "id": [4],
     "name": ["Diana"],
     "email": ["diana@ex.com"],
-    "created_at": [datetime.now()],
+    "created_at": [datetime.now(timezone.utc)],
     "status": ["active"],  # New column!
 })
 

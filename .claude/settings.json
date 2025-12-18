@@ -25,7 +25,9 @@
       "Bash(find:*)",
       "Bash(tree:*)",
       "Bash(ls:*)",
-      "Read(**)"
+      "Read(**)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs"
     ],
     "deny": [
       "Bash(rm -rf:*)",
