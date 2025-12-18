@@ -19,25 +19,27 @@ Environment variables:
 
 from __future__ import annotations
 
+import contextlib
 import os
 import uuid
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Generator
+from collections.abc import Generator
+from typing import TYPE_CHECKING
 
 import pandas as pd
 import pyarrow as pa
 import pytest
 from dagster import (
-    AssetIn,
     AssetKey,
-    DailyPartitionsDefinition,
     Definitions,
-    InputContext,
-    OutputContext,
     asset,
     build_input_context,
     build_output_context,
     materialize,
+)
+from floe_polaris import (
+    PolarisCatalog,
+    PolarisCatalogConfig,
+    create_catalog,
 )
 
 from floe_iceberg import (
@@ -46,11 +48,6 @@ from floe_iceberg import (
     IcebergTableManager,
     WriteMode,
     create_io_manager,
-)
-from floe_polaris import (
-    PolarisCatalog,
-    PolarisCatalogConfig,
-    create_catalog,
 )
 
 if TYPE_CHECKING:
@@ -174,10 +171,8 @@ def test_namespace(catalog: PolarisCatalog) -> Generator[str, None, None]:
     yield ns_name
 
     # Cleanup: Drop namespace (tables cleaned up by individual tests)
-    try:
+    with contextlib.suppress(Exception):
         catalog.drop_namespace(ns_name)
-    except Exception:
-        pass
 
 
 @pytest.fixture
@@ -295,10 +290,8 @@ class TestHandleOutput:
             result = table_manager.scan(full_table)
             assert result.num_rows == 3
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 table_manager.drop_table(full_table)
-            except Exception:
-                pass
 
     def test_handle_output_dataframe(
         self,
@@ -325,10 +318,8 @@ class TestHandleOutput:
             result = table_manager.scan(full_table)
             assert result.num_rows == 3
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 table_manager.drop_table(full_table)
-            except Exception:
-                pass
 
     def test_handle_output_append_mode(
         self,
@@ -357,10 +348,8 @@ class TestHandleOutput:
             result = table_manager.scan(full_table)
             assert result.num_rows == 4
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 table_manager.drop_table(full_table)
-            except Exception:
-                pass
 
     def test_handle_output_overwrite_mode(
         self,
@@ -408,10 +397,8 @@ class TestHandleOutput:
             result = table_manager.scan(full_table)
             assert result.num_rows == 1  # Only replacement data
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 table_manager.drop_table(full_table)
-            except Exception:
-                pass
 
 
 # =============================================================================
@@ -455,10 +442,8 @@ class TestLoadInput:
             assert isinstance(result, pa.Table)
             assert result.num_rows == 3
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 table_manager.drop_table(full_table)
-            except Exception:
-                pass
 
     def test_load_input_with_columns(
         self,
@@ -500,10 +485,8 @@ class TestLoadInput:
             assert "name" in result.column_names
             assert "value" not in result.column_names
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 table_manager.drop_table(full_table)
-            except Exception:
-                pass
 
     def test_load_input_with_limit(
         self,
@@ -533,10 +516,8 @@ class TestLoadInput:
 
             assert result.num_rows == 10
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 table_manager.drop_table(full_table)
-            except Exception:
-                pass
 
 
 # =============================================================================
@@ -565,7 +546,7 @@ class TestDagsterIntegration:
             })
 
         try:
-            defs = Definitions(
+            Definitions(
                 assets=[simple_asset],
                 resources={"io_manager": io_manager},
             )
@@ -581,10 +562,8 @@ class TestDagsterIntegration:
             data = table_manager.scan(full_table)
             assert data.num_rows == 3
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 table_manager.drop_table(full_table)
-            except Exception:
-                pass
 
     def test_materialize_asset_chain(
         self,
@@ -632,10 +611,8 @@ class TestDagsterIntegration:
             assert derived_data.num_rows == 3
         finally:
             for t in [full_source, full_derived]:
-                try:
+                with contextlib.suppress(Exception):
                     table_manager.drop_table(t)
-                except Exception:
-                    pass
 
 
 # =============================================================================
@@ -682,7 +659,5 @@ class TestSchemaEvolutionIntegration:
             assert "email" in result.column_names
             assert result.num_rows == 2
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 table_manager.drop_table(full_table)
-            except Exception:
-                pass

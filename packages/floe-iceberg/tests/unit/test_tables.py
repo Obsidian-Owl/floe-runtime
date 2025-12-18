@@ -334,8 +334,11 @@ class TestAppend:
         mock_snapshot = MagicMock()
         mock_snapshot.snapshot_id = 123456
         mock_snapshot.timestamp_ms = 1702857600000
-        mock_snapshot.operation = "append"
-        mock_snapshot.summary = {"added-records": "3"}
+        mock_summary = MagicMock()
+        mock_summary.operation = MagicMock()
+        mock_summary.operation.value = "append"
+        mock_summary.model_dump.return_value = {"operation": "append", "added-records": "3"}
+        mock_snapshot.summary = mock_summary
         mock_snapshot.manifest_list = None
         mock_table.current_snapshot.return_value = mock_snapshot
         mock_table.schema.return_value = MagicMock(fields=[])
@@ -386,8 +389,11 @@ class TestOverwrite:
         mock_snapshot = MagicMock()
         mock_snapshot.snapshot_id = 123456
         mock_snapshot.timestamp_ms = 1702857600000
-        mock_snapshot.operation = "overwrite"
-        mock_snapshot.summary = {}
+        mock_summary = MagicMock()
+        mock_summary.operation = MagicMock()
+        mock_summary.operation.value = "overwrite"
+        mock_summary.model_dump.return_value = {"operation": "overwrite"}
+        mock_snapshot.summary = mock_summary
         mock_snapshot.manifest_list = None
         mock_table.current_snapshot.return_value = mock_snapshot
         mock_table.schema.return_value = MagicMock(fields=[])
@@ -464,15 +470,21 @@ class TestListSnapshots:
         mock_snap1 = MagicMock()
         mock_snap1.snapshot_id = 1
         mock_snap1.timestamp_ms = 1702857600000
-        mock_snap1.operation = "append"
-        mock_snap1.summary = {}
+        mock_summary1 = MagicMock()
+        mock_summary1.operation = MagicMock()
+        mock_summary1.operation.value = "append"
+        mock_summary1.model_dump.return_value = {"operation": "append"}
+        mock_snap1.summary = mock_summary1
         mock_snap1.manifest_list = None
 
         mock_snap2 = MagicMock()
         mock_snap2.snapshot_id = 2
         mock_snap2.timestamp_ms = 1702857700000  # Newer
-        mock_snap2.operation = "overwrite"
-        mock_snap2.summary = {}
+        mock_summary2 = MagicMock()
+        mock_summary2.operation = MagicMock()
+        mock_summary2.operation.value = "overwrite"
+        mock_summary2.model_dump.return_value = {"operation": "overwrite"}
+        mock_snap2.summary = mock_summary2
         mock_snap2.manifest_list = None
 
         mock_metadata = MagicMock()
@@ -495,8 +507,11 @@ class TestListSnapshots:
             snap = MagicMock()
             snap.snapshot_id = i
             snap.timestamp_ms = 1702857600000 + i * 1000
-            snap.operation = "append"
-            snap.summary = {}
+            mock_summary = MagicMock()
+            mock_summary.operation = MagicMock()
+            mock_summary.operation.value = "append"
+            mock_summary.model_dump.return_value = {"operation": "append"}
+            snap.summary = mock_summary
             snap.manifest_list = None
             mock_snaps.append(snap)
 
@@ -519,8 +534,11 @@ class TestGetCurrentSnapshot:
         mock_snapshot = MagicMock()
         mock_snapshot.snapshot_id = 123456
         mock_snapshot.timestamp_ms = 1702857600000
-        mock_snapshot.operation = "append"
-        mock_snapshot.summary = {}
+        mock_summary = MagicMock()
+        mock_summary.operation = MagicMock()
+        mock_summary.operation.value = "append"
+        mock_summary.model_dump.return_value = {"operation": "append"}
+        mock_snapshot.summary = mock_summary
         mock_snapshot.manifest_list = None
         mock_table.current_snapshot.return_value = mock_snapshot
         manager._catalog.inner_catalog.load_table.return_value = mock_table

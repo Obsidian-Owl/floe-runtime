@@ -10,7 +10,7 @@ for direct table operations (schema changes, maintenance, etc.).
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 import pandas as pd
 import pyarrow as pa
@@ -59,7 +59,7 @@ if TYPE_CHECKING:
     from structlog.stdlib import BoundLogger
 
     # Union type for catalog sources
-    CatalogLike = PolarisCatalog | Catalog
+    CatalogLike: TypeAlias = PolarisCatalog | Catalog
 
 
 class IcebergTableManager:
@@ -828,10 +828,7 @@ class IcebergTableManager:
         Iceberg requires microsecond (us) timestamp precision, but Pandas
         defaults to nanosecond (ns). This method handles the conversion.
         """
-        if isinstance(data, pd.DataFrame):
-            table = pa.Table.from_pandas(data)
-        else:
-            table = data
+        table = pa.Table.from_pandas(data) if isinstance(data, pd.DataFrame) else data
 
         # Downcast any nanosecond timestamps to microsecond for Iceberg compatibility
         # Iceberg spec only supports microseconds, not nanoseconds
@@ -929,8 +926,7 @@ class IcebergTableManager:
         }
 
         if transform.transform_type in transform_map:
-            # Type ignore: PyIceberg transforms work without args at runtime
-            return transform_map[transform.transform_type]()  # type: ignore[call-arg]
+            return transform_map[transform.transform_type]()
 
         if transform.transform_type == PartitionTransformType.BUCKET:
             if transform.param is None:
@@ -996,7 +992,10 @@ class IcebergTableManager:
         summary_dict: dict[str, str] = {}
         if snapshot.summary is not None:
             # summary.operation is an Operation enum
-            operation = snapshot.summary.operation.value if snapshot.summary.operation else "unknown"
+            if snapshot.summary.operation:
+                operation = snapshot.summary.operation.value
+            else:
+                operation = "unknown"
             # Convert Summary to dict for additional fields (exclude 'operation' which is separate)
             summary_dict = {
                 k: str(v) for k, v in snapshot.summary.model_dump().items() if k != "operation"

@@ -18,9 +18,11 @@ Environment variables:
 
 from __future__ import annotations
 
+import contextlib
 import os
 import uuid
-from typing import TYPE_CHECKING, Generator
+from collections.abc import Generator
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -36,7 +38,7 @@ from floe_polaris import (
 )
 
 if TYPE_CHECKING:
-    from floe_polaris.config import NamespaceInfo
+    pass
 
 
 # =============================================================================
@@ -120,7 +122,7 @@ def test_namespace(catalog: PolarisCatalog) -> Generator[str, None, None]:
         # First, list and drop any tables
         try:
             tables = catalog.list_tables(ns_name)
-            for table in tables:
+            for _table in tables:
                 # Note: Table dropping not implemented in current API
                 # Would need to add drop_table method
                 pass
@@ -141,14 +143,10 @@ def nested_namespace(catalog: PolarisCatalog) -> Generator[str, None, None]:
     yield child
 
     # Cleanup nested structure
-    try:
+    with contextlib.suppress(NamespaceNotFoundError, NamespaceNotEmptyError):
         catalog.drop_namespace(child)
-    except (NamespaceNotFoundError, NamespaceNotEmptyError):
-        pass
-    try:
+    with contextlib.suppress(NamespaceNotFoundError, NamespaceNotEmptyError):
         catalog.drop_namespace(parent)
-    except (NamespaceNotFoundError, NamespaceNotEmptyError):
-        pass
 
 
 # =============================================================================
@@ -325,7 +323,7 @@ class TestNamespaceOperations:
 
         children = catalog.list_namespaces(parent)
 
-        child_names = [ns.name for ns in children]
+        [ns.name for ns in children]
         # The child namespace name as returned might be just "child" or "parent.child"
         assert len(children) >= 1
 
@@ -529,10 +527,8 @@ class TestIntegrationScenarios:
 
         finally:
             # Cleanup in case of failure
-            try:
+            with contextlib.suppress(NamespaceNotFoundError, NamespaceNotEmptyError):
                 catalog.drop_namespace(ns_name)
-            except (NamespaceNotFoundError, NamespaceNotEmptyError):
-                pass
 
     def test_nested_namespace_hierarchy(
         self,
@@ -559,7 +555,5 @@ class TestIntegrationScenarios:
         finally:
             # Cleanup in reverse order
             for ns in [raw, bronze, base]:
-                try:
+                with contextlib.suppress(NamespaceNotFoundError, NamespaceNotEmptyError):
                     catalog.drop_namespace(ns)
-                except (NamespaceNotFoundError, NamespaceNotEmptyError):
-                    pass

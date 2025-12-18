@@ -13,6 +13,7 @@ Features:
 
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
@@ -33,7 +34,7 @@ if TYPE_CHECKING:
     from pyiceberg.catalog import Catalog
 
 
-class IcebergIOManager(ConfigurableIOManager):
+class IcebergIOManager(ConfigurableIOManager):  # type: ignore[misc]
     """Iceberg-backed IOManager for Dagster assets.
 
     Maps Dagster asset keys to Iceberg table identifiers:
@@ -308,7 +309,7 @@ class IcebergIOManager(ConfigurableIOManager):
             # Attach metadata to context
             # Note: In append mode, multiple handle_output calls may occur with same context
             # In that case, metadata keys already exist and we skip adding them again
-            try:
+            with contextlib.suppress(DagsterInvalidMetadata):
                 context.add_output_metadata(
                     {
                         "table": table_id,
@@ -320,9 +321,6 @@ class IcebergIOManager(ConfigurableIOManager):
                         "schema_evolved": schema_evolved,
                     }
                 )
-            except DagsterInvalidMetadata:
-                # Metadata already exists from a previous call (e.g., append mode)
-                pass
 
             # Log materialization
             log_materialization(

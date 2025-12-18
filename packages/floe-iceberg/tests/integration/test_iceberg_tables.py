@@ -20,9 +20,10 @@ from __future__ import annotations
 import os
 import sys
 import uuid
-from datetime import datetime, timedelta, timezone
+from collections.abc import Generator
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Generator
+from typing import TYPE_CHECKING
 
 import pandas as pd
 import pyarrow as pa
@@ -34,27 +35,29 @@ if str(_fixtures_path) not in sys.path:
     sys.path.insert(0, str(_fixtures_path))
 
 # Auto-load Polaris credentials from Docker environment
-from services import ensure_polaris_credentials_in_env
+from services import ensure_polaris_credentials_in_env  # noqa: E402
 
 ensure_polaris_credentials_in_env()
 
-from floe_iceberg import (
-    IcebergTableManager,
-    PartitionTransform,
-    PartitionTransformType,
-    SchemaEvolutionError,
-    TableExistsError,
-    TableNotFoundError,
-)
-from floe_polaris import (
+import contextlib  # noqa: E402
+
+from floe_polaris import (  # noqa: E402
     NamespaceNotFoundError,
     PolarisCatalog,
     PolarisCatalogConfig,
     create_catalog,
 )
 
+from floe_iceberg import (  # noqa: E402
+    IcebergTableManager,
+    PartitionTransform,
+    PartitionTransformType,
+    TableExistsError,
+    TableNotFoundError,
+)
+
 if TYPE_CHECKING:
-    from floe_iceberg.config import SnapshotInfo
+    pass
 
 
 # =============================================================================
@@ -144,7 +147,7 @@ def test_namespace(catalog: PolarisCatalog) -> Generator[str, None, None]:
     # Cleanup: Drop all tables and namespace
     try:
         tables = catalog.list_tables(ns_name)
-        for table in tables:
+        for _table in tables:
             # Tables will be cleaned up by individual test cleanup
             pass
         catalog.drop_namespace(ns_name)
@@ -221,10 +224,8 @@ class TestTableCreation:
             assert table is not None
             assert table_manager.table_exists(test_table_name)
         finally:
-            try:
+            with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
-            except TableNotFoundError:
-                pass
 
     def test_create_table_with_properties(
         self,
@@ -248,10 +249,8 @@ class TestTableCreation:
             assert table is not None
             # Properties should be set on the table
         finally:
-            try:
+            with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
-            except TableNotFoundError:
-                pass
 
     def test_create_partitioned_table(
         self,
@@ -279,10 +278,8 @@ class TestTableCreation:
             spec = table.spec()
             assert len(spec.fields) == 1
         finally:
-            try:
+            with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
-            except TableNotFoundError:
-                pass
 
     def test_create_table_already_exists(
         self,
@@ -297,10 +294,8 @@ class TestTableCreation:
             with pytest.raises(TableExistsError):
                 table_manager.create_table(test_table_name, sample_schema)
         finally:
-            try:
+            with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
-            except TableNotFoundError:
-                pass
 
     def test_create_table_if_not_exists(
         self,
@@ -324,10 +319,8 @@ class TestTableCreation:
             )
             assert table2 is not None
         finally:
-            try:
+            with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
-            except TableNotFoundError:
-                pass
 
     def test_create_table_namespace_not_found(
         self,
@@ -365,10 +358,8 @@ class TestTableOperations:
             assert table is not None
             assert len(table.schema().fields) == len(sample_schema)
         finally:
-            try:
+            with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
-            except TableNotFoundError:
-                pass
 
     def test_load_table_not_found(
         self,
@@ -415,10 +406,8 @@ class TestTableOperations:
 
             assert table_manager.table_exists(test_table_name)
         finally:
-            try:
+            with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
-            except TableNotFoundError:
-                pass
 
     def test_list_tables(
         self,
@@ -442,10 +431,8 @@ class TestTableOperations:
                 assert name in tables
         finally:
             for t in [table1, table2]:
-                try:
+                with contextlib.suppress(TableNotFoundError):
                     table_manager.drop_table(t)
-                except TableNotFoundError:
-                    pass
 
 
 # =============================================================================
@@ -477,10 +464,8 @@ class TestDataOperations:
             result = table_manager.scan(test_table_name)
             assert result.num_rows == sample_data.num_rows
         finally:
-            try:
+            with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
-            except TableNotFoundError:
-                pass
 
     def test_append_dataframe(
         self,
@@ -501,10 +486,8 @@ class TestDataOperations:
             result = table_manager.scan(test_table_name)
             assert result.num_rows == len(sample_dataframe)
         finally:
-            try:
+            with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
-            except TableNotFoundError:
-                pass
 
     def test_append_multiple_batches(
         self,
@@ -526,10 +509,8 @@ class TestDataOperations:
             result = table_manager.scan(test_table_name)
             assert result.num_rows == sample_data.num_rows * 2
         finally:
-            try:
+            with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
-            except TableNotFoundError:
-                pass
 
     def test_overwrite_data(
         self,
@@ -567,10 +548,8 @@ class TestDataOperations:
             result = table_manager.scan(test_table_name)
             assert result.num_rows == 1
         finally:
-            try:
+            with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
-            except TableNotFoundError:
-                pass
 
     def test_scan_all_data(
         self,
@@ -589,10 +568,8 @@ class TestDataOperations:
             assert result.num_rows == sample_data.num_rows
             assert result.num_columns == sample_data.num_columns
         finally:
-            try:
+            with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
-            except TableNotFoundError:
-                pass
 
     def test_scan_select_columns(
         self,
@@ -616,10 +593,8 @@ class TestDataOperations:
             assert "id" in result.column_names
             assert "name" in result.column_names
         finally:
-            try:
+            with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
-            except TableNotFoundError:
-                pass
 
     def test_scan_with_limit(
         self,
@@ -637,10 +612,8 @@ class TestDataOperations:
 
             assert result.num_rows == 1
         finally:
-            try:
+            with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
-            except TableNotFoundError:
-                pass
 
 
 # =============================================================================
@@ -671,10 +644,8 @@ class TestSnapshotOperations:
             # Newest first
             assert snapshots[0].timestamp_ms >= snapshots[1].timestamp_ms
         finally:
-            try:
+            with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
-            except TableNotFoundError:
-                pass
 
     def test_get_current_snapshot(
         self,
@@ -693,10 +664,8 @@ class TestSnapshotOperations:
             assert current is not None
             assert current.snapshot_id == append_result.snapshot_id
         finally:
-            try:
+            with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
-            except TableNotFoundError:
-                pass
 
     def test_time_travel_scan(
         self,
@@ -735,10 +704,8 @@ class TestSnapshotOperations:
             )
             assert historical_data.num_rows == sample_data.num_rows
         finally:
-            try:
+            with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
-            except TableNotFoundError:
-                pass
 
 
 # =============================================================================
@@ -777,10 +744,8 @@ class TestSchemaEvolution:
             result = table_manager.scan(test_table_name)
             assert "new_column" in result.column_names
         finally:
-            try:
+            with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
-            except TableNotFoundError:
-                pass
 
 
 # =============================================================================
@@ -829,7 +794,5 @@ class TestIntegrationScenarios:
             assert not table_manager.table_exists(table_name)
 
         finally:
-            try:
+            with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(table_name)
-            except TableNotFoundError:
-                pass
