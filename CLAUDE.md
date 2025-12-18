@@ -1,6 +1,6 @@
 # floe-runtime Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2025-12-17
+Auto-generated from all feature plans. Last updated: 2025-12-18
 
 ## Active Technologies
 - Python 3.10+ (per Constitution: Dagster/dbt minimum) + Pydantic v2, pydantic-settings, PyYAML, structlog (001-core-foundation)
@@ -26,6 +26,9 @@ packages/
 testing/
 ├── docker/          # E2E test infrastructure (Docker Compose)
 │   ├── docker-compose.yml
+│   ├── Dockerfile.test-runner
+│   ├── scripts/
+│   │   └── run-integration-tests.sh
 │   ├── init-scripts/
 │   ├── trino-config/
 │   ├── cube-schema/
@@ -38,19 +41,21 @@ testing/
 ## Commands
 
 ```bash
-# Run tests
-pytest packages/<package>/tests/
+# Run unit tests
+uv run pytest packages/<package>/tests/
 
-# Run integration tests (requires Docker)
-cd testing/docker && docker compose --profile storage up -d
-pytest -m integration packages/floe-polaris/tests/
-pytest -m integration packages/floe-iceberg/tests/
+# Run integration tests (zero-config, requires Docker)
+./testing/docker/scripts/run-integration-tests.sh
+
+# Run specific integration tests
+./testing/docker/scripts/run-integration-tests.sh -k "test_append"
+./testing/docker/scripts/run-integration-tests.sh -v --tb=short
 
 # Linting
-ruff check packages/
+uv run ruff check packages/
 
 # Type checking
-mypy --strict packages/
+uv run mypy --strict packages/
 ```
 
 ## Code Style
@@ -73,6 +78,24 @@ Python 3.10+ (per Constitution: Dagster/dbt minimum): Follow standard convention
 
 ## Test Infrastructure
 
+### Zero-Config Integration Tests
+
+The recommended way to run integration tests is via the test runner script:
+
+```bash
+# Run all integration tests (62 tests total)
+./testing/docker/scripts/run-integration-tests.sh
+```
+
+This script:
+1. Starts test infrastructure (LocalStack, Polaris)
+2. Waits for Polaris initialization to complete
+3. Loads dynamically-generated credentials
+4. Builds and runs tests inside Docker network
+5. Handles all hostname resolution automatically
+
+### Docker Compose Profiles
+
 Docker Compose profiles for local testing:
 - `(none)`: PostgreSQL, Jaeger (unit tests, dbt-postgres)
 - `storage`: + LocalStack (S3+STS+IAM), Polaris (Iceberg storage tests)
@@ -80,7 +103,7 @@ Docker Compose profiles for local testing:
 - `full`: + Cube, Marquez (E2E tests, semantic layer)
 
 ```bash
-# Start storage profile
+# Manual service startup (if needed)
 cd testing/docker
 docker compose --profile storage up -d
 
@@ -90,6 +113,7 @@ curl http://localhost:4566/_localstack/health     # LocalStack
 ```
 
 ## Recent Changes
+- 004-storage-catalog: Zero-config Docker test runner (62 integration tests passing)
 - 004-storage-catalog: Added floe-polaris, floe-iceberg packages with full integration tests
 - 004-storage-catalog: Added Docker Compose E2E test infrastructure
 - 003-orchestration-layer: Added floe-dagster, floe-dbt packages
