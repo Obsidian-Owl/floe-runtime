@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://floe.dev/schemas/openlineage-event.schema.json",
+  "title": "QueryLineageEvent",
+  "description": "OpenLineage event structure for Cube query audit",
+  "type": "object",
+  "required": ["run_id", "job_name", "namespace", "event_type", "event_time", "inputs"],
+  "additionalProperties": false,
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique query run identifier (UUID)"
+    },
+    "job_name": {
+      "type": "string",
+      "pattern": "^cube\\.[a-zA-Z_][a-zA-Z0-9_]*\\.query$",
+      "description": "Job name in format cube.{cube_name}.query"
+    },
+    "namespace": {
+      "type": "string",
+      "default": "floe-cube",
+      "description": "OpenLineage namespace"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": ["START", "COMPLETE", "FAIL"],
+      "description": "Event state"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event timestamp in ISO 8601 format (UTC)"
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Input dataset names (cubes queried)"
+    },
+    "sql": {
+      "type": ["string", "null"],
+      "description": "Query SQL (for START events only)"
+    },
+    "row_count": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Result row count (for COMPLETE events only)"
+    },
+    "error": {
+      "type": ["string", "null"],
+      "maxLength": 500,
+      "description": "Sanitized error message (for FAIL events only, no sensitive data)"
+    }
+  }
+}

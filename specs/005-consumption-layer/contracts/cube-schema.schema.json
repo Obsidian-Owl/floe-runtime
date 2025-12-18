@@ -1,0 +1,197 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://floe.dev/schemas/cube-schema.schema.json",
+  "title": "CubeSchema",
+  "description": "Generated cube definitions derived from dbt models",
+  "type": "object",
+  "required": ["name", "sql_table", "dimensions", "measures"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+      "description": "Cube name (from dbt model name)"
+    },
+    "sql_table": {
+      "type": "string",
+      "description": "Fully-qualified table reference (catalog.schema.table)"
+    },
+    "description": {
+      "type": ["string", "null"],
+      "description": "Cube description from dbt model"
+    },
+    "filter_column": {
+      "type": ["string", "null"],
+      "description": "Column name for row-level security filtering (e.g., organization_id, department, region). User-configured, not SaaS tenant isolation."
+    },
+    "dimensions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/CubeDimension"
+      },
+      "description": "List of cube dimensions"
+    },
+    "measures": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/CubeMeasure"
+      },
+      "description": "List of cube measures"
+    },
+    "joins": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/CubeJoin"
+      },
+      "description": "Relationships to other cubes"
+    },
+    "pre_aggregations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/CubePreAggregation"
+      },
+      "description": "Pre-aggregation definitions"
+    }
+  },
+  "$defs": {
+    "CubeDimension": {
+      "type": "object",
+      "required": ["name", "sql", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+          "description": "Dimension name"
+        },
+        "sql": {
+          "type": "string",
+          "description": "SQL expression for dimension"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["string", "number", "time", "boolean", "geo"],
+          "description": "Dimension data type"
+        },
+        "primary_key": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether this is the primary key"
+        },
+        "description": {
+          "type": ["string", "null"],
+          "description": "Dimension description"
+        },
+        "meta": {
+          "type": "object",
+          "description": "Additional metadata (classification, etc.)"
+        }
+      }
+    },
+    "CubeMeasure": {
+      "type": "object",
+      "required": ["name", "sql", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+          "description": "Measure name"
+        },
+        "sql": {
+          "type": "string",
+          "description": "SQL expression for measure"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["count", "sum", "avg", "min", "max", "countDistinct", "countDistinctApprox", "runningTotal"],
+          "description": "Aggregation type"
+        },
+        "description": {
+          "type": ["string", "null"],
+          "description": "Measure description"
+        },
+        "filters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["sql"],
+            "properties": {
+              "sql": {
+                "type": "string",
+                "description": "Filter SQL expression"
+              }
+            }
+          },
+          "description": "Measure-level filters"
+        }
+      }
+    },
+    "CubeJoin": {
+      "type": "object",
+      "required": ["name", "relationship", "sql"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the joined cube"
+        },
+        "relationship": {
+          "type": "string",
+          "enum": ["one_to_one", "one_to_many", "many_to_one"],
+          "description": "Join cardinality"
+        },
+        "sql": {
+          "type": "string",
+          "description": "Join condition SQL"
+        }
+      }
+    },
+    "CubePreAggregation": {
+      "type": "object",
+      "required": ["name", "measures", "refresh_every"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+          "description": "Pre-aggregation name"
+        },
+        "measures": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "Measures to include"
+        },
+        "dimensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Dimensions to include"
+        },
+        "time_dimension": {
+          "type": ["string", "null"],
+          "description": "Time dimension for time-series"
+        },
+        "granularity": {
+          "type": "string",
+          "enum": ["second", "minute", "hour", "day", "week", "month", "quarter", "year"],
+          "description": "Time granularity"
+        },
+        "refresh_every": {
+          "type": "string",
+          "description": "Cron expression for refresh schedule"
+        },
+        "external": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use Cube Store for storage"
+        }
+      }
+    }
+  }
+}
