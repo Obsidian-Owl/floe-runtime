@@ -214,6 +214,7 @@ def sample_dataframe() -> pd.DataFrame:
 class TestTableCreation:
     """Tests for Iceberg table creation."""
 
+    @pytest.mark.requirement("FR-013")
     def test_create_table_with_arrow_schema(
         self,
         table_manager: IcebergTableManager,
@@ -230,6 +231,7 @@ class TestTableCreation:
             with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
 
+    @pytest.mark.requirement("FR-013")
     def test_create_table_with_properties(
         self,
         table_manager: IcebergTableManager,
@@ -255,6 +257,7 @@ class TestTableCreation:
             with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
 
+    @pytest.mark.requirement("FR-013")
     def test_create_partitioned_table(
         self,
         table_manager: IcebergTableManager,
@@ -284,6 +287,7 @@ class TestTableCreation:
             with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
 
+    @pytest.mark.requirement("FR-013")
     def test_create_table_already_exists(
         self,
         table_manager: IcebergTableManager,
@@ -300,6 +304,7 @@ class TestTableCreation:
             with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
 
+    @pytest.mark.requirement("FR-013")
     def test_create_table_if_not_exists(
         self,
         table_manager: IcebergTableManager,
@@ -325,6 +330,7 @@ class TestTableCreation:
             with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
 
+    @pytest.mark.requirement("FR-013")
     def test_create_table_namespace_not_found(
         self,
         table_manager: IcebergTableManager,
@@ -346,6 +352,7 @@ class TestTableCreation:
 class TestTableOperations:
     """Tests for table load, drop, and list operations."""
 
+    @pytest.mark.requirement("FR-013")
     def test_load_table(
         self,
         table_manager: IcebergTableManager,
@@ -364,6 +371,7 @@ class TestTableOperations:
             with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
 
+    @pytest.mark.requirement("FR-013")
     def test_load_table_not_found(
         self,
         table_manager: IcebergTableManager,
@@ -373,6 +381,7 @@ class TestTableOperations:
         with pytest.raises(TableNotFoundError):
             table_manager.load_table(f"{test_namespace}.nonexistent_table_12345")
 
+    @pytest.mark.requirement("FR-013")
     def test_drop_table(
         self,
         table_manager: IcebergTableManager,
@@ -386,6 +395,7 @@ class TestTableOperations:
 
         assert not table_manager.table_exists(test_table_name)
 
+    @pytest.mark.requirement("FR-013")
     def test_drop_table_not_found(
         self,
         table_manager: IcebergTableManager,
@@ -395,6 +405,7 @@ class TestTableOperations:
         with pytest.raises(TableNotFoundError):
             table_manager.drop_table(f"{test_namespace}.nonexistent_table_12345")
 
+    @pytest.mark.requirement("FR-013")
     def test_table_exists(
         self,
         table_manager: IcebergTableManager,
@@ -412,6 +423,7 @@ class TestTableOperations:
             with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
 
+    @pytest.mark.requirement("FR-013")
     def test_list_tables(
         self,
         table_manager: IcebergTableManager,
@@ -446,6 +458,7 @@ class TestTableOperations:
 class TestDataOperations:
     """Tests for append, overwrite, and scan operations."""
 
+    @pytest.mark.requirement("FR-013")
     def test_append_arrow_table(
         self,
         table_manager: IcebergTableManager,
@@ -470,6 +483,7 @@ class TestDataOperations:
             with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
 
+    @pytest.mark.requirement("FR-013")
     def test_append_dataframe(
         self,
         table_manager: IcebergTableManager,
@@ -492,6 +506,7 @@ class TestDataOperations:
             with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
 
+    @pytest.mark.requirement("FR-013")
     def test_append_multiple_batches(
         self,
         table_manager: IcebergTableManager,
@@ -515,6 +530,7 @@ class TestDataOperations:
             with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
 
+    @pytest.mark.requirement("FR-013")
     def test_overwrite_data(
         self,
         table_manager: IcebergTableManager,
@@ -556,6 +572,7 @@ class TestDataOperations:
             with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
 
+    @pytest.mark.requirement("FR-013")
     def test_scan_all_data(
         self,
         table_manager: IcebergTableManager,
@@ -576,6 +593,7 @@ class TestDataOperations:
             with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
 
+    @pytest.mark.requirement("FR-013")
     def test_scan_select_columns(
         self,
         table_manager: IcebergTableManager,
@@ -601,6 +619,7 @@ class TestDataOperations:
             with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
 
+    @pytest.mark.requirement("FR-013")
     def test_scan_with_limit(
         self,
         table_manager: IcebergTableManager,
@@ -629,6 +648,7 @@ class TestDataOperations:
 class TestSnapshotOperations:
     """Tests for snapshot management."""
 
+    @pytest.mark.requirement("FR-013")
     def test_list_snapshots(
         self,
         table_manager: IcebergTableManager,
@@ -652,6 +672,7 @@ class TestSnapshotOperations:
             with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
 
+    @pytest.mark.requirement("FR-013")
     def test_get_current_snapshot(
         self,
         table_manager: IcebergTableManager,
@@ -672,6 +693,7 @@ class TestSnapshotOperations:
             with contextlib.suppress(TableNotFoundError):
                 table_manager.drop_table(test_table_name)
 
+    @pytest.mark.requirement("FR-013")
     def test_time_travel_scan(
         self,
         table_manager: IcebergTableManager,
@@ -723,6 +745,7 @@ class TestSnapshotOperations:
 class TestSchemaEvolution:
     """Tests for automatic schema evolution."""
 
+    @pytest.mark.requirement("FR-013")
     def test_append_with_new_columns(
         self,
         table_manager: IcebergTableManager,
@@ -765,6 +788,7 @@ class TestSchemaEvolution:
 class TestIntegrationScenarios:
     """End-to-end integration scenarios."""
 
+    @pytest.mark.requirement("FR-013")
     def test_full_table_lifecycle(
         self,
         table_manager: IcebergTableManager,

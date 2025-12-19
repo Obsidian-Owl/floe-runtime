@@ -196,6 +196,7 @@ def io_manager(
 class TestIOManagerBasics:
     """Tests for basic IOManager functionality."""
 
+    @pytest.mark.requirement("FR-014")
     def test_create_io_manager(
         self,
         io_manager_config: IcebergIOManagerConfig,
@@ -207,6 +208,7 @@ class TestIOManagerBasics:
         assert io_manager.catalog_uri == io_manager_config.catalog_uri
         assert io_manager.warehouse == io_manager_config.warehouse
 
+    @pytest.mark.requirement("FR-014")
     def test_get_table_identifier_single_part(
         self,
         io_manager: IcebergIOManager,
@@ -221,6 +223,7 @@ class TestIOManagerBasics:
 
         assert table_id == f"{test_namespace}.customers"
 
+    @pytest.mark.requirement("FR-014")
     def test_get_table_identifier_two_parts(
         self,
         io_manager: IcebergIOManager,
@@ -234,6 +237,7 @@ class TestIOManagerBasics:
 
         assert table_id == "bronze.customers"
 
+    @pytest.mark.requirement("FR-014")
     def test_get_table_identifier_multi_parts(
         self,
         io_manager: IcebergIOManager,
@@ -256,6 +260,7 @@ class TestIOManagerBasics:
 class TestHandleOutput:
     """Tests for handle_output (writing assets to Iceberg)."""
 
+    @pytest.mark.requirement("FR-014")
     def test_handle_output_arrow_table(
         self,
         io_manager: IcebergIOManager,
@@ -290,6 +295,7 @@ class TestHandleOutput:
             with contextlib.suppress(Exception):
                 table_manager.drop_table(full_table)
 
+    @pytest.mark.requirement("FR-014")
     def test_handle_output_dataframe(
         self,
         io_manager: IcebergIOManager,
@@ -320,6 +326,7 @@ class TestHandleOutput:
             with contextlib.suppress(Exception):
                 table_manager.drop_table(full_table)
 
+    @pytest.mark.requirement("FR-014")
     def test_handle_output_append_mode(
         self,
         io_manager: IcebergIOManager,
@@ -350,6 +357,7 @@ class TestHandleOutput:
             with contextlib.suppress(Exception):
                 table_manager.drop_table(full_table)
 
+    @pytest.mark.requirement("FR-014")
     def test_handle_output_overwrite_mode(
         self,
         io_manager_config: IcebergIOManagerConfig,
@@ -408,6 +416,7 @@ class TestHandleOutput:
 class TestLoadInput:
     """Tests for load_input (reading assets from Iceberg)."""
 
+    @pytest.mark.requirement("FR-014")
     def test_load_input_all_data(
         self,
         io_manager: IcebergIOManager,
@@ -446,6 +455,7 @@ class TestLoadInput:
             with contextlib.suppress(Exception):
                 table_manager.drop_table(full_table)
 
+    @pytest.mark.requirement("FR-014")
     def test_load_input_with_columns(
         self,
         io_manager: IcebergIOManager,
@@ -493,6 +503,7 @@ class TestLoadInput:
             with contextlib.suppress(Exception):
                 table_manager.drop_table(full_table)
 
+    @pytest.mark.requirement("FR-014")
     def test_load_input_with_limit(
         self,
         io_manager: IcebergIOManager,
@@ -533,6 +544,7 @@ class TestLoadInput:
 class TestDagsterIntegration:
     """End-to-end tests with Dagster materialize()."""
 
+    @pytest.mark.requirement("FR-014")
     def test_materialize_simple_asset(
         self,
         io_manager: IcebergIOManager,
@@ -572,6 +584,7 @@ class TestDagsterIntegration:
             with contextlib.suppress(Exception):
                 table_manager.drop_table(full_table)
 
+    @pytest.mark.requirement("FR-014")
     def test_materialize_asset_chain(
         self,
         io_manager: IcebergIOManager,
@@ -634,6 +647,7 @@ class TestDagsterIntegration:
 class TestSchemaEvolutionIntegration:
     """Tests for schema evolution during asset materialization."""
 
+    @pytest.mark.requirement("FR-014")
     def test_auto_add_columns(
         self,
         io_manager: IcebergIOManager,
