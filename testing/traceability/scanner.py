@@ -262,6 +262,7 @@ def _infer_package(file_path: Path) -> str:
     path_str = str(file_path)
 
     # Match packages/<package-name>/tests/ pattern
+    # Security: Safe - simple pattern, no nested quantifiers  # nosonar: S4784
     match = re.search(r"packages/([^/]+)/tests/", path_str)
     if match:
         return match.group(1)

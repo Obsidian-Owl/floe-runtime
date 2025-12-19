@@ -23,6 +23,7 @@ class TestJaegerClientImport:
         """Verify JaegerClient can be instantiated with base_url."""
         from testing.fixtures.observability import JaegerClient
 
+        # HTTP is intentional for local Docker testing  # nosonar: S5332
         client = JaegerClient(base_url="http://localhost:16686")
         assert client.base_url == "http://localhost:16686"
 
@@ -65,6 +66,7 @@ class TestMarquezClientImport:
         """Verify MarquezClient can be instantiated with base_url."""
         from testing.fixtures.observability import MarquezClient
 
+        # HTTP is intentional for local Docker testing  # nosonar: S5332
         client = MarquezClient(base_url="http://localhost:5002")
         assert client.base_url == "http://localhost:5002"
 

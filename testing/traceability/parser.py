@@ -29,7 +29,10 @@ from testing.traceability.models import Requirement, RequirementCategory
 # Pattern to match FR-XXX requirements in markdown
 # Matches: - **FR-001**: Description text
 # or: * **FR-002**: Description text
-REQUIREMENT_PATTERN = re.compile(r"^[-*]\s+\*\*(?P<id>FR-\d{3})\*\*:\s*(?P<text>.+)$")
+# Security: Safe from ReDoS - anchored with ^ and $, no nested quantifiers
+REQUIREMENT_PATTERN = re.compile(  # nosonar: S4784
+    r"^[-*]\s+\*\*(?P<id>FR-\d{3})\*\*:\s*(?P<text>.+)$"
+)
 
 # Mapping from section heading keywords to categories
 CATEGORY_KEYWORDS: dict[str, RequirementCategory] = {
@@ -101,6 +104,7 @@ def parse_requirements(spec_path: Path) -> list[Requirement]:
                 req_text = match.group("text").strip()
 
                 # Validate the requirement ID format (exactly 3 digits)
+                # Security: Safe - simple bounded pattern  # nosonar: S4784
                 if not re.match(r"^FR-\d{3}$", req_id):
                     continue
 
