@@ -234,8 +234,12 @@ class QueryLineageEmitter:
 
         try:
             from openlineage.client import OpenLineageClient
+            from openlineage.client.transport.http import HttpConfig, HttpTransport
 
-            self._client = OpenLineageClient(url=self.endpoint)
+            # Use explicit HttpTransport (new API - url parameter is deprecated)
+            http_config = HttpConfig(url=self.endpoint)
+            transport = HttpTransport(http_config)
+            self._client = OpenLineageClient(transport=transport)
             logger.info(
                 "openlineage_client_initialized",
                 endpoint=self.endpoint,

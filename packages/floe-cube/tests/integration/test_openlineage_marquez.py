@@ -329,9 +329,11 @@ class TestQueryLineageEmitterIntegration:
             enabled=True,
         )
 
-        # Skip if client couldn't be initialized (openlineage not installed)
-        if not emitter.enabled:
-            pytest.skip("OpenLineage client not available")
+        # FAIL if client couldn't be initialized - OpenLineage should be available
+        assert emitter.enabled, (
+            "OpenLineage client failed to initialize. "
+            "Check that openlineage-python is installed and Marquez is accessible."
+        )
 
         cube_name = f"test_{uuid.uuid4().hex[:8]}"
 
