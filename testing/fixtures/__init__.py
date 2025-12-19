@@ -15,6 +15,10 @@ Exports:
         docker_compose_file: Get path to docker-compose.yml
         wait_for_services: Wait for multiple services to be healthy
 
+    Observability fixtures:
+        JaegerClient: Client for querying Jaeger trace data
+        MarquezClient: Client for querying Marquez lineage data
+
 Usage:
     ```python
     from testing.fixtures import make_compiled_artifacts, DockerServices
@@ -24,6 +28,11 @@ Usage:
 
     # Use Docker services in tests
     services = DockerServices(compose_file, profile="storage")
+
+    # Use observability clients
+    from testing.fixtures import JaegerClient, MarquezClient
+    jaeger = JaegerClient()
+    marquez = MarquezClient()
     ```
 """
 
@@ -34,6 +43,10 @@ from testing.fixtures.artifacts import (
     base_metadata,
     make_compiled_artifacts,
     make_minimal_artifacts,
+)
+from testing.fixtures.observability import (
+    JaegerClient,
+    MarquezClient,
 )
 from testing.fixtures.services import (
     DockerServices,
@@ -51,4 +64,7 @@ __all__ = [
     "DockerServices",
     "docker_compose_file",
     "wait_for_services",
+    # Observability fixtures
+    "JaegerClient",
+    "MarquezClient",
 ]

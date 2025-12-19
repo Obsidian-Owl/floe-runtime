@@ -8,9 +8,10 @@ This module defines configuration for Iceberg catalog integration
 
 from __future__ import annotations
 
+import warnings
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class CatalogConfig(BaseModel):
@@ -21,19 +22,24 @@ class CatalogConfig(BaseModel):
     Supports Polaris, AWS Glue, and Nessie catalogs with
     appropriate authentication and connection settings.
 
+    Security:
+        For Polaris catalogs, the scope field MUST follow the principle of least
+        privilege. Use a narrowly-scoped role like 'PRINCIPAL_ROLE:DATA_ENGINEER'.
+        NEVER use 'PRINCIPAL_ROLE:ALL' in production - it grants unrestricted access.
+
     Attributes:
         type: Catalog type (polaris, glue, nessie).
         uri: Catalog endpoint URI.
         credential_secret_ref: K8s secret name for credentials.
         warehouse: Default warehouse name.
-        scope: OAuth2 scope (Polaris: e.g., "PRINCIPAL_ROLE:ALL").
+        scope: OAuth2 scope (Polaris: e.g., "PRINCIPAL_ROLE:DATA_ENGINEER").
         token_refresh_enabled: Enable OAuth2 token refresh.
         access_delegation: Iceberg access delegation header.
         properties: Catalog-specific properties. Common properties per type:
 
             Polaris:
                 Uses top-level fields: scope, token_refresh_enabled, access_delegation
-                - scope: OAuth2 scope (e.g., "PRINCIPAL_ROLE:ALL")
+                - scope: OAuth2 scope (e.g., "PRINCIPAL_ROLE:DATA_ENGINEER")
                 - token_refresh_enabled: Enable token refresh for long sessions
                 - access_delegation: "vended-credentials" for delegated access
 
@@ -93,7 +99,12 @@ class CatalogConfig(BaseModel):
     )
     scope: str | None = Field(
         default=None,
-        description="OAuth2 scope (Polaris)",
+        pattern=r"^PRINCIPAL_ROLE:[A-Za-z0-9_]+$",
+        description=(
+            "OAuth2 scope for Polaris catalogs. Required for Polaris type. "
+            "Format: 'PRINCIPAL_ROLE:<role_name>'. "
+            "Use least-privilege roles (e.g., 'PRINCIPAL_ROLE:DATA_ENGINEER')."
+        ),
     )
     token_refresh_enabled: bool | None = Field(
         default=None,
@@ -107,3 +118,22 @@ class CatalogConfig(BaseModel):
         default_factory=dict,
         description="Catalog-specific properties",
     )
+
+    @field_validator("scope")
+    @classmethod
+    def warn_overly_permissive_scope(cls, v: str | None) -> str | None:
+        """Warn if scope violates least privilege principle.
+
+        Security:
+            PRINCIPAL_ROLE:ALL grants unrestricted access to all roles in Polaris.
+            This violates the principle of least privilege and should only be used
+            in development/testing environments, never in production.
+        """
+        if v == "PRINCIPAL_ROLE:ALL":
+            warnings.warn(
+                "scope='PRINCIPAL_ROLE:ALL' grants unrestricted access to all roles. "
+                "Use a narrowly-scoped principal role in production environments.",
+                UserWarning,
+                stacklevel=2,
+            )
+        return v

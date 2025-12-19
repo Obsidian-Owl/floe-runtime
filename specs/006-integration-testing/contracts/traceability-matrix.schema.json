@@ -1,0 +1,180 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://floe.dev/schemas/traceability-matrix.schema.json",
+  "title": "TraceabilityMatrix",
+  "description": "Complete traceability matrix mapping functional requirements to integration tests",
+  "type": "object",
+  "required": [
+    "feature_id",
+    "feature_name",
+    "generated_at",
+    "spec_files",
+    "requirements",
+    "tests",
+    "mappings"
+  ],
+  "properties": {
+    "feature_id": {
+      "type": "string",
+      "description": "Feature identifier (e.g., '006')",
+      "pattern": "^\\d{3}$"
+    },
+    "feature_name": {
+      "type": "string",
+      "description": "Human-readable feature name"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of generation"
+    },
+    "spec_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of specification files analyzed"
+    },
+    "requirements": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Requirement"
+      },
+      "description": "All requirements extracted from specs"
+    },
+    "tests": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Test"
+      },
+      "description": "All integration tests discovered"
+    },
+    "mappings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/TraceabilityMapping"
+      },
+      "description": "Requirement-to-test mappings"
+    }
+  },
+  "definitions": {
+    "RequirementCategory": {
+      "type": "string",
+      "enum": [
+        "traceability",
+        "execution",
+        "package_coverage",
+        "infrastructure",
+        "shared_fixtures",
+        "production_config",
+        "observability",
+        "row_level_security",
+        "standalone_first",
+        "contract_boundary"
+      ]
+    },
+    "Requirement": {
+      "type": "object",
+      "required": ["id", "spec_file", "line_number", "text", "category"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^FR-\\d{3}$",
+          "description": "Unique requirement identifier"
+        },
+        "spec_file": {
+          "type": "string",
+          "description": "Path to specification file"
+        },
+        "line_number": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Line number in spec file"
+        },
+        "text": {
+          "type": "string",
+          "description": "Full requirement text"
+        },
+        "category": {
+          "$ref": "#/definitions/RequirementCategory"
+        },
+        "priority": {
+          "type": "string",
+          "pattern": "^P[1-3]$",
+          "default": "P2"
+        }
+      }
+    },
+    "TestMarker": {
+      "type": "string",
+      "enum": ["integration", "e2e", "slow", "requires_docker"]
+    },
+    "Test": {
+      "type": "object",
+      "required": ["file_path", "function_name", "package"],
+      "properties": {
+        "file_path": {
+          "type": "string",
+          "description": "Path to test file"
+        },
+        "function_name": {
+          "type": "string",
+          "description": "Test function name"
+        },
+        "class_name": {
+          "type": ["string", "null"],
+          "description": "Test class name if applicable"
+        },
+        "markers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TestMarker"
+          },
+          "default": []
+        },
+        "requirement_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^FR-\\d{3}$"
+          },
+          "default": [],
+          "description": "Requirements covered by this test"
+        },
+        "package": {
+          "type": "string",
+          "description": "Package name (e.g., 'floe-core')"
+        }
+      }
+    },
+    "CoverageStatus": {
+      "type": "string",
+      "enum": ["covered", "partial", "uncovered", "excluded"]
+    },
+    "TraceabilityMapping": {
+      "type": "object",
+      "required": ["requirement_id", "coverage_status"],
+      "properties": {
+        "requirement_id": {
+          "type": "string",
+          "pattern": "^FR-\\d{3}$"
+        },
+        "test_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Test identifiers (file::class::function)"
+        },
+        "coverage_status": {
+          "$ref": "#/definitions/CoverageStatus"
+        },
+        "notes": {
+          "type": ["string", "null"],
+          "description": "Optional notes about coverage"
+        }
+      }
+    }
+  }
+}

@@ -12,6 +12,7 @@ This module provides:
 
 from __future__ import annotations
 
+import warnings
 from datetime import datetime, timezone
 from enum import Enum
 
@@ -353,10 +354,9 @@ class IcebergIOManagerConfig(BaseModel):
     scope: str | None = Field(
         default=None,
         description=(
-            "OAuth2 scope for token requests. Should follow least privilege principle. "
-            "For Polaris, use format like 'PRINCIPAL_ROLE:my_role'. "
-            "Only set in test environments to 'PRINCIPAL_ROLE:ALL' for convenience. "
-            "Production deployments should use narrowly-scoped principal roles."
+            "OAuth2 scope for token requests. MUST follow least privilege principle. "
+            "For Polaris, use format like 'PRINCIPAL_ROLE:DATA_ENGINEER'. "
+            "NEVER use 'PRINCIPAL_ROLE:ALL' in production - it grants unrestricted access."
         ),
     )
     default_namespace: str = Field(
@@ -417,3 +417,22 @@ class IcebergIOManagerConfig(BaseModel):
             msg = f"URI must start with http:// or https://, got: {v}"
             raise ValueError(msg)
         return v.rstrip("/")  # Normalize by removing trailing slash
+
+    @field_validator("scope")
+    @classmethod
+    def warn_overly_permissive_scope(cls, v: str | None) -> str | None:
+        """Warn if scope violates least privilege principle.
+
+        Security:
+            PRINCIPAL_ROLE:ALL grants unrestricted access to all roles in Polaris.
+            This violates the principle of least privilege and should only be used
+            in development/testing environments, never in production.
+        """
+        if v == "PRINCIPAL_ROLE:ALL":
+            warnings.warn(
+                "scope='PRINCIPAL_ROLE:ALL' grants unrestricted access to all roles. "
+                "Use a narrowly-scoped principal role in production environments.",
+                UserWarning,
+                stacklevel=2,
+            )
+        return v

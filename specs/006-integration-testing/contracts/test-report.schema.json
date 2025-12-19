@@ -1,0 +1,150 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://floe.dev/schemas/test-report.schema.json",
+  "title": "TraceabilityReport",
+  "description": "CI-compatible traceability report for integration testing",
+  "type": "object",
+  "required": [
+    "feature_id",
+    "generated_at",
+    "total_requirements",
+    "covered",
+    "partial",
+    "uncovered",
+    "excluded",
+    "coverage_percentage",
+    "packages",
+    "test_results",
+    "gaps"
+  ],
+  "properties": {
+    "feature_id": {
+      "type": "string",
+      "description": "Feature identifier (e.g., '006')"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp"
+    },
+    "total_requirements": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total FR-XXX count"
+    },
+    "covered": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Fully covered count"
+    },
+    "partial": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Partially covered count"
+    },
+    "uncovered": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Uncovered count"
+    },
+    "excluded": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Excluded count"
+    },
+    "coverage_percentage": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Overall coverage percentage"
+    },
+    "packages": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/PackageCoverage"
+      },
+      "description": "Per-package breakdown"
+    },
+    "test_results": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/TestResult"
+      },
+      "description": "Test execution results"
+    },
+    "gaps": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^FR-\\d{3}$"
+      },
+      "description": "List of uncovered requirement IDs"
+    }
+  },
+  "definitions": {
+    "TestStatus": {
+      "type": "string",
+      "enum": ["passed", "failed", "skipped", "error"]
+    },
+    "TestResult": {
+      "type": "object",
+      "required": ["test_id", "status", "duration_ms"],
+      "properties": {
+        "test_id": {
+          "type": "string",
+          "description": "Test identifier (file::class::function)"
+        },
+        "status": {
+          "$ref": "#/definitions/TestStatus"
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Test duration in milliseconds"
+        },
+        "error_message": {
+          "type": ["string", "null"],
+          "description": "Error message if failed/error"
+        }
+      }
+    },
+    "PackageCoverage": {
+      "type": "object",
+      "required": [
+        "package",
+        "total_requirements",
+        "covered",
+        "partial",
+        "uncovered",
+        "coverage_percentage"
+      ],
+      "properties": {
+        "package": {
+          "type": "string",
+          "description": "Package name (e.g., 'floe-polaris')"
+        },
+        "total_requirements": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "covered": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "partial": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "uncovered": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "coverage_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    }
+  }
+}

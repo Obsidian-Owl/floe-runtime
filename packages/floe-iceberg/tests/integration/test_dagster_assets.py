@@ -22,6 +22,7 @@ from __future__ import annotations
 import contextlib
 import os
 import uuid
+import warnings
 from collections.abc import Generator
 
 import pandas as pd
@@ -144,8 +145,11 @@ pytestmark = [
 @pytest.fixture(scope="module")
 def catalog() -> Generator[PolarisCatalog, None, None]:
     """Provide connected catalog instance for the module."""
-    config = get_test_config()
-    cat = create_catalog(config)
+    # Suppress expected warning for PRINCIPAL_ROLE:ALL in test environment
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="scope='PRINCIPAL_ROLE:ALL'")
+        config = get_test_config()
+        cat = create_catalog(config)
     yield cat
 
 
@@ -173,7 +177,10 @@ def test_namespace(catalog: PolarisCatalog) -> Generator[str, None, None]:
 @pytest.fixture
 def io_manager_config(test_namespace: str) -> IcebergIOManagerConfig:
     """Provide IOManager configuration."""
-    return get_io_manager_config(test_namespace)
+    # Suppress expected warning for PRINCIPAL_ROLE:ALL in test environment
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="scope='PRINCIPAL_ROLE:ALL'")
+        return get_io_manager_config(test_namespace)
 
 
 @pytest.fixture
@@ -196,6 +203,7 @@ def io_manager(
 class TestIOManagerBasics:
     """Tests for basic IOManager functionality."""
 
+    @pytest.mark.requirement("FR-014")
     def test_create_io_manager(
         self,
         io_manager_config: IcebergIOManagerConfig,
@@ -207,6 +215,7 @@ class TestIOManagerBasics:
         assert io_manager.catalog_uri == io_manager_config.catalog_uri
         assert io_manager.warehouse == io_manager_config.warehouse
 
+    @pytest.mark.requirement("FR-014")
     def test_get_table_identifier_single_part(
         self,
         io_manager: IcebergIOManager,
@@ -221,6 +230,7 @@ class TestIOManagerBasics:
 
         assert table_id == f"{test_namespace}.customers"
 
+    @pytest.mark.requirement("FR-014")
     def test_get_table_identifier_two_parts(
         self,
         io_manager: IcebergIOManager,
@@ -234,6 +244,7 @@ class TestIOManagerBasics:
 
         assert table_id == "bronze.customers"
 
+    @pytest.mark.requirement("FR-014")
     def test_get_table_identifier_multi_parts(
         self,
         io_manager: IcebergIOManager,
@@ -256,6 +267,7 @@ class TestIOManagerBasics:
 class TestHandleOutput:
     """Tests for handle_output (writing assets to Iceberg)."""
 
+    @pytest.mark.requirement("FR-014")
     def test_handle_output_arrow_table(
         self,
         io_manager: IcebergIOManager,
@@ -290,6 +302,7 @@ class TestHandleOutput:
             with contextlib.suppress(Exception):
                 table_manager.drop_table(full_table)
 
+    @pytest.mark.requirement("FR-014")
     def test_handle_output_dataframe(
         self,
         io_manager: IcebergIOManager,
@@ -320,6 +333,7 @@ class TestHandleOutput:
             with contextlib.suppress(Exception):
                 table_manager.drop_table(full_table)
 
+    @pytest.mark.requirement("FR-014")
     def test_handle_output_append_mode(
         self,
         io_manager: IcebergIOManager,
@@ -350,6 +364,7 @@ class TestHandleOutput:
             with contextlib.suppress(Exception):
                 table_manager.drop_table(full_table)
 
+    @pytest.mark.requirement("FR-014")
     def test_handle_output_overwrite_mode(
         self,
         io_manager_config: IcebergIOManagerConfig,
@@ -359,21 +374,24 @@ class TestHandleOutput:
         """Test overwrite mode replaces all data."""
         # Create IOManager with overwrite mode - inherit all config from fixture
         # Note: Don't pass pre-configured catalog - let IOManager create its own with S3 creds
-        config = IcebergIOManagerConfig(
-            catalog_uri=io_manager_config.catalog_uri,
-            warehouse=io_manager_config.warehouse,
-            client_id=io_manager_config.client_id,
-            client_secret=io_manager_config.client_secret,
-            scope=io_manager_config.scope,  # TESTING ONLY: inherit scope from fixture
-            default_namespace=test_namespace,
-            write_mode=WriteMode.OVERWRITE,
-            auto_create_tables=True,
-            # Inherit S3 config from fixture for LocalStack testing
-            s3_endpoint=io_manager_config.s3_endpoint,
-            s3_access_key_id=io_manager_config.s3_access_key_id,
-            s3_secret_access_key=io_manager_config.s3_secret_access_key,
-            s3_region=io_manager_config.s3_region,
-        )
+        # Suppress expected warning for PRINCIPAL_ROLE:ALL in test environment
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="scope='PRINCIPAL_ROLE:ALL'")
+            config = IcebergIOManagerConfig(
+                catalog_uri=io_manager_config.catalog_uri,
+                warehouse=io_manager_config.warehouse,
+                client_id=io_manager_config.client_id,
+                client_secret=io_manager_config.client_secret,
+                scope=io_manager_config.scope,  # TESTING ONLY: inherit scope from fixture
+                default_namespace=test_namespace,
+                write_mode=WriteMode.OVERWRITE,
+                auto_create_tables=True,
+                # Inherit S3 config from fixture for LocalStack testing
+                s3_endpoint=io_manager_config.s3_endpoint,
+                s3_access_key_id=io_manager_config.s3_access_key_id,
+                s3_secret_access_key=io_manager_config.s3_secret_access_key,
+                s3_region=io_manager_config.s3_region,
+            )
         io_manager = create_io_manager(config)
 
         table_name = f"output_overwrite_{uuid.uuid4().hex[:8]}"
@@ -408,6 +426,7 @@ class TestHandleOutput:
 class TestLoadInput:
     """Tests for load_input (reading assets from Iceberg)."""
 
+    @pytest.mark.requirement("FR-014")
     def test_load_input_all_data(
         self,
         io_manager: IcebergIOManager,
@@ -446,6 +465,7 @@ class TestLoadInput:
             with contextlib.suppress(Exception):
                 table_manager.drop_table(full_table)
 
+    @pytest.mark.requirement("FR-014")
     def test_load_input_with_columns(
         self,
         io_manager: IcebergIOManager,
@@ -493,6 +513,7 @@ class TestLoadInput:
             with contextlib.suppress(Exception):
                 table_manager.drop_table(full_table)
 
+    @pytest.mark.requirement("FR-014")
     def test_load_input_with_limit(
         self,
         io_manager: IcebergIOManager,
@@ -533,6 +554,7 @@ class TestLoadInput:
 class TestDagsterIntegration:
     """End-to-end tests with Dagster materialize()."""
 
+    @pytest.mark.requirement("FR-014")
     def test_materialize_simple_asset(
         self,
         io_manager: IcebergIOManager,
@@ -572,6 +594,7 @@ class TestDagsterIntegration:
             with contextlib.suppress(Exception):
                 table_manager.drop_table(full_table)
 
+    @pytest.mark.requirement("FR-014")
     def test_materialize_asset_chain(
         self,
         io_manager: IcebergIOManager,
@@ -634,6 +657,7 @@ class TestDagsterIntegration:
 class TestSchemaEvolutionIntegration:
     """Tests for schema evolution during asset materialization."""
 
+    @pytest.mark.requirement("FR-014")
     def test_auto_add_columns(
         self,
         io_manager: IcebergIOManager,

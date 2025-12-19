@@ -111,6 +111,8 @@ markers = [
     "adapter: marks tests for a specific compute adapter (use with parameter)",
     "requires_dbt: marks tests that require dbt-core to be installed",
     "requires_container: marks tests that require Docker containers",
+    "requirement: marks test with a single functional requirement ID (FR-XXX) for traceability",
+    "requirements: marks test with multiple functional requirement IDs for traceability",
 ]
 
 [tool.coverage.run]

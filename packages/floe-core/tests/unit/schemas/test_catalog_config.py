@@ -132,15 +132,23 @@ class TestCatalogConfig:
         assert config.warehouse == "my_warehouse"
 
     def test_catalog_config_polaris_oauth2_scope(self) -> None:
-        """CatalogConfig should accept Polaris OAuth2 scope."""
+        """CatalogConfig should accept Polaris OAuth2 scope and warn on ALL."""
+        import warnings
+
         from floe_core.schemas import CatalogConfig
 
-        config = CatalogConfig(
-            type="polaris",
-            uri="http://polaris:8181/api/catalog",
-            scope="PRINCIPAL_ROLE:ALL",
-        )
-        assert config.scope == "PRINCIPAL_ROLE:ALL"
+        # PRINCIPAL_ROLE:ALL should emit a warning (security: least privilege)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            config = CatalogConfig(
+                type="polaris",
+                uri="http://polaris:8181/api/catalog",
+                scope="PRINCIPAL_ROLE:ALL",
+            )
+            assert config.scope == "PRINCIPAL_ROLE:ALL"
+            # Verify warning was emitted
+            assert len(w) == 1
+            assert "PRINCIPAL_ROLE:ALL" in str(w[0].message)
 
     def test_catalog_config_polaris_token_refresh(self) -> None:
         """CatalogConfig should accept token_refresh_enabled."""
@@ -166,20 +174,28 @@ class TestCatalogConfig:
 
     def test_catalog_config_polaris_full_oauth2(self) -> None:
         """CatalogConfig should accept full Polaris OAuth2 configuration."""
+        import warnings
+
         from floe_core.schemas import CatalogConfig
 
-        config = CatalogConfig(
-            type="polaris",
-            uri="http://polaris:8181/api/catalog",
-            credential_secret_ref="polaris-oauth2-secret",
-            warehouse="my_warehouse",
-            scope="PRINCIPAL_ROLE:ALL",
-            token_refresh_enabled=True,
-            access_delegation="vended-credentials",
-        )
-        assert config.scope == "PRINCIPAL_ROLE:ALL"
-        assert config.token_refresh_enabled is True
-        assert config.access_delegation == "vended-credentials"
+        # PRINCIPAL_ROLE:ALL should emit a warning (security: least privilege)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            config = CatalogConfig(
+                type="polaris",
+                uri="http://polaris:8181/api/catalog",
+                credential_secret_ref="polaris-oauth2-secret",
+                warehouse="my_warehouse",
+                scope="PRINCIPAL_ROLE:ALL",
+                token_refresh_enabled=True,
+                access_delegation="vended-credentials",
+            )
+            assert config.scope == "PRINCIPAL_ROLE:ALL"
+            assert config.token_refresh_enabled is True
+            assert config.access_delegation == "vended-credentials"
+            # Verify warning was emitted
+            assert len(w) == 1
+            assert "PRINCIPAL_ROLE:ALL" in str(w[0].message)
 
     def test_catalog_config_properties_default_empty(self) -> None:
         """CatalogConfig.properties should default to empty dict."""
