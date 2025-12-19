@@ -23,9 +23,9 @@ class TestJaegerClientImport:
         """Verify JaegerClient can be instantiated with base_url."""
         from testing.fixtures.observability import JaegerClient
 
-        # HTTP is intentional for local Docker testing  # nosonar: S5332
-        client = JaegerClient(base_url="http://localhost:16686")
-        assert client.base_url == "http://localhost:16686"
+        # HTTP is intentional for local Docker testing
+        client = JaegerClient(base_url="http://localhost:16686")  # nosonar: S5332
+        assert client.base_url == "http://localhost:16686"  # nosonar: S5332
 
     def test_jaeger_client_default_url(self) -> None:
         """Verify JaegerClient has sensible default base_url."""
@@ -66,9 +66,9 @@ class TestMarquezClientImport:
         """Verify MarquezClient can be instantiated with base_url."""
         from testing.fixtures.observability import MarquezClient
 
-        # HTTP is intentional for local Docker testing  # nosonar: S5332
-        client = MarquezClient(base_url="http://localhost:5002")
-        assert client.base_url == "http://localhost:5002"
+        # HTTP is intentional for local Docker testing
+        client = MarquezClient(base_url="http://localhost:5002")  # nosonar: S5332
+        assert client.base_url == "http://localhost:5002"  # nosonar: S5332
 
     def test_marquez_client_default_url(self) -> None:
         """Verify MarquezClient has sensible default base_url."""

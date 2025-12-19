@@ -68,8 +68,8 @@ class JaegerClient:
         """
         if base_url is None:
             host = get_service_host("jaeger")
-            # HTTP is intentional for local Docker testing  # nosonar: S5332
-            base_url = f"http://{host}:16686"
+            # HTTP is intentional for local Docker testing
+            base_url = f"http://{host}:16686"  # nosonar: S5332
         self.base_url = base_url
 
     def get_traces(
@@ -150,8 +150,8 @@ class MarquezClient:
             host = get_service_host("marquez")
             # Use port 5000 inside Docker, 5002 from host
             port = "5000" if is_running_in_docker() else "5002"
-            # HTTP is intentional for local Docker testing  # nosonar: S5332
-            base_url = f"http://{host}:{port}"
+            # HTTP is intentional for local Docker testing
+            base_url = f"http://{host}:{port}"  # nosonar: S5332
         self.base_url = base_url
 
     def get_lineage_events(
