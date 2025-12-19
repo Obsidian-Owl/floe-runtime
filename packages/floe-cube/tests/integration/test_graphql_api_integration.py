@@ -292,7 +292,13 @@ class TestGraphQLNestedRelationships:
         cube_client: httpx.Client,
         authenticated_headers: dict[str, str],
     ) -> None:
-        """Basic Orders cube query should return data."""
+        """Basic Orders cube query should return data.
+
+        Note: First GraphQL data query may take longer due to Cube query compilation
+        and Trino connection warm-up. We use retry logic to handle this.
+        """
+        import time
+
         query = """
         {
             cube {
@@ -304,29 +310,56 @@ class TestGraphQLNestedRelationships:
         }
         """
 
-        response = execute_graphql(
-            cube_client,
-            query,
-            headers=authenticated_headers,
-        )
+        # Retry up to 3 times with increasing delays for first-query latency
+        max_retries = 3
+        last_error = None
 
-        assert response.status_code == 200, (
-            f"Orders query failed: {response.status_code}: {response.text}"
-        )
+        for attempt in range(max_retries):
+            response = execute_graphql(
+                cube_client,
+                query,
+                headers=authenticated_headers,
+            )
 
-        data = response.json()
+            if response.status_code != 200:
+                last_error = f"Orders query failed: {response.status_code}: {response.text}"
+                if attempt < max_retries - 1:
+                    time.sleep(2 * (attempt + 1))  # 2s, 4s delays
+                    continue
+                pytest.fail(last_error)
 
-        # Check for GraphQL errors
-        if "errors" in data:
-            pytest.fail(f"GraphQL errors: {data['errors']}")
+            data = response.json()
 
-        assert "data" in data, f"No data in response: {data}"
-        assert "cube" in data["data"], f"No 'cube' in data: {data}"
+            # Check for GraphQL errors that indicate query is still processing
+            if "errors" in data:
+                errors_str = str(data["errors"])
+                # Transient errors - retry
+                if "timeout" in errors_str.lower() or "processing" in errors_str.lower():
+                    last_error = f"GraphQL errors (attempt {attempt + 1}): {data['errors']}"
+                    if attempt < max_retries - 1:
+                        time.sleep(2 * (attempt + 1))
+                        continue
+                # Permanent errors - fail immediately
+                pytest.fail(f"GraphQL errors: {data['errors']}")
 
-        # The cube query returns an array
-        cube_data = data["data"]["cube"]
-        assert isinstance(cube_data, list), f"Expected list, got: {type(cube_data)}"
-        assert len(cube_data) > 0, "No data returned from Orders cube"
+            if "data" not in data:
+                last_error = f"No data in response: {data}"
+                if attempt < max_retries - 1:
+                    time.sleep(2 * (attempt + 1))
+                    continue
+                pytest.fail(last_error)
+
+            if "cube" not in data["data"]:
+                pytest.fail(f"No 'cube' in data: {data}")
+
+            # The cube query returns an array
+            cube_data = data["data"]["cube"]
+            assert isinstance(cube_data, list), f"Expected list, got: {type(cube_data)}"
+            assert len(cube_data) > 0, "No data returned from Orders cube"
+            return  # Success
+
+        # Should not reach here
+        pytest.fail(f"Failed after {max_retries} attempts. Last error: {last_error}")
 
     def test_orders_query_with_dimensions(
         self,

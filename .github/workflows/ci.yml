@@ -181,7 +181,7 @@ jobs:
               packages/floe-iceberg/tests/integration/ \
               packages/floe-polaris/tests/integration/ \
               packages/floe-cube/tests/integration/ \
-              -v --tb=short
+              -v --tb=short -p no:cacheprovider
 
       - name: Show Docker logs on failure
         if: failure()
