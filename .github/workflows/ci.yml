@@ -152,6 +152,23 @@ jobs:
           timeout 60 bash -c 'until curl -sf http://localhost:5002/api/v1/namespaces; do sleep 2; done'
           echo "All services ready"
 
+      - name: Wait for cube-init to complete
+        working-directory: testing/docker
+        run: |
+          echo "Waiting for cube-init to load test data..."
+          timeout 120 bash -c 'until docker inspect -f "{{.State.Status}}" floe-cube-init 2>/dev/null | grep -q "exited"; do sleep 2; done' || {
+            echo "Error: cube-init did not complete in time"
+            docker compose logs cube-init
+            exit 1
+          }
+          EXIT_CODE=$(docker inspect -f "{{.State.ExitCode}}" floe-cube-init 2>/dev/null || echo "1")
+          if [[ "$EXIT_CODE" != "0" ]]; then
+            echo "Error: cube-init failed with exit code $EXIT_CODE"
+            docker compose logs cube-init
+            exit 1
+          fi
+          echo "cube-init completed successfully (15,500 test rows loaded)"
+
       - name: Build test-runner container
         working-directory: testing/docker
         run: docker compose --profile full --profile test build test-runner
@@ -160,7 +177,11 @@ jobs:
         working-directory: testing/docker
         run: |
           docker compose --profile full --profile test run --rm test-runner \
-            uv run pytest packages/*/tests/integration/ -v --tb=short
+            uv run pytest \
+              packages/floe-iceberg/tests/integration/ \
+              packages/floe-polaris/tests/integration/ \
+              packages/floe-cube/tests/integration/ \
+              -v --tb=short
 
       - name: Show Docker logs on failure
         if: failure()

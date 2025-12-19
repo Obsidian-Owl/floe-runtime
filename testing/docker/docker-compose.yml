@@ -456,6 +456,15 @@ services:
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
       AWS_REGION: ${AWS_REGION:-us-east-1}
+      # Cube API configuration (internal Docker hostnames)
+      CUBE_API_URL: http://cube:4000
+      CUBE_SQL_HOST: cube
+      CUBE_SQL_PORT: "15432"
+      # Marquez/OpenLineage configuration
+      MARQUEZ_API_URL: http://marquez:5000
+      # Jaeger/OpenTelemetry configuration
+      JAEGER_QUERY_URL: http://jaeger:16686
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       # Python settings
       PYTHONDONTWRITEBYTECODE: "1"
       PYTHONUNBUFFERED: "1"
