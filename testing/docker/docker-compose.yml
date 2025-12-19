@@ -242,7 +242,8 @@ services:
   # ==============================================================================
 
   trino:
-    image: trinodb/trino:443
+    # Upgraded from 443 to 479 to support oauth2.scope property for Polaris authentication
+    image: trinodb/trino:479
     container_name: floe-trino
     ports:
       - "8080:8080"   # HTTP API / UI
@@ -252,10 +253,16 @@ services:
       AWS_SECRET_ACCESS_KEY: test
       AWS_REGION: ${AWS_REGION:-us-east-1}
     volumes:
-      - ./trino-config/catalog:/etc/trino/catalog:ro
+      # Use dynamically-generated iceberg.properties with OAuth2 credentials
+      # This file is created by polaris-init with the auto-generated Polaris credentials
+      - ./config/trino-iceberg.properties:/etc/trino/catalog/iceberg.properties:ro
+      # Static config for PostgreSQL connector
+      - ./trino-config/catalog/postgresql.properties:/etc/trino/catalog/postgresql.properties:ro
     depends_on:
-      polaris:
-        condition: service_healthy
+      # Wait for polaris-init to generate OAuth2 credentials before starting Trino
+      # polaris-init writes the trino-iceberg.properties file with valid credentials
+      polaris-init:
+        condition: service_completed_successfully
       localstack:
         condition: service_healthy
     healthcheck:
@@ -272,7 +279,7 @@ services:
       - full
 
   spark-iceberg:
-    image: tabulario/spark-iceberg:3.5.1_1.5.2
+    image: tabulario/spark-iceberg:3.5.1_1.5.0
     container_name: floe-spark
     ports:
       - "8888:8888"   # Jupyter Notebook
@@ -304,8 +311,9 @@ services:
   marquez:
     image: marquezproject/marquez:0.49.0
     container_name: floe-marquez
+    platform: linux/amd64  # Required for Apple Silicon (runs via Rosetta 2)
     ports:
-      - "5000:5000"   # API (OpenLineage endpoint)
+      - "5002:5000"   # API (OpenLineage endpoint) - 5002 external to avoid macOS port conflict
       - "5001:5001"   # Admin
     environment:
       MARQUEZ_PORT: "5000"
@@ -313,8 +321,9 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       POSTGRES_DB: marquez
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      # Marquez expects its own dedicated user (created by init script)
+      POSTGRES_USER: marquez
+      POSTGRES_PASSWORD: marquez
     depends_on:
       postgres:
         condition: service_healthy
@@ -322,8 +331,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:5001/healthcheck"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 10
+      start_period: 60s  # Marquez takes longer to start via Rosetta 2 on ARM
     networks:
       - floe-network
     restart: unless-stopped
@@ -333,6 +342,7 @@ services:
   marquez-web:
     image: marquezproject/marquez-web:0.49.0
     container_name: floe-marquez-web
+    platform: linux/amd64  # Required for Apple Silicon (runs via Rosetta 2)
     ports:
       - "3001:3000"   # Web UI
     environment:
@@ -358,6 +368,7 @@ services:
       CUBEJS_DB_TYPE: trino
       CUBEJS_DB_HOST: trino
       CUBEJS_DB_PORT: "8080"
+      CUBEJS_DB_USER: trino  # Required for Trino 479+ (sends X-Trino-User header)
       CUBEJS_DB_CATALOG: iceberg
       CUBEJS_DB_SCHEMA: default
       # API configuration
@@ -366,16 +377,15 @@ services:
       CUBEJS_EXTERNAL_DEFAULT: "true"
       # Telemetry
       CUBEJS_TELEMETRY: "false"
-      # Pre-aggregation storage (LocalStack S3)
-      CUBEJS_DB_EXPORT_BUCKET_TYPE: s3
-      CUBEJS_DB_EXPORT_BUCKET: s3://cube-preaggs
-      CUBEJS_DB_EXPORT_BUCKET_AWS_KEY: test
-      CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET: test
-      CUBEJS_DB_EXPORT_BUCKET_AWS_REGION: ${AWS_REGION:-us-east-1}
-      # Point to LocalStack S3
-      AWS_ENDPOINT_URL: http://localstack:4566
+      # SQL API (Postgres wire protocol) configuration
+      CUBEJS_PG_SQL_PORT: "15432"
+      CUBEJS_SQL_USER: ${CUBEJS_SQL_USER:-cube}
+      CUBEJS_SQL_PASSWORD: ${CUBEJS_SQL_PASSWORD:-cube_password}
+      # Note: Pre-aggregations disabled - Trino driver doesn't support S3 export bucket
+      # Pre-aggregation refresh would require GCS which isn't available in test environment
     volumes:
-      - ./cube-schema:/cube/conf/schema:ro
+      # Note: Cube v0.36+ uses 'model' directory by default (changed from 'schema')
+      - ./cube-schema:/cube/conf/model:ro
     depends_on:
       trino:
         condition: service_healthy
@@ -388,6 +398,27 @@ services:
     networks:
       - floe-network
     restart: unless-stopped
+    profiles:
+      - full
+
+  # Initialize Cube test data in Iceberg via Trino
+  # Creates orders table and loads 15k+ rows for pagination tests
+  cube-init:
+    # Use same Trino version as main service for consistency
+    image: trinodb/trino:479
+    container_name: floe-cube-init
+    depends_on:
+      # Wait for Trino to be healthy (it starts after polaris-init generates OAuth2 credentials)
+      trino:
+        condition: service_healthy
+    environment:
+      TRINO_HOST: trino
+      TRINO_PORT: "8080"
+    volumes:
+      - ./init-scripts/03-init-cube-data.sh:/init-cube-data.sh:ro
+    entrypoint: ["/bin/bash", "/init-cube-data.sh"]
+    networks:
+      - floe-network
     profiles:
       - full
 
@@ -425,6 +456,15 @@ services:
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
       AWS_REGION: ${AWS_REGION:-us-east-1}
+      # Cube API configuration (internal Docker hostnames)
+      CUBE_API_URL: http://cube:4000
+      CUBE_SQL_HOST: cube
+      CUBE_SQL_PORT: "15432"
+      # Marquez/OpenLineage configuration
+      MARQUEZ_API_URL: http://marquez:5000
+      # Jaeger/OpenTelemetry configuration
+      JAEGER_QUERY_URL: http://jaeger:16686
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       # Python settings
       PYTHONDONTWRITEBYTECODE: "1"
       PYTHONUNBUFFERED: "1"

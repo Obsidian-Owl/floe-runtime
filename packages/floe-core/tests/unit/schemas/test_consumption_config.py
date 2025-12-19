@@ -51,7 +51,7 @@ class TestCubeSecurityConfig:
 
         config = CubeSecurityConfig()
         assert config.row_level is True
-        assert config.tenant_column == "tenant_id"
+        assert config.filter_column == "organization_id"
 
     def test_cube_security_config_custom_values(self) -> None:
         """CubeSecurityConfig should accept custom values."""
@@ -59,10 +59,10 @@ class TestCubeSecurityConfig:
 
         config = CubeSecurityConfig(
             row_level=False,
-            tenant_column="org_id",
+            filter_column="department_id",
         )
         assert config.row_level is False
-        assert config.tenant_column == "org_id"
+        assert config.filter_column == "department_id"
 
     def test_cube_security_config_is_frozen(self) -> None:
         """CubeSecurityConfig should be immutable."""
@@ -182,11 +182,11 @@ class TestConsumptionConfig:
             enabled=True,
             security=CubeSecurityConfig(
                 row_level=False,
-                tenant_column="organization_id",
+                filter_column="department_id",
             ),
         )
         assert config.security.row_level is False
-        assert config.security.tenant_column == "organization_id"
+        assert config.security.filter_column == "department_id"
 
     def test_consumption_config_is_frozen(self) -> None:
         """ConsumptionConfig should be immutable."""

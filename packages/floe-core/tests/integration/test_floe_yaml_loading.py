@@ -81,7 +81,7 @@ consumption:
     timezone: UTC
   security:
     row_level: true
-    tenant_column: organization_id
+    filter_column: organization_id
 
 governance:
   classification_source: dbt_meta
@@ -126,7 +126,7 @@ catalog:
         # Verify consumption
         assert spec.consumption.enabled is True
         assert spec.consumption.database_type == "snowflake"
-        assert spec.consumption.security.tenant_column == "organization_id"
+        assert spec.consumption.security.filter_column == "organization_id"
 
         # Verify catalog
         assert spec.catalog is not None

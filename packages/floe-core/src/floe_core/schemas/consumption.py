@@ -41,14 +41,23 @@ class PreAggregationConfig(BaseModel):
 class CubeSecurityConfig(BaseModel):
     """Configuration for Cube row-level security.
 
+    Row-level security filters query results based on JWT claims.
+    The filter_column specifies which database column to filter on,
+    and the corresponding claim value is extracted from the JWT token.
+
+    Note:
+        This is USER-MANAGED row-level security, NOT SaaS tenant isolation.
+        Users define their own filter columns and claims for their use cases
+        (e.g., organization_id, department, region).
+
     Attributes:
         row_level: Enable row-level security filtering.
-        tenant_column: Column name used for tenant filtering.
+        filter_column: Column name used for row-level filtering.
 
     Example:
         >>> config = CubeSecurityConfig(
         ...     row_level=True,
-        ...     tenant_column="organization_id"
+        ...     filter_column="organization_id"
         ... )
     """
 
@@ -58,9 +67,9 @@ class CubeSecurityConfig(BaseModel):
         default=True,
         description="Enable row-level security",
     )
-    tenant_column: str = Field(
-        default="tenant_id",
-        description="Column for tenant filtering",
+    filter_column: str = Field(
+        default="organization_id",
+        description="Column for row-level filtering (matches JWT claim name)",
     )
 
 

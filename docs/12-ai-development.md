@@ -226,12 +226,20 @@ mypy --strict packages/floe-core/
 ### 3. Testing Phase
 
 ```bash
-# Run tests
-pytest --cov=packages --cov-report=term-missing
+# Unit tests (run on host - fast, no external deps)
+uv run pytest packages/*/tests/unit/ --cov=packages --cov-report=term-missing
+
+# Integration tests (MUST run in Docker)
+./testing/docker/scripts/run-integration-tests.sh
+# Or: make test-integration
 
 # Check coverage
 # Goal: > 80%
 ```
+
+**IMPORTANT**: Integration tests MUST run inside Docker. Running from host will fail
+with `Could not resolve host: localstack` errors because Docker service hostnames
+(localstack, polaris, trino, etc.) only resolve inside the Docker network.
 
 **AI Prompt**:
 ```

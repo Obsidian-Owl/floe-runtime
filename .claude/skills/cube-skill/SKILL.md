@@ -1,6 +1,6 @@
 ---
 name: cube-semantic-layer
-description: Research-driven Cube semantic layer development. Injects research steps for data modeling, dbt integration, metrics, dimensions, and REST API. Use when building semantic layer, consumption APIs, or metrics layer on top of dbt models.
+description: Research-driven Cube semantic layer development. Injects research steps for data modeling, dbt integration, metrics, dimensions, REST API, GraphQL API, and SQL API (Postgres wire protocol). Use when building semantic layer, consumption APIs, metrics layer, Cube integration tests, or working with Cube MEASURE() syntax and psycopg2 connections.
 allowed-tools: Read, Grep, Glob, Bash, WebSearch
 ---
 
@@ -218,7 +218,101 @@ Cube Project
 - Authentication: JWT tokens, API keys
 - Response format: `data` (result set) + `schema` (column metadata)
 - Pagination: `limit`, `offset`
-- SQL API: Expose semantic layer via SQL
+
+### GraphQL API (Consumption)
+
+**Core concept**: Cube exposes GraphQL API for flexible querying
+
+**Research questions**:
+- What queries are supported?
+- What mutations? (none - read-only)
+- What authentication?
+- How to query multiple cubes?
+
+**SDK features to research**:
+- Endpoint: `/cubejs-api/graphql` (NOT `/graphql`)
+- Query format: `cube` query with `measures`, `dimensions`, `filters`
+- Authentication: Same as REST API (JWT, API keys)
+- Introspection: Schema discovery via `__schema` query
+
+**Example GraphQL query**:
+```graphql
+query {
+  cube(
+    measures: ["Orders.count", "Orders.totalAmount"]
+    dimensions: ["Orders.status"]
+    filters: [{ dimension: "Orders.status", operator: "equals", values: ["completed"] }]
+  ) {
+    Orders {
+      count
+      totalAmount
+      status
+    }
+  }
+}
+```
+
+### SQL API (Postgres Wire Protocol)
+
+**Core concept**: Cube exposes SQL API via Postgres wire protocol for BI tool integration
+
+**Research questions**:
+- What port is SQL API on? (default: 15432)
+- What authentication? (user/password)
+- What SQL dialect? (Postgres-compatible with Cube extensions)
+- What BI tools are supported? (Tableau, Looker, Metabase, psycopg2)
+
+**SDK features to research**:
+- Port: `CUBEJS_PG_SQL_PORT` (default 15432)
+- Authentication: `CUBEJS_SQL_USER`, `CUBEJS_SQL_PASSWORD`
+- Connection: Standard Postgres clients (psycopg2, JDBC, etc.)
+- Query syntax: Use `MEASURE()` function for aggregates
+- Read-only: INSERT/UPDATE/DELETE not supported
+
+**CRITICAL - Cube SQL syntax differs from standard SQL**:
+```sql
+-- Cube SQL API syntax (NOT standard Postgres)
+SELECT
+    MEASURE(count) AS order_count,
+    MEASURE(total_amount) AS total
+FROM Orders
+WHERE status = 'completed'
+GROUP BY 1
+
+-- Dimensions referenced directly (no quotes)
+SELECT status, MEASURE(count) FROM Orders GROUP BY 1
+
+-- Time dimensions with granularity
+SELECT
+    DATE_TRUNC('month', created_at) AS month,
+    MEASURE(count)
+FROM Orders
+GROUP BY 1
+```
+
+**Python psycopg2 example**:
+```python
+import psycopg2
+
+conn = psycopg2.connect(
+    host="localhost",
+    port=15432,
+    user="cube",
+    password="cube_password",
+    database="cube"
+)
+cursor = conn.cursor()
+cursor.execute("SELECT MEASURE(count) FROM Orders")
+results = cursor.fetchall()
+```
+
+**Docker configuration**:
+```yaml
+environment:
+  CUBEJS_PG_SQL_PORT: "15432"
+  CUBEJS_SQL_USER: ${CUBEJS_SQL_USER:-cube}
+  CUBEJS_SQL_PASSWORD: ${CUBEJS_SQL_PASSWORD:-cube_password}
+```
 
 ## Validation Workflow
 
@@ -239,11 +333,13 @@ Cube Project
 
 ### After Implementation
 1. ✅ Verify Cube models load without errors
-2. ✅ Test REST API queries
-3. ✅ Verify measures calculate correctly
-4. ✅ Test dimension filtering and grouping
-5. ✅ Check pre-aggregation materialization
-6. ✅ Validate integration with downstream apps (BI tools, dashboards)
+2. ✅ Test REST API queries (`/cubejs-api/v1/load`)
+3. ✅ Test GraphQL API queries (`/cubejs-api/graphql`)
+4. ✅ Test SQL API queries (port 15432, `MEASURE()` syntax)
+5. ✅ Verify measures calculate correctly
+6. ✅ Test dimension filtering and grouping
+7. ✅ Check pre-aggregation materialization
+8. ✅ Validate integration with downstream apps (BI tools, dashboards)
 
 ## Context Injection (For Future Claude Instances)
 
@@ -286,8 +382,11 @@ Use these WebSearch queries when encountering specific needs:
 - **Joins**: "Cube joins relationships between cubes 2025"
 - **Pre-aggregations**: "Cube pre-aggregations materialization 2025"
 - **REST API**: "Cube REST API query format 2025"
+- **GraphQL API**: "Cube GraphQL API query format endpoint 2025"
+- **SQL API**: "Cube SQL API Postgres wire protocol MEASURE syntax 2025"
+- **SQL API psycopg2**: "Cube SQL API Python psycopg2 connection 2025"
 - **Python client**: "Cube Python REST API client 2025"
-- **SQL API**: "Cube SQL API BI tools integration 2025"
+- **Integration tests**: "Cube integration testing pytest httpx 2025"
 
 ## Integration Points to Research
 

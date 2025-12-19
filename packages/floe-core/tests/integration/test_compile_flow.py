@@ -81,7 +81,7 @@ class TestFullCompileFlow:
                 "database_type": "snowflake",
                 "port": 8080,
                 "pre_aggregations": {"refresh_schedule": "0 * * * *"},
-                "security": {"row_level": True, "tenant_column": "org_id"},
+                "security": {"row_level": True, "filter_column": "org_id"},
             },
             "governance": {
                 "classification_source": "dbt_meta",

@@ -132,6 +132,34 @@ def test_property_based(input_str: str):
 - Property-based tests: Use `hypothesis` for edge cases
 - > 80% coverage required
 
+## Test Execution Model (MANDATORY)
+
+| Test Type | Location | Execution Environment |
+|-----------|----------|----------------------|
+| Unit tests | `packages/*/tests/unit/` | Host (`uv run pytest`) |
+| Contract tests | `packages/*/tests/contract/` | Host (`uv run pytest`) |
+| **Integration tests** | `packages/*/tests/integration/` | **Docker (test-runner)** |
+| **E2E tests** | `packages/*/tests/e2e/` | **Docker (test-runner)** |
+
+**Rules:**
+- Unit/contract tests: Fast, isolated, mock external dependencies, run on host
+- Integration tests: Require Docker services (DB, S3, Polaris), MUST run inside test-runner container
+- E2E tests: End-to-end workflows, MUST run inside test-runner container
+
+**Local development:**
+```bash
+# Unit tests (host)
+uv run pytest packages/<package>/tests/unit/ -v
+
+# Integration tests (Docker)
+./testing/docker/scripts/run-integration-tests.sh
+```
+
+**Why Docker for integration tests?**
+- Docker networking resolves service hostnames (localstack, polaris, etc.)
+- Consistent environment between local development and CI
+- Tests that require S3, databases, or external services work reliably
+
 ## Documentation: Google-Style Docstrings
 
 ```python

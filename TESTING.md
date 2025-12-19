@@ -110,6 +110,60 @@ floe-runtime/
   /____________\    Unit (60%): Mocks, fast feedback
 ```
 
+## Test Execution Model (CRITICAL)
+
+**Understanding where tests run is essential for reliable testing.**
+
+| Test Type | Location | Execution Environment | Why |
+|-----------|----------|----------------------|-----|
+| Unit tests | `packages/*/tests/unit/` | Host (`uv run pytest`) | Fast, no external deps |
+| Contract tests | `packages/*/tests/contract/` | Host (`uv run pytest`) | Fast, no external deps |
+| **Integration tests** | `packages/*/tests/integration/` | **Docker (test-runner)** | Requires S3, Polaris, etc. |
+| **E2E tests** | `packages/*/tests/e2e/` | **Docker (test-runner)** | Full pipeline testing |
+
+### Why Integration Tests MUST Run Inside Docker
+
+Integration tests interact with services using Docker internal hostnames:
+- **LocalStack** (S3, STS, IAM) at `localstack:4566`
+- **Polaris** (Iceberg catalog) at `polaris:8181`
+- **PostgreSQL** at `postgres:5432`
+- **Trino** at `trino:8080`
+- **Cube** at `cube:4000`
+
+These hostnames only resolve inside the Docker network. Running integration tests
+from the host will fail with errors like:
+
+```
+Could not resolve host: localstack
+AWS Error NETWORK_CONNECTION during CreateMultipartUpload operation
+```
+
+### Correct Test Execution
+
+```bash
+# ✅ Unit tests - OK to run from host
+uv run pytest packages/floe-core/tests/unit/ -v
+
+# ✅ Integration tests - MUST run inside Docker
+./testing/docker/scripts/run-integration-tests.sh
+# Or:
+make test-integration
+
+# ❌ WRONG - Will fail for S3/Polaris tests
+uv run pytest packages/floe-iceberg/tests/integration/ -v
+```
+
+### CI/Local Parity
+
+Both CI and local development use the same execution model:
+
+| Environment | Unit/Contract Tests | Integration Tests |
+|-------------|---------------------|-------------------|
+| **Local** | `uv run pytest` on host | `make test-integration` (Docker) |
+| **CI (GitHub Actions)** | `uv run pytest` on runner | Docker test-runner container |
+
+This ensures tests behave identically everywhere.
+
 ## pytest Markers
 
 Available markers (defined in `pyproject.toml`):
@@ -350,14 +404,14 @@ with layered profiles for different testing scenarios.
 │                             │                                           │
 │                     ┌───────┴───────┐                                  │
 │                     │    Polaris    │  Iceberg REST Catalog            │
-│                     │  (Port 8181)  │                                  │
+│                     │  (Port 8181)  │  (OAuth2 credentials via init)   │
 │                     └───────┬───────┘                                  │
 │                             │                                           │
 │         ┌───────────────────┼───────────────────┐                      │
 │         │                   │                   │                       │
 │  ┌──────┴───────┐    ┌──────┴───────┐    ┌──────┴───────┐              │
 │  │  PostgreSQL  │    │  LocalStack  │    │   Marquez    │  Storage &   │
-│  │ (Port 5432)  │    │ (Port 4566)  │    │ (Port 5000)  │  Lineage     │
+│  │ (Port 5432)  │    │ (Port 4566)  │    │ (Port 5002)  │  Lineage     │
 │  └──────────────┘    └──────────────┘    └──────────────┘              │
 │                                                                         │
 │  ┌──────────────┐                                                      │
@@ -373,9 +427,22 @@ with layered profiles for different testing scenarios.
 | Profile | Services | Use Case |
 |---------|----------|----------|
 | (none) | PostgreSQL, Jaeger | Unit tests, dbt-postgres target |
-| `storage` | + LocalStack (S3+STS+IAM), Polaris | Iceberg storage tests |
-| `compute` | + Trino, Spark | Compute engine tests |
-| `full` | + Cube, Marquez | E2E tests, semantic layer |
+| `storage` | + LocalStack (S3+STS+IAM), Polaris, polaris-init | Iceberg storage tests (62 tests) |
+| `compute` | + Trino 479, Spark | Compute engine tests |
+| `full` | + Cube v0.36, cube-init, Marquez | E2E tests, semantic layer (21 tests) |
+
+### Service Versions
+
+| Service | Version | Notes |
+|---------|---------|-------|
+| PostgreSQL | 16-alpine | Multi-database setup |
+| LocalStack | latest | S3 + STS + IAM emulation |
+| Polaris | localstack/polaris | Pre-configured for LocalStack S3 |
+| Trino | 479 | OAuth2 support for Polaris authentication |
+| Spark | 3.5.1 + Iceberg 1.5.0 | tabulario/spark-iceberg image |
+| Cube | v0.36 | Trino driver, pre-aggregations |
+| Marquez | 0.49.0 | OpenLineage backend |
+| Jaeger | latest | OpenTelemetry collector |
 
 ### Zero-Config Integration Testing (Recommended)
 
@@ -444,20 +511,28 @@ After starting services, access UIs at:
 | Service | URL | Credentials |
 |---------|-----|-------------|
 | LocalStack Health | http://localhost:4566/_localstack/health | - |
-| Polaris API | http://localhost:8181 | - |
+| Polaris API | http://localhost:8181/api/catalog/v1/config | OAuth2 (auto-generated) |
 | Trino UI | http://localhost:8080 | - |
 | Jaeger UI | http://localhost:16686 | - |
 | Spark Notebooks | http://localhost:8888 | - |
-| Cube Playground | http://localhost:3000 | - |
+| Cube REST API | http://localhost:4000 | Dev mode (no auth) |
+| Cube SQL API | localhost:15432 | Postgres wire protocol |
+| Marquez API | http://localhost:5002 | - |
 | Marquez UI | http://localhost:3001 | - |
 
 ### Automatic Credential Management
 
-Polaris auto-generates OAuth2 credentials on each container startup. These are automatically
-extracted by the `polaris-init` container and written to:
+Polaris auto-generates OAuth2 credentials on each container startup. The `polaris-init` container:
+1. Extracts credentials from Polaris logs
+2. Writes `polaris-credentials.env` for Python tests
+3. Writes `trino-iceberg.properties` with OAuth2 config for Trino
+
+**Files generated by polaris-init:**
 
 ```
-testing/docker/config/polaris-credentials.env
+testing/docker/config/
+├── polaris-credentials.env      # For Python tests (PyIceberg)
+└── trino-iceberg.properties     # For Trino Iceberg connector
 ```
 
 **For integration tests**, credentials are loaded automatically by importing from `testing.fixtures.services`:
@@ -483,7 +558,22 @@ source testing/docker/config/polaris-credentials.env
 uv run pytest -m integration packages/floe-iceberg/tests/
 ```
 
-The credentials file is git-ignored and regenerated on each `docker compose up`.
+Both credential files are git-ignored and regenerated on each `docker compose up`.
+
+### Trino-Polaris Authentication
+
+Trino 479 requires OAuth2 authentication for the Polaris REST catalog. The `polaris-init` container
+automatically generates `trino-iceberg.properties` with the correct OAuth2 credentials:
+
+```properties
+# Auto-generated by polaris-init
+iceberg.rest-catalog.security=OAUTH2
+iceberg.rest-catalog.oauth2.server-uri=http://polaris:8181/api/catalog/v1/oauth/tokens
+iceberg.rest-catalog.oauth2.credential=<client_id>:<client_secret>
+iceberg.rest-catalog.oauth2.scope=PRINCIPAL_ROLE:ALL
+```
+
+This enables Trino, Cube, and other services to authenticate with Polaris.
 
 ### Using Docker Services in Tests
 
@@ -545,9 +635,43 @@ curl -f http://localhost:8181/api/catalog/v1/config
 # Check LocalStack
 curl -f http://localhost:4566/_localstack/health
 
+# Check Trino
+docker exec floe-trino trino --execute "SELECT 1"
+
 # Check Cube
 curl -f http://localhost:4000/readyz
+
+# Check Marquez
+curl -f http://localhost:5002/api/v1/namespaces
 ```
+
+### Running Cube Integration Tests
+
+The `--profile full` includes Cube with test data:
+
+```bash
+# Start full profile
+cd testing/docker
+docker compose --profile full up -d
+
+# Wait for cube-init to complete (loads 15,500 test rows)
+docker compose logs cube-init --tail 20
+
+# Run Cube integration tests (21 tests, including pre-aggregations)
+uv run pytest packages/floe-cube/tests/integration/ -v
+```
+
+**What cube-init does:**
+1. Waits for Trino to be healthy
+2. Creates `iceberg.default` namespace
+3. Creates `orders` table with schema (id, customer_id, status, region, amount, created_at)
+4. Loads 15,500 test rows for pagination testing
+
+**Test coverage (T036-T039):**
+- T036: REST API returns JSON for valid queries
+- T037: REST API authentication handling
+- T038: REST API pagination over 10k rows
+- T039: Pre-aggregations (using `external: false` for Trino storage)
 
 ### Pre-configured Databases
 

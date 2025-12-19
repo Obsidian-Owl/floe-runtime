@@ -19,11 +19,6 @@ cube(`Customers`, {
     count: {
       type: `count`,
     },
-    totalOrders: {
-      sql: `${Orders.count}`,
-      type: `number`,
-      subQuery: true,
-    },
   },
 
   dimensions: {

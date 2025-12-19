@@ -14,7 +14,10 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
     COMMENT ON DATABASE polaris IS 'Apache Polaris - Iceberg REST catalog metadata';
 
     -- Database for Marquez (OpenLineage backend)
-    CREATE DATABASE marquez;
+    -- Create marquez user and database with proper permissions
+    CREATE USER marquez WITH PASSWORD 'marquez';
+    CREATE DATABASE marquez OWNER marquez;
+    GRANT ALL PRIVILEGES ON DATABASE marquez TO marquez;
     COMMENT ON DATABASE marquez IS 'Marquez - OpenLineage data lineage storage';
 
     -- Database for floe development/testing
