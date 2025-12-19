@@ -67,6 +67,21 @@ uv run mypy --strict packages/
 
 Python 3.10+ (per Constitution: Dagster/dbt minimum): Follow standard conventions
 
+## SonarQube Quality Gates
+
+This project enforces SonarQube Quality Gate on all PRs. Common issues to avoid:
+
+| Rule | Severity | Prevention |
+|------|----------|------------|
+| S6437 | BLOCKER | Never hardcode secrets - use `os.environ.get()` |
+| S1192 | CRITICAL | Extract duplicate strings (3+) to module constants |
+| S1244 | MAJOR | Use `pytest.approx()` for float comparison |
+| S108 | MAJOR | No empty code blocks - add content or remove |
+| S5727 | CRITICAL | Don't assert `is not None` on non-nullable values |
+| S1481 | MINOR | Remove unused variables or prefix with `_` |
+
+See `.claude/rules/sonarqube-quality.md` for comprehensive guidance.
+
 ## Packages
 
 ### floe-polaris (004-storage-catalog)

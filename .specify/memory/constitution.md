@@ -206,6 +206,17 @@ DuckDB (development), Snowflake, BigQuery, Redshift, Databricks, PostgreSQL, Spa
 3. **Security Gate**: `bandit -r packages/`, `pip-audit`, `safety check` must pass
 4. **Test Gate**: `pytest --cov` with > 80% coverage must pass
 5. **Contract Gate**: JSON Schema validation, backward compatibility check
+6. **SonarQube Gate**: Quality Gate must pass (A rating, 100% hotspots reviewed)
+
+**SonarQube Quality Standards:**
+
+Common issues to prevent (see `.claude/rules/sonarqube-quality.md`):
+- S6437: Never hardcode secrets - use environment variables
+- S1192: Extract duplicate string literals (3+) to module constants
+- S1244: Use `pytest.approx()` for float comparison, not `==`
+- S108: No empty code blocks - add content or remove entirely
+- S5727: Don't assert `is not None` on values that can never be None
+- S5655: Update function signatures to match actual usage (no `# type: ignore`)
 
 **Architecture Decision Records (ADRs):**
 
@@ -241,4 +252,4 @@ Constitution, the Constitution wins.
 - `docs/` - Architecture documentation (arc42 format)
 - `docs/adr/` - Architecture Decision Records
 
-**Version**: 1.0.0 | **Ratified**: 2025-12-15 | **Last Amended**: 2025-12-15
+**Version**: 1.1.0 | **Ratified**: 2025-12-15 | **Last Amended**: 2025-12-19
