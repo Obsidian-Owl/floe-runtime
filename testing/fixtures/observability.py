@@ -314,45 +314,207 @@ class MarquezClient:
         namespace: str = "default",
         limit: int = 20,
     ) -> list[dict[str, Any]]:
-        """Query lineage events from Marquez.
+        """Query lineage events from Marquez for a specific job.
+
+        Retrieves the run history for a job, then fetches facets for each run.
+        Events are returned in reverse chronological order (most recent first).
 
         Args:
             job_name: Job name to query events for.
             namespace: Namespace containing the job.
-            limit: Maximum number of events to return.
+            limit: Maximum number of runs to return.
 
         Returns:
-            List of OpenLineage event dictionaries.
+            List of run event dictionaries containing run metadata and facets.
+            Each event contains: id, state, startedAt, endedAt, facets.
 
         Raises:
-            NotImplementedError: Until T010 implements this method.
+            ValueError: If job_name or namespace contains invalid characters.
+            requests.RequestException: If the Marquez API request fails.
 
-        Note:
-            Full implementation added in T010.
+        Example:
+            >>> client = MarquezClient()
+            >>> events = client.get_lineage_events("my_pipeline", namespace="default")
+            >>> for event in events:
+            ...     print(f"Run {event['id']} state: {event.get('state')}")
         """
-        raise NotImplementedError("get_lineage_events will be implemented in T010")
+        # Validate inputs to prevent path traversal
+        _validate_name(job_name, "job_name")
+        _validate_name(namespace, "namespace")
+
+        # URL-encode for safety
+        safe_namespace = quote(namespace, safe="")
+        safe_job = quote(job_name, safe="")
+
+        # Get job runs from Marquez API
+        url = f"{self.base_url}/api/v1/namespaces/{safe_namespace}/jobs/{safe_job}/runs"
+        params: dict[str, Any] = {"limit": limit}
+
+        try:
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            runs: list[dict[str, Any]] = data.get("runs", [])
+
+            # Enrich runs with facets
+            events: list[dict[str, Any]] = []
+            for run in runs:
+                run_id = run.get("id")
+                if run_id:
+                    # Fetch facets for this run
+                    facets = self._get_run_facets(run_id)
+                    run["facets"] = facets
+                events.append(run)
+
+            logger.debug(
+                "Retrieved %d runs for job=%s namespace=%s",
+                len(events),
+                job_name,
+                namespace,
+            )
+            return events
+        except requests.RequestException as e:
+            logger.warning("Failed to query Marquez runs: %s", e)
+            raise
+
+    def _get_run_facets(self, run_id: str) -> dict[str, Any]:
+        """Get facets for a specific run.
+
+        Args:
+            run_id: The run ID (UUID format).
+
+        Returns:
+            Dictionary of facets for the run.
+        """
+        # URL-encode the run_id for safety
+        safe_run_id = quote(run_id, safe="")
+        url = f"{self.base_url}/api/v1/jobs/runs/{safe_run_id}/facets"
+
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            facets: dict[str, Any] = data.get("facets", {})
+            return facets
+        except requests.RequestException as e:
+            logger.debug("Failed to get facets for run %s: %s", run_id, e)
+            return {}
+
+    def get_namespaces(self) -> list[str]:
+        """Get list of namespaces in Marquez.
+
+        Returns:
+            List of namespace names.
+
+        Raises:
+            requests.RequestException: If the Marquez API request fails.
+        """
+        url = f"{self.base_url}/api/v1/namespaces"
+
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            namespaces = data.get("namespaces", [])
+            return [ns.get("name", "") for ns in namespaces if ns.get("name")]
+        except requests.RequestException as e:
+            logger.warning("Failed to query Marquez namespaces: %s", e)
+            raise
+
+    def get_jobs(self, namespace: str = "default") -> list[dict[str, Any]]:
+        """Get list of jobs in a namespace.
+
+        Args:
+            namespace: Namespace to list jobs from.
+
+        Returns:
+            List of job dictionaries.
+
+        Raises:
+            ValueError: If namespace contains invalid characters.
+            requests.RequestException: If the Marquez API request fails.
+        """
+        _validate_name(namespace, "namespace")
+        safe_namespace = quote(namespace, safe="")
+        url = f"{self.base_url}/api/v1/namespaces/{safe_namespace}/jobs"
+
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            jobs: list[dict[str, Any]] = data.get("jobs", [])
+            return jobs
+        except requests.RequestException as e:
+            logger.warning("Failed to query Marquez jobs: %s", e)
+            raise
 
     def verify_event_facets(
         self,
         event: dict[str, Any],
         expected: dict[str, Any],
     ) -> bool:
-        """Verify an event contains expected facets.
+        """Verify an event contains expected facets or top-level fields.
+
+        Checks both top-level event fields (id, state, etc.) and nested
+        facets for the expected key-value pairs.
 
         Args:
             event: Event dictionary from get_lineage_events().
-            expected: Dictionary of expected facet key-value pairs.
+            expected: Dictionary of expected key-value pairs to find.
+                      Can match top-level fields or nested facet values.
 
         Returns:
-            True if all expected facets are found in the event.
+            True if all expected fields are found in the event.
 
-        Raises:
-            NotImplementedError: Until T010 implements this method.
-
-        Note:
-            Full implementation added in T010.
+        Example:
+            >>> client = MarquezClient()
+            >>> events = client.get_lineage_events("my_job")
+            >>> if events:
+            ...     # Check run state
+            ...     has_completed = client.verify_event_facets(
+            ...         events[0], {"state": "COMPLETED"}
+            ...     )
         """
-        raise NotImplementedError("verify_event_facets will be implemented in T010")
+        for key, expected_value in expected.items():
+            # Check top-level fields first
+            if key in event:
+                if str(event[key]) != str(expected_value):
+                    return False
+                continue
+
+            # Check in facets
+            facets = event.get("facets", {})
+            if key in facets:
+                if str(facets[key]) != str(expected_value):
+                    return False
+                continue
+
+            # Check nested facet structures (e.g., run facets have nested dicts)
+            found = False
+            for facet_value in facets.values():
+                if (
+                    isinstance(facet_value, dict)
+                    and key in facet_value
+                    and str(facet_value[key]) == str(expected_value)
+                ):
+                    found = True
+                    break
+            if not found:
+                return False
+
+        return True
+
+    def is_available(self) -> bool:
+        """Check if Marquez is available and responding.
+
+        Returns:
+            True if Marquez is available, False otherwise.
+        """
+        try:
+            response = requests.get(f"{self.base_url}/api/v1/namespaces", timeout=5)
+            return bool(response.status_code == 200)
+        except requests.RequestException:
+            return False
 
 
 __all__ = [
