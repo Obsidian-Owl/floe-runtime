@@ -328,9 +328,9 @@ class TestTracesAppearInJaeger:
             # Should return None when disabled
             assert span is None
 
-        # Child span creation should also return None
+        # Child span creation should also return None when parent is None
         child = tracer.create_child_span(
-            None,  # type: ignore[arg-type]
+            None,
             name="child_span",
         )
         assert child is None

@@ -26,13 +26,9 @@ from __future__ import annotations
 
 import os
 from collections.abc import Generator
-from typing import TYPE_CHECKING
 
 import httpx
 import pytest
-
-if TYPE_CHECKING:
-    pass
 
 # Mark all tests in this module as integration tests
 pytestmark = pytest.mark.integration
@@ -468,7 +464,6 @@ class TestRestApiPagination:
         Requires sufficient test data (15k+ rows loaded by cube-init).
         """
         pages_fetched = 0
-        total_rows = 0
         page_size = 5000
         offset = 0
 
@@ -491,7 +486,6 @@ class TestRestApiPagination:
 
             data = response.json()
             rows_returned = len(data.get("data", []))
-            total_rows += rows_returned
             pages_fetched += 1
 
             # Stop if no more data

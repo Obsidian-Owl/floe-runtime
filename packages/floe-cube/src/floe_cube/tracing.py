@@ -346,7 +346,7 @@ class QueryTracer:
 
     def create_child_span(
         self,
-        parent: QueryTraceSpan,
+        parent: QueryTraceSpan | None,
         name: str,
         kind: SpanKind = SpanKind.INTERNAL,
         attributes: dict[str, str | int | bool] | None = None,
@@ -354,7 +354,7 @@ class QueryTracer:
         """Create a child span in the hierarchy.
 
         Args:
-            parent: Parent span.
+            parent: Parent span (can be None if tracing disabled).
             name: Child span name.
             kind: Span kind (default INTERNAL).
             attributes: Additional attributes.
@@ -362,7 +362,7 @@ class QueryTracer:
         Returns:
             Child QueryTraceSpan if tracing enabled, None otherwise.
         """
-        if not self._enabled:
+        if not self._enabled or parent is None:
             return None
 
         return self.create_span(

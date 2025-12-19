@@ -397,7 +397,8 @@ class TestManifestWatcherConfiguration:
             manifest_path=manifest_file,
             output_dir=output_dir,
         )
-        assert watcher.debounce_seconds == 1.0
+        # Use pytest.approx for float comparison (SonarQube S1244)
+        assert watcher.debounce_seconds == pytest.approx(1.0)
 
     def test_custom_debounce(self, manifest_file: Path, output_dir: Path) -> None:
         """Custom debounce should be respected."""
@@ -406,7 +407,8 @@ class TestManifestWatcherConfiguration:
             output_dir=output_dir,
             debounce_seconds=2.5,
         )
-        assert watcher.debounce_seconds == 2.5
+        # Use pytest.approx for float comparison (SonarQube S1244)
+        assert watcher.debounce_seconds == pytest.approx(2.5)
 
     def test_manifest_path_property(self, manifest_file: Path, output_dir: Path) -> None:
         """ManifestWatcher.manifest_path should return configured path."""

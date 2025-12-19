@@ -23,6 +23,13 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+# Constants to avoid duplicate literals (SonarQube S1192)
+CUBE_IDENTIFIER_PATTERN = r"^[a-zA-Z][a-zA-Z0-9_]*$"
+"""Regex pattern for valid Cube identifiers (names)."""
+
+HUMAN_READABLE_DESCRIPTION = "Human-readable description"
+"""Common field description for optional description fields."""
+
 
 class DatabaseType(str, Enum):
     """Supported database types for Cube.
@@ -183,7 +190,7 @@ class CubeDimension(BaseModel):
         ...,
         min_length=1,
         max_length=255,
-        pattern=r"^[a-zA-Z][a-zA-Z0-9_]*$",
+        pattern=CUBE_IDENTIFIER_PATTERN,
         description="Unique name for the dimension",
     )
     sql: str = Field(
@@ -202,7 +209,7 @@ class CubeDimension(BaseModel):
     description: str | None = Field(
         default=None,
         max_length=1000,
-        description="Human-readable description",
+        description=HUMAN_READABLE_DESCRIPTION,
     )
     meta: dict[str, Any] | None = Field(
         default=None,
@@ -238,7 +245,7 @@ class CubeMeasure(BaseModel):
         ...,
         min_length=1,
         max_length=255,
-        pattern=r"^[a-zA-Z][a-zA-Z0-9_]*$",
+        pattern=CUBE_IDENTIFIER_PATTERN,
         description="Unique name for the measure",
     )
     sql: str | None = Field(
@@ -252,7 +259,7 @@ class CubeMeasure(BaseModel):
     description: str | None = Field(
         default=None,
         max_length=1000,
-        description="Human-readable description",
+        description=HUMAN_READABLE_DESCRIPTION,
     )
     filters: list[dict[str, Any]] | None = Field(
         default=None,
@@ -284,7 +291,7 @@ class CubeJoin(BaseModel):
         ...,
         min_length=1,
         max_length=255,
-        pattern=r"^[a-zA-Z][a-zA-Z0-9_]*$",
+        pattern=CUBE_IDENTIFIER_PATTERN,
         description="Name of the cube to join to",
     )
     relationship: JoinRelationship = Field(
@@ -329,7 +336,7 @@ class CubePreAggregation(BaseModel):
         ...,
         min_length=1,
         max_length=255,
-        pattern=r"^[a-zA-Z][a-zA-Z0-9_]*$",
+        pattern=CUBE_IDENTIFIER_PATTERN,
         description="Unique name for the pre-aggregation",
     )
     measures: list[str] = Field(
@@ -410,7 +417,7 @@ class CubeSchema(BaseModel):
         ...,
         min_length=1,
         max_length=255,
-        pattern=r"^[a-zA-Z][a-zA-Z0-9_]*$",
+        pattern=CUBE_IDENTIFIER_PATTERN,
         description="Unique name for the cube",
     )
     sql_table: str = Field(
@@ -421,7 +428,7 @@ class CubeSchema(BaseModel):
     description: str | None = Field(
         default=None,
         max_length=1000,
-        description="Human-readable description",
+        description=HUMAN_READABLE_DESCRIPTION,
     )
     dimensions: list[CubeDimension] = Field(
         default_factory=list,

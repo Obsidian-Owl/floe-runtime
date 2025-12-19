@@ -23,7 +23,7 @@ echo "    Trino: ${TRINO_HOST}:${TRINO_PORT}"
 echo "==> Waiting for Trino to be ready..."
 MAX_ATTEMPTS=30
 ATTEMPT=0
-while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+while [[ $ATTEMPT -lt $MAX_ATTEMPTS ]]; do
     if trino --server "http://${TRINO_HOST}:${TRINO_PORT}" --execute "SELECT 1" >/dev/null 2>&1; then
         echo "    Trino is ready"
         break
@@ -33,8 +33,8 @@ while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
     sleep 5
 done
 
-if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
-    echo "ERROR: Trino did not become ready in time"
+if [[ $ATTEMPT -eq $MAX_ATTEMPTS ]]; then
+    echo "ERROR: Trino did not become ready in time" >&2
     exit 1
 fi
 
@@ -49,14 +49,14 @@ TABLE_EXISTS=$(trino --server "http://${TRINO_HOST}:${TRINO_PORT}" --execute "
 SHOW TABLES FROM iceberg.default LIKE 'orders'
 " 2>/dev/null | grep -c "orders" || echo "0")
 
-if [ "$TABLE_EXISTS" != "0" ]; then
+if [[ "$TABLE_EXISTS" != "0" ]]; then
     echo "==> Orders table already exists, checking row count..."
     ROW_COUNT=$(trino --server "http://${TRINO_HOST}:${TRINO_PORT}" --execute "
 SELECT COUNT(*) FROM iceberg.default.orders
 " 2>/dev/null | tail -1 | tr -d ' "')
     echo "    Current row count: $ROW_COUNT"
 
-    if [ "$ROW_COUNT" -ge 15000 ]; then
+    if [[ "$ROW_COUNT" -ge 15000 ]]; then
         echo "==> Sufficient test data exists, skipping data load"
         exit 0
     fi

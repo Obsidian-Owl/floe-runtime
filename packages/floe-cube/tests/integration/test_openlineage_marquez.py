@@ -21,13 +21,10 @@ import os
 import time
 import uuid
 from collections.abc import Generator
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import httpx
 import pytest
-
-if TYPE_CHECKING:
-    pass
 
 # Mark all tests in this module as integration tests
 pytestmark = pytest.mark.integration

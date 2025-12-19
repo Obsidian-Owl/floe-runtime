@@ -15,7 +15,6 @@ Tests cover:
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
 
 import pytest
 from pydantic import ValidationError
@@ -27,9 +26,6 @@ from floe_cube.models import (
     SpanStatus,
 )
 from floe_cube.tracing import QueryTracer, create_noop_tracer
-
-if TYPE_CHECKING:
-    pass
 
 
 class TestQueryTraceSpanValidation:
@@ -571,7 +567,9 @@ class TestTracingDisabled:
             start_time=datetime.now(tz=timezone.utc),
         )
 
-        assert span is not None
+        # Verify the span was created with expected values
+        assert span.trace_id == "0af7651916cd43dd8448eb211c80319c"
+        assert span.name == "cube.query"
 
     def test_span_attributes_for_disabled_detection(self) -> None:
         """Tracing disabled can be indicated via attributes."""

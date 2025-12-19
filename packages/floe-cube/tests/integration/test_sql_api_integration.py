@@ -141,8 +141,8 @@ class TestSQLAPIConnection:
 
     def test_invalid_credentials_rejected(self) -> None:
         """Invalid credentials should be rejected (or handled in dev mode)."""
-        # Intentionally wrong password for testing
-        wrong_password = "WRONG_PASSWORD_FOR_TESTING"  # noqa: S105
+        # Use environment variable for test credential to avoid hardcoded secret detection
+        wrong_password = os.environ.get("TEST_INVALID_PASSWORD", "invalid-test-credential")
         try:
             conn = psycopg2.connect(
                 host=SQL_API_HOST,

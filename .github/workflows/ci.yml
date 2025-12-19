@@ -102,9 +102,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-packages
 
-      - name: Run tests
-        # Exclude integration tests (require Docker infrastructure)
-        run: uv run pytest packages/*/tests/ --cov=packages --cov-report=xml -m "not integration"
+      - name: Run unit and contract tests
+        # Run only unit and contract tests (integration tests run in separate job)
+        run: uv run pytest packages/*/tests/unit/ packages/*/tests/contract/ --cov=packages --cov-report=xml
 
       - name: Upload coverage
         uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238  # v4
@@ -112,3 +112,47 @@ jobs:
         with:
           files: coverage.xml
           fail_ci_if_error: false
+
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a  # v4
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --all-packages
+
+      - name: Start Docker infrastructure
+        working-directory: testing/docker
+        run: docker compose --profile full up -d
+
+      - name: Wait for services
+        run: |
+          echo "Waiting for Polaris..."
+          timeout 120 bash -c 'until curl -sf http://localhost:8181/api/catalog/v1/config; do sleep 2; done' || echo "Polaris timeout"
+          echo "Waiting for Cube..."
+          timeout 120 bash -c 'until curl -sf http://localhost:4000/readyz; do sleep 2; done' || echo "Cube timeout"
+          echo "Waiting for Marquez..."
+          timeout 60 bash -c 'until curl -sf http://localhost:5002/api/v1/namespaces; do sleep 2; done' || echo "Marquez timeout"
+          echo "All services ready"
+
+      - name: Run integration tests
+        run: uv run pytest packages/*/tests/integration/ -v --tb=short
+
+      - name: Show Docker logs on failure
+        if: failure()
+        working-directory: testing/docker
+        run: docker compose --profile full logs --tail=100
+
+      - name: Stop Docker infrastructure
+        if: always()
+        working-directory: testing/docker
+        run: docker compose --profile full down -v
