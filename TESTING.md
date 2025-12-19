@@ -194,6 +194,93 @@ uv run pytest -m contract -v
 uv run pytest -m "not integration and not slow" -v
 ```
 
+## Tests FAIL, Never Skip (CRITICAL PHILOSOPHY)
+
+**Skipped tests hide problems. If a test can't run, FIX the underlying issue.**
+
+### The Rule
+
+```python
+# ❌ FORBIDDEN - Skipping hides the real problem
+@pytest.mark.skip("Service not available")
+def test_something():
+    ...
+
+# ❌ FORBIDDEN - pytest.skip() in test body
+def test_something():
+    if not service_available():
+        pytest.skip("Service not available")  # NO!
+    ...
+
+# ✅ CORRECT - Test FAILS if infrastructure missing
+def test_something(service_client):
+    """Test requires service - FAILS if not available."""
+    response = service_client.query(...)
+    assert response.status_code == 200
+```
+
+### Why This Matters
+
+1. **Skipped tests are invisible failures** - CI shows green but functionality is untested
+2. **Skips accumulate silently** - "Just one skip" becomes 50 skipped tests over time
+3. **Skips hide infrastructure rot** - Broken setup goes unnoticed for months
+4. **False confidence** - "All tests pass!" when half are skipped
+
+### What To Do Instead
+
+| Situation | Wrong Approach | Correct Approach |
+|-----------|---------------|------------------|
+| Service unavailable | `pytest.skip()` | Fix infrastructure, test FAILS until fixed |
+| Feature not implemented | `@pytest.mark.skip` | Don't write test yet, or test the NOT-implemented behavior |
+| Flaky test | `@pytest.mark.skip` | Fix the flakiness (add retries, fix race condition) |
+| Slow test | `pytest.skip()` | Use `@pytest.mark.slow` marker, still runs in CI |
+| Platform-specific | `pytest.skip()` | Use `pytest.importorskip()` only for optional deps |
+
+### Acceptable Uses of Skip
+
+The ONLY acceptable uses of skip:
+
+1. **Optional dependencies**: `pytest.importorskip("optional_library")` - when a library is genuinely optional
+2. **Platform markers**: `@pytest.mark.skipif(sys.platform == "win32")` - when test literally cannot run on platform
+
+Even these should be rare. If you find yourself writing skips, ask: "What's the real problem here?"
+
+### Integration Test Philosophy
+
+Integration tests are especially strict:
+
+```python
+# ❌ WRONG - Skipping when Marquez unavailable
+def test_lineage_emission(marquez_client):
+    if not marquez_client:
+        pytest.skip("Marquez not available")
+    ...
+
+# ✅ CORRECT - Fixture FAILS if Marquez unavailable
+@pytest.fixture
+def marquez_client():
+    """Create Marquez client. FAILS if not available."""
+    try:
+        client = create_marquez_client()
+        response = client.get("/api/v1/namespaces")
+        if response.status_code != 200:
+            pytest.fail(
+                f"Marquez not ready: {response.status_code}. "
+                "Start infrastructure: docker compose --profile full up -d"
+            )
+    except ConnectionError as e:
+        pytest.fail(f"Cannot connect to Marquez: {e}")
+    return client
+```
+
+### CI Enforcement
+
+CI is configured to treat skipped tests as a warning sign:
+
+- **0 skipped tests** is the goal
+- Skipped tests in CI should trigger investigation
+- New skips require explicit justification in PR description
+
 ## Base Test Classes
 
 ### BaseProfileGeneratorTests

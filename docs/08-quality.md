@@ -46,6 +46,53 @@ This document describes quality requirements, testing strategy, and CI/CD for fl
 | **E2E** | Full workflows | pytest, Docker Compose | < 5min |
 | **Performance** | Benchmarks | pytest-benchmark | varies |
 
+### 2.3 Tests FAIL, Never Skip (MANDATORY)
+
+**Skipped tests hide problems. If a test can't run, FIX the underlying issue.**
+
+```python
+# ❌ FORBIDDEN - Skipping hides the real problem
+@pytest.mark.skip("Service not available")
+def test_something():
+    ...
+
+# ❌ FORBIDDEN - pytest.skip() in test body
+def test_something():
+    if not service_available():
+        pytest.skip("Service not available")  # NO!
+    ...
+
+# ✅ CORRECT - Test FAILS if infrastructure missing
+def test_something(service_client):
+    """Test requires service - FAILS if not available."""
+    response = service_client.query(...)
+    assert response.status_code == 200
+```
+
+**Why this matters:**
+- Skipped tests are invisible failures
+- "Just one skip" becomes 50 skipped tests over time
+- Skips hide infrastructure rot
+- False confidence: "All tests pass!" when half are skipped
+
+**The ONLY acceptable uses of skip:**
+1. `pytest.importorskip("optional_library")` - genuinely optional dependencies
+2. `@pytest.mark.skipif(sys.platform == "win32")` - test literally cannot run on platform
+
+If you find yourself writing skips, ask: "What's the real problem here?"
+
+### 2.4 Test Execution Model
+
+| Test Type | Location | Execution Environment |
+|-----------|----------|----------------------|
+| Unit tests | `packages/*/tests/unit/` | Host (`uv run pytest`) |
+| Contract tests | `packages/*/tests/contract/` | Host (`uv run pytest`) |
+| **Integration tests** | `packages/*/tests/integration/` | **Docker (test-runner)** |
+| **E2E tests** | `packages/*/tests/e2e/` | **Docker (test-runner)** |
+
+**IMPORTANT**: Integration tests MUST run inside Docker. Running from host will fail
+with `Could not resolve host: localstack` errors due to Docker network hostname resolution.
+
 ---
 
 ## 3. Unit Testing

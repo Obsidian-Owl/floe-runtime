@@ -131,6 +131,42 @@ def test_property_based(input_str: str):
 - Integration tests: Use testcontainers for databases
 - Property-based tests: Use `hypothesis` for edge cases
 - > 80% coverage required
+- **Tests FAIL, never skip** - see below
+
+## Tests FAIL, Never Skip (MANDATORY)
+
+**Skipped tests hide problems. If a test can't run, FIX the underlying issue.**
+
+```python
+# ❌ FORBIDDEN - Skipping hides the real problem
+@pytest.mark.skip("Service not available")
+def test_something():
+    ...
+
+# ❌ FORBIDDEN - pytest.skip() in test body
+def test_something():
+    if not service_available():
+        pytest.skip("Service not available")  # NO!
+    ...
+
+# ✅ CORRECT - Test FAILS if infrastructure missing
+def test_something(service_client):
+    """Test requires service - FAILS if not available."""
+    response = service_client.query(...)
+    assert response.status_code == 200
+```
+
+**Why this matters:**
+- Skipped tests are invisible failures
+- "Just one skip" becomes 50 skipped tests over time
+- Skips hide infrastructure rot
+- False confidence: "All tests pass!" when half are skipped
+
+**The ONLY acceptable uses of skip:**
+1. `pytest.importorskip("optional_library")` - genuinely optional dependencies
+2. `@pytest.mark.skipif(sys.platform == "win32")` - test literally cannot run on platform
+
+If you find yourself writing skips, ask: "What's the real problem here?"
 
 ## Test Execution Model (MANDATORY)
 
