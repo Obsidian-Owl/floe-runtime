@@ -374,21 +374,24 @@ class TestHandleOutput:
         """Test overwrite mode replaces all data."""
         # Create IOManager with overwrite mode - inherit all config from fixture
         # Note: Don't pass pre-configured catalog - let IOManager create its own with S3 creds
-        config = IcebergIOManagerConfig(
-            catalog_uri=io_manager_config.catalog_uri,
-            warehouse=io_manager_config.warehouse,
-            client_id=io_manager_config.client_id,
-            client_secret=io_manager_config.client_secret,
-            scope=io_manager_config.scope,  # TESTING ONLY: inherit scope from fixture
-            default_namespace=test_namespace,
-            write_mode=WriteMode.OVERWRITE,
-            auto_create_tables=True,
-            # Inherit S3 config from fixture for LocalStack testing
-            s3_endpoint=io_manager_config.s3_endpoint,
-            s3_access_key_id=io_manager_config.s3_access_key_id,
-            s3_secret_access_key=io_manager_config.s3_secret_access_key,
-            s3_region=io_manager_config.s3_region,
-        )
+        # Suppress expected warning for PRINCIPAL_ROLE:ALL in test environment
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="scope='PRINCIPAL_ROLE:ALL'")
+            config = IcebergIOManagerConfig(
+                catalog_uri=io_manager_config.catalog_uri,
+                warehouse=io_manager_config.warehouse,
+                client_id=io_manager_config.client_id,
+                client_secret=io_manager_config.client_secret,
+                scope=io_manager_config.scope,  # TESTING ONLY: inherit scope from fixture
+                default_namespace=test_namespace,
+                write_mode=WriteMode.OVERWRITE,
+                auto_create_tables=True,
+                # Inherit S3 config from fixture for LocalStack testing
+                s3_endpoint=io_manager_config.s3_endpoint,
+                s3_access_key_id=io_manager_config.s3_access_key_id,
+                s3_secret_access_key=io_manager_config.s3_secret_access_key,
+                s3_region=io_manager_config.s3_region,
+            )
         io_manager = create_io_manager(config)
 
         table_name = f"output_overwrite_{uuid.uuid4().hex[:8]}"
