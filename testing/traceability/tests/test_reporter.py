@@ -10,6 +10,8 @@ from __future__ import annotations
 from pathlib import Path
 from textwrap import dedent
 
+import pytest
+
 from testing.traceability.models import (
     CoverageStatus,
     TraceabilityMatrix,
@@ -42,7 +44,7 @@ class TestGenerateMatrix:
         assert matrix.requirements == []
         assert matrix.tests == []
         assert matrix.mappings == []
-        assert matrix.get_coverage_percentage() == 100.0  # Empty = 100%
+        assert matrix.get_coverage_percentage() == pytest.approx(100.0)  # Empty = 100%
 
     def test_generate_matrix_with_uncovered_requirements(self, tmp_path: Path) -> None:
         """Generate matrix with requirements but no tests."""
@@ -78,7 +80,7 @@ class TestGenerateMatrix:
         assert len(matrix.requirements) == 2
         assert len(matrix.tests) == 0
         assert len(matrix.mappings) == 2
-        assert matrix.get_coverage_percentage() == 0.0
+        assert matrix.get_coverage_percentage() == pytest.approx(0.0)
 
     def test_generate_matrix_with_covered_requirements(self, tmp_path: Path) -> None:
         """Generate matrix with matching requirements and tests."""
@@ -120,7 +122,7 @@ class TestGenerateMatrix:
         assert len(matrix.tests) == 1
         assert len(matrix.mappings) == 1
         assert matrix.mappings[0].coverage_status == CoverageStatus.COVERED
-        assert matrix.get_coverage_percentage() == 100.0
+        assert matrix.get_coverage_percentage() == pytest.approx(100.0)
 
     def test_generate_matrix_mixed_coverage(self, tmp_path: Path) -> None:
         """Generate matrix with partially covered requirements."""
@@ -162,7 +164,7 @@ class TestGenerateMatrix:
         assert len(matrix.requirements) == 2
         assert len(matrix.tests) == 1
         assert len(matrix.mappings) == 2
-        assert matrix.get_coverage_percentage() == 50.0
+        assert matrix.get_coverage_percentage() == pytest.approx(50.0)
 
         # Check specific mappings
         fr_001 = next(m for m in matrix.mappings if m.requirement_id == "FR-001")
@@ -548,7 +550,7 @@ class TestFormatJsonReport:
         data = json.loads(output)
 
         assert "coverage_percentage" in data
-        assert data["coverage_percentage"] == 0.0
+        assert data["coverage_percentage"] == pytest.approx(0.0)
 
     def test_format_json_report_includes_requirements(self, tmp_path: Path) -> None:
         """JSON output includes requirements list."""

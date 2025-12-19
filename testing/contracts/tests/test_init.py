@@ -60,9 +60,9 @@ class TestSchemaConstants:
             TRACEABILITY_MATRIX_SCHEMA_PATH,
         )
 
-        assert (
-            TRACEABILITY_MATRIX_SCHEMA_PATH.exists()
-        ), f"Schema file not found: {TRACEABILITY_MATRIX_SCHEMA_PATH}"
+        assert TRACEABILITY_MATRIX_SCHEMA_PATH.exists(), (
+            f"Schema file not found: {TRACEABILITY_MATRIX_SCHEMA_PATH}"
+        )
         assert TEST_REPORT_SCHEMA_PATH.exists(), f"Schema file not found: {TEST_REPORT_SCHEMA_PATH}"
 
 

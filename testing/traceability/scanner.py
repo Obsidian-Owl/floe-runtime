@@ -85,31 +85,38 @@ def _scan_file(file_path: Path) -> list[Test]:
     tests: list[Test] = []
     package = _infer_package(file_path)
 
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ClassDef):
-            # Scan methods in test classes
-            class_name = node.name
-            for item in node.body:
-                if isinstance(item, ast.FunctionDef) and item.name.startswith("test_"):
-                    test = _extract_test_from_function(
-                        item, file_path, package, class_name=class_name
-                    )
-                    if test is not None:
-                        tests.append(test)
-        elif isinstance(node, ast.FunctionDef) and node.name.startswith("test_"):
-            # Check if this is a module-level function (not inside a class)
-            # We need to verify it's not inside a class by checking parent context
-            # For simplicity, we handle class methods above, so skip if we find
-            # functions with 'self' parameter or that are inside ClassDef
-            pass
+    # Scan class methods
+    tests.extend(_scan_class_methods(tree, file_path, package))
 
-    # Handle module-level test functions (not in classes)
+    # Scan module-level test functions
+    tests.extend(_scan_module_functions(tree, file_path, package))
+
+    return tests
+
+
+def _scan_class_methods(tree: ast.Module, file_path: Path, package: str) -> list[Test]:
+    """Extract tests from class methods in an AST tree."""
+    tests: list[Test] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef):
+            continue
+        class_name = node.name
+        for item in node.body:
+            if isinstance(item, ast.FunctionDef) and item.name.startswith("test_"):
+                test = _extract_test_from_function(item, file_path, package, class_name=class_name)
+                if test is not None:
+                    tests.append(test)
+    return tests
+
+
+def _scan_module_functions(tree: ast.Module, file_path: Path, package: str) -> list[Test]:
+    """Extract tests from module-level functions in an AST tree."""
+    tests: list[Test] = []
     for node in ast.iter_child_nodes(tree):
         if isinstance(node, ast.FunctionDef) and node.name.startswith("test_"):
             test = _extract_test_from_function(node, file_path, package, class_name=None)
             if test is not None:
                 tests.append(test)
-
     return tests
 
 
@@ -134,26 +141,10 @@ def _extract_test_from_function(
     markers: list[TestMarker] = []
 
     for decorator in node.decorator_list:
-        # Handle @pytest.mark.requirement("FR-XXX")
-        if isinstance(decorator, ast.Call):
-            marker_name = _get_marker_name(decorator.func)
-            if marker_name == "requirement":
-                req_id = _extract_string_arg(decorator)
-                if req_id:
-                    requirement_ids.append(req_id)
-            elif marker_name == "requirements":
-                req_ids = _extract_list_arg(decorator)
-                requirement_ids.extend(req_ids)
-            elif marker_name in ("integration", "e2e", "slow", "requires_docker"):
-                marker = _marker_name_to_enum(marker_name)
-                if marker is not None:
-                    markers.append(marker)
-        # Handle @pytest.mark.integration (without call)
-        elif isinstance(decorator, ast.Attribute):
-            marker_name = decorator.attr
-            marker = _marker_name_to_enum(marker_name)
-            if marker is not None:
-                markers.append(marker)
+        req_ids, marker = _process_decorator(decorator)
+        requirement_ids.extend(req_ids)
+        if marker is not None:
+            markers.append(marker)
 
     if not requirement_ids:
         return None
@@ -166,6 +157,41 @@ def _extract_test_from_function(
         requirement_ids=requirement_ids,
         package=package,
     )
+
+
+def _process_decorator(decorator: ast.expr) -> tuple[list[str], TestMarker | None]:
+    """Process a single decorator and extract requirement IDs and markers.
+
+    Returns:
+        Tuple of (requirement_ids, optional marker).
+    """
+    requirement_ids: list[str] = []
+    marker: TestMarker | None = None
+
+    if isinstance(decorator, ast.Call):
+        requirement_ids, marker = _process_call_decorator(decorator)
+    elif isinstance(decorator, ast.Attribute):
+        marker = _marker_name_to_enum(decorator.attr)
+
+    return requirement_ids, marker
+
+
+def _process_call_decorator(decorator: ast.Call) -> tuple[list[str], TestMarker | None]:
+    """Process a decorator call (e.g., @pytest.mark.requirement("FR-001"))."""
+    requirement_ids: list[str] = []
+    marker: TestMarker | None = None
+
+    marker_name = _get_marker_name(decorator.func)
+    if marker_name == "requirement":
+        req_id = _extract_string_arg(decorator)
+        if req_id:
+            requirement_ids.append(req_id)
+    elif marker_name == "requirements":
+        requirement_ids.extend(_extract_list_arg(decorator))
+    elif marker_name in ("integration", "e2e", "slow", "requires_docker"):
+        marker = _marker_name_to_enum(marker_name)
+
+    return requirement_ids, marker
 
 
 def _get_marker_name(node: ast.expr) -> str | None:

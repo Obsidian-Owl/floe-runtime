@@ -20,6 +20,7 @@ from __future__ import annotations
 import os
 import sys
 import uuid
+import warnings
 from collections.abc import Generator
 from datetime import datetime, timezone
 from pathlib import Path
@@ -125,8 +126,11 @@ pytestmark = [
 @pytest.fixture(scope="module")
 def catalog() -> Generator[PolarisCatalog, None, None]:
     """Provide connected catalog instance for the module."""
-    config = get_test_config()
-    cat = create_catalog(config)
+    # Suppress expected warning for PRINCIPAL_ROLE:ALL in test environment
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="scope='PRINCIPAL_ROLE:ALL'")
+        config = get_test_config()
+        cat = create_catalog(config)
     yield cat
 
 

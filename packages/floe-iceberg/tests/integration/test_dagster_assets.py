@@ -22,6 +22,7 @@ from __future__ import annotations
 import contextlib
 import os
 import uuid
+import warnings
 from collections.abc import Generator
 
 import pandas as pd
@@ -144,8 +145,11 @@ pytestmark = [
 @pytest.fixture(scope="module")
 def catalog() -> Generator[PolarisCatalog, None, None]:
     """Provide connected catalog instance for the module."""
-    config = get_test_config()
-    cat = create_catalog(config)
+    # Suppress expected warning for PRINCIPAL_ROLE:ALL in test environment
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="scope='PRINCIPAL_ROLE:ALL'")
+        config = get_test_config()
+        cat = create_catalog(config)
     yield cat
 
 
@@ -173,7 +177,10 @@ def test_namespace(catalog: PolarisCatalog) -> Generator[str, None, None]:
 @pytest.fixture
 def io_manager_config(test_namespace: str) -> IcebergIOManagerConfig:
     """Provide IOManager configuration."""
-    return get_io_manager_config(test_namespace)
+    # Suppress expected warning for PRINCIPAL_ROLE:ALL in test environment
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="scope='PRINCIPAL_ROLE:ALL'")
+        return get_io_manager_config(test_namespace)
 
 
 @pytest.fixture

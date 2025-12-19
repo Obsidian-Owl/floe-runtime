@@ -36,7 +36,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from testing.fixtures.services import get_service_host
+from testing.fixtures.services import get_service_host, is_running_in_docker
 
 
 class JaegerClient:
@@ -148,7 +148,7 @@ class MarquezClient:
         if base_url is None:
             host = get_service_host("marquez")
             # Use port 5000 inside Docker, 5002 from host
-            port = "5000" if host == "marquez" else "5002"
+            port = "5000" if is_running_in_docker() else "5002"
             base_url = f"http://{host}:{port}"
         self.base_url = base_url
 

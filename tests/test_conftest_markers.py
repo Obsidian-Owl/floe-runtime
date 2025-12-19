@@ -30,7 +30,7 @@ class TestRequirementMarker:
 
         @pytest.mark.requirement("FR-001")
         def sample_test() -> None:
-            pass
+            """Sample test function - body intentionally empty to test marker attachment."""
 
         # Check the marker is attached
         markers = list(sample_test.pytestmark)  # type: ignore[attr-defined]
@@ -58,7 +58,7 @@ class TestRequirementsMarker:
 
         @pytest.mark.requirements(["FR-032", "FR-033"])
         def sample_test() -> None:
-            pass
+            """Sample test function - body intentionally empty to test marker attachment."""
 
         markers = list(sample_test.pytestmark)  # type: ignore[attr-defined]
         assert len(markers) == 1
@@ -75,7 +75,7 @@ class TestCombinedMarkers:
         @pytest.mark.integration
         @pytest.mark.requirement("FR-012")
         def sample_test() -> None:
-            pass
+            """Sample test function - body intentionally empty to test marker attachment."""
 
         markers = list(sample_test.pytestmark)  # type: ignore[attr-defined]
         marker_names = {m.name for m in markers}
@@ -89,7 +89,7 @@ class TestCombinedMarkers:
         @pytest.mark.requirement("FR-001")
         @pytest.mark.integration
         def sample_test() -> None:
-            pass
+            """Sample test function - body intentionally empty to test marker attachment."""
 
         markers = list(sample_test.pytestmark)  # type: ignore[attr-defined]
         # All markers should be present
@@ -110,9 +110,9 @@ class TestMarkerWarnings:
         # Find our custom markers
         marker_names = [m.split(":")[0].strip() for m in markers]
 
-        assert (
-            "requirement" in marker_names
-        ), "requirement marker not registered - will produce warnings"
-        assert (
-            "requirements" in marker_names
-        ), "requirements marker not registered - will produce warnings"
+        assert "requirement" in marker_names, (
+            "requirement marker not registered - will produce warnings"
+        )
+        assert "requirements" in marker_names, (
+            "requirements marker not registered - will produce warnings"
+        )

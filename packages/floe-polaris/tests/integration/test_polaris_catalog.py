@@ -21,6 +21,7 @@ from __future__ import annotations
 import contextlib
 import os
 import uuid
+import warnings
 from collections.abc import Generator
 
 import pytest
@@ -100,13 +101,19 @@ pytestmark = [
 @pytest.fixture
 def config() -> PolarisCatalogConfig:
     """Provide test configuration."""
-    return get_test_config()
+    # Suppress expected warning for PRINCIPAL_ROLE:ALL in test environment
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="scope='PRINCIPAL_ROLE:ALL'")
+        return get_test_config()
 
 
 @pytest.fixture
 def catalog(config: PolarisCatalogConfig) -> Generator[PolarisCatalog, None, None]:
     """Provide connected catalog instance."""
-    cat = create_catalog(config)
+    # Suppress expected warning for PRINCIPAL_ROLE:ALL in test environment
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="scope='PRINCIPAL_ROLE:ALL'")
+        cat = create_catalog(config)
     yield cat
     # No cleanup needed - catalog is stateless
 
@@ -192,32 +199,38 @@ class TestCatalogConnection:
     @pytest.mark.requirement("FR-012")
     def test_invalid_uri_connection_error(self) -> None:
         """Test that invalid URI raises CatalogConnectionError."""
-        config = PolarisCatalogConfig(
-            uri="http://nonexistent.invalid:8181/api/catalog",
-            warehouse="test",
-            client_id="test",
-            client_secret="test",
-            scope="PRINCIPAL_ROLE:ALL",  # Required field
-        )
+        # Suppress expected warning for PRINCIPAL_ROLE:ALL in test environment
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="scope='PRINCIPAL_ROLE:ALL'")
+            config = PolarisCatalogConfig(
+                uri="http://nonexistent.invalid:8181/api/catalog",
+                warehouse="test",
+                client_id="test",
+                client_secret="test",
+                scope="PRINCIPAL_ROLE:ALL",  # Required field
+            )
 
-        with pytest.raises(CatalogConnectionError) as exc_info:
-            create_catalog(config)
+            with pytest.raises(CatalogConnectionError) as exc_info:
+                create_catalog(config)
 
         assert "Failed to connect" in str(exc_info.value)
 
     @pytest.mark.requirement("FR-012")
     def test_invalid_credentials_authentication_error(self) -> None:
         """Test that invalid credentials raise CatalogAuthenticationError."""
-        config = PolarisCatalogConfig(
-            uri=os.environ.get("POLARIS_URI", "http://localhost:8181/api/catalog"),
-            warehouse=os.environ.get("POLARIS_WAREHOUSE", "warehouse"),
-            client_id="invalid_client",
-            client_secret="invalid_secret",
-            scope="PRINCIPAL_ROLE:ALL",  # Required field
-        )
+        # Suppress expected warning for PRINCIPAL_ROLE:ALL in test environment
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="scope='PRINCIPAL_ROLE:ALL'")
+            config = PolarisCatalogConfig(
+                uri=os.environ.get("POLARIS_URI", "http://localhost:8181/api/catalog"),
+                warehouse=os.environ.get("POLARIS_WAREHOUSE", "warehouse"),
+                client_id="invalid_client",
+                client_secret="invalid_secret",
+                scope="PRINCIPAL_ROLE:ALL",  # Required field
+            )
 
-        with pytest.raises((CatalogAuthenticationError, CatalogConnectionError)) as exc_info:
-            create_catalog(config)
+            with pytest.raises((CatalogAuthenticationError, CatalogConnectionError)) as exc_info:
+                create_catalog(config)
 
         # Error message should indicate auth failure
         error_str = str(exc_info.value).lower()

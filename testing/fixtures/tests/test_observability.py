@@ -16,7 +16,8 @@ class TestJaegerClientImport:
         """Verify JaegerClient can be imported from module."""
         from testing.fixtures.observability import JaegerClient
 
-        assert JaegerClient is not None
+        # Verify it's a class we can instantiate
+        assert callable(JaegerClient)
 
     def test_jaeger_client_instantiation(self) -> None:
         """Verify JaegerClient can be instantiated with base_url."""
@@ -57,7 +58,8 @@ class TestMarquezClientImport:
         """Verify MarquezClient can be imported from module."""
         from testing.fixtures.observability import MarquezClient
 
-        assert MarquezClient is not None
+        # Verify it's a class we can instantiate
+        assert callable(MarquezClient)
 
     def test_marquez_client_instantiation(self) -> None:
         """Verify MarquezClient can be instantiated with base_url."""
