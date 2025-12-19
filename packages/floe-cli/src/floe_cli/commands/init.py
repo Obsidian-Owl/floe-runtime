@@ -102,11 +102,12 @@ transforms:
 
 governance:
   classification_source: dbt_meta
-  default_classification: internal
+  emit_lineage: true
 
 observability:
-  tracing_enabled: true
-  metrics_enabled: true
+  traces: true
+  metrics: true
+  lineage: true
 """
 
         floe_yaml_content = env.from_string(floe_yaml_template).render(
