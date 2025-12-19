@@ -7,10 +7,15 @@ Tests for:
 
 from __future__ import annotations
 
+import warnings
+
 import pytest
 from pydantic import ValidationError
 
 from floe_polaris.config import NamespaceInfo, PolarisCatalogConfig, RetryConfig
+
+# Test scope - use a least-privilege role for testing
+TEST_SCOPE = "PRINCIPAL_ROLE:DATA_ENGINEER"
 
 
 class TestRetryConfig:
@@ -108,16 +113,28 @@ class TestPolarisCatalogConfig:
     """Tests for PolarisCatalogConfig Pydantic model."""
 
     def test_minimal_config(self) -> None:
-        """Test minimal valid config with just uri and warehouse."""
+        """Test minimal valid config with uri, warehouse, and scope."""
         config = PolarisCatalogConfig(
             uri="http://localhost:8181/api/catalog",
             warehouse="my_warehouse",
+            scope=TEST_SCOPE,
         )
 
         assert config.uri == "http://localhost:8181/api/catalog"
         assert config.warehouse == "my_warehouse"
+        assert config.scope == TEST_SCOPE
         assert config.client_id is None
         assert config.client_secret is None
+
+    def test_scope_required(self) -> None:
+        """Test that scope is required (security: least privilege)."""
+        with pytest.raises(ValidationError) as exc_info:
+            PolarisCatalogConfig(
+                uri="http://localhost:8181/api/catalog",
+                warehouse="my_warehouse",
+            )
+
+        assert "scope" in str(exc_info.value).lower()
 
     def test_full_config(self) -> None:
         """Test full config with all fields."""
@@ -143,6 +160,7 @@ class TestPolarisCatalogConfig:
         config = PolarisCatalogConfig(
             uri="http://localhost:8181/api/catalog",
             warehouse="test",
+            scope=TEST_SCOPE,
         )
 
         assert config.uri.startswith("http://")
@@ -152,6 +170,7 @@ class TestPolarisCatalogConfig:
         config = PolarisCatalogConfig(
             uri="https://secure.example.com/api/catalog",
             warehouse="test",
+            scope=TEST_SCOPE,
         )
 
         assert config.uri.startswith("https://")
@@ -162,6 +181,7 @@ class TestPolarisCatalogConfig:
             PolarisCatalogConfig(
                 uri="ftp://invalid.example.com/catalog",
                 warehouse="test",
+                scope=TEST_SCOPE,
             )
 
         assert "uri" in str(exc_info.value).lower()
@@ -171,6 +191,7 @@ class TestPolarisCatalogConfig:
         config = PolarisCatalogConfig(
             uri="http://localhost:8181/api/catalog/",
             warehouse="test",
+            scope=TEST_SCOPE,
         )
 
         assert not config.uri.endswith("/")
@@ -178,7 +199,10 @@ class TestPolarisCatalogConfig:
     def test_warehouse_required(self) -> None:
         """Test warehouse is required."""
         with pytest.raises(ValidationError) as exc_info:
-            PolarisCatalogConfig(uri="http://localhost:8181/api/catalog")  # type: ignore[call-arg]
+            PolarisCatalogConfig(
+                uri="http://localhost:8181/api/catalog",
+                scope=TEST_SCOPE,
+            )  # type: ignore[call-arg]
 
         assert "warehouse" in str(exc_info.value).lower()
 
@@ -188,6 +212,7 @@ class TestPolarisCatalogConfig:
             PolarisCatalogConfig(
                 uri="http://localhost:8181/api/catalog",
                 warehouse="",
+                scope=TEST_SCOPE,
             )
 
         assert "warehouse" in str(exc_info.value).lower()
@@ -197,6 +222,7 @@ class TestPolarisCatalogConfig:
         config = PolarisCatalogConfig(
             uri="http://localhost:8181/api/catalog",
             warehouse="test",
+            scope=TEST_SCOPE,
         )
 
         assert isinstance(config.retry, RetryConfig)
@@ -207,6 +233,7 @@ class TestPolarisCatalogConfig:
         config = PolarisCatalogConfig(
             uri="http://localhost:8181/api/catalog",
             warehouse="test",
+            scope=TEST_SCOPE,
             retry=RetryConfig(max_attempts=5),
         )
 
@@ -217,6 +244,7 @@ class TestPolarisCatalogConfig:
         config = PolarisCatalogConfig(
             uri="http://localhost:8181/api/catalog",
             warehouse="test",
+            scope=TEST_SCOPE,
             client_secret="super_secret_password",
         )
 
@@ -224,20 +252,26 @@ class TestPolarisCatalogConfig:
         assert "super_secret_password" not in repr_str
         assert "**" in repr_str or "SecretStr" in repr_str
 
-    def test_default_scope(self) -> None:
-        """Test default OAuth2 scope."""
-        config = PolarisCatalogConfig(
-            uri="http://localhost:8181/api/catalog",
-            warehouse="test",
-        )
+    def test_overly_permissive_scope_warns(self) -> None:
+        """Test PRINCIPAL_ROLE:ALL scope emits a warning."""
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            PolarisCatalogConfig(
+                uri="http://localhost:8181/api/catalog",
+                warehouse="test",
+                scope="PRINCIPAL_ROLE:ALL",
+            )
 
-        assert config.scope == "PRINCIPAL_ROLE:ALL"
+            assert len(w) == 1
+            assert "PRINCIPAL_ROLE:ALL" in str(w[0].message)
+            assert "unrestricted access" in str(w[0].message)
 
     def test_token_alternative_to_credentials(self) -> None:
         """Test token can be used instead of client credentials."""
         config = PolarisCatalogConfig(
             uri="http://localhost:8181/api/catalog",
             warehouse="test",
+            scope=TEST_SCOPE,
             token="bearer_token_value",
         )
 

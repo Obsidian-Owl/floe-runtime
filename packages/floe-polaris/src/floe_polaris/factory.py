@@ -42,6 +42,7 @@ def create_catalog(
         ...     warehouse="my_warehouse",
         ...     client_id="my_client",
         ...     client_secret="my_secret",
+        ...     scope="PRINCIPAL_ROLE:DATA_ENGINEER",
         ... )
         >>> catalog = create_catalog(config)
         >>> namespaces = catalog.list_namespaces()
@@ -54,6 +55,7 @@ def create_catalog(
         ...     type="polaris",
         ...     uri="http://localhost:8181/api/catalog",
         ...     warehouse="my_warehouse",
+        ...     scope="PRINCIPAL_ROLE:DATA_ENGINEER",
         ... )
         >>> catalog = create_catalog(core_config)
     """
@@ -108,8 +110,15 @@ def _convert_catalog_config(config: Any) -> PolarisCatalogConfig:
         if hasattr(config, "token") and config.token:
             kwargs["token"] = config.token
 
-        if hasattr(config, "scope") and config.scope:
-            kwargs["scope"] = config.scope
+        # Scope is required - fail if not provided (security: least privilege)
+        if not (hasattr(config, "scope") and config.scope):
+            msg = (
+                "scope is required for Polaris catalog configuration. "
+                "Use a least-privilege scope like 'PRINCIPAL_ROLE:DATA_ENGINEER'. "
+                "Never use 'PRINCIPAL_ROLE:ALL' in production."
+            )
+            raise ValueError(msg)
+        kwargs["scope"] = config.scope
 
         return PolarisCatalogConfig(**kwargs)
 

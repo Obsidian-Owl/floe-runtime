@@ -8,6 +8,8 @@ This module provides:
 
 from __future__ import annotations
 
+import warnings
+
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 
@@ -82,13 +84,18 @@ class PolarisCatalogConfig(BaseModel):
     Supports OAuth2 client credentials flow or pre-fetched bearer tokens.
     At least one of (client_id + client_secret) or token must be provided.
 
+    Security:
+        The scope field is REQUIRED and must follow the principle of least privilege.
+        Use a narrowly-scoped role like 'PRINCIPAL_ROLE:DATA_ENGINEER' instead of
+        'PRINCIPAL_ROLE:ALL' which grants unrestricted access.
+
     Attributes:
         uri: Polaris REST API endpoint (required).
         warehouse: Warehouse name (required).
         client_id: OAuth2 client ID (optional if using token).
         client_secret: OAuth2 client secret (optional if using token).
         token: Pre-fetched bearer token (alternative to client credentials).
-        scope: OAuth2 scope (default "PRINCIPAL_ROLE:ALL").
+        scope: OAuth2 scope (REQUIRED - use least-privilege role).
         token_refresh_enabled: Enable automatic token refresh (default True).
         access_delegation: Iceberg access delegation mode (default "vended-credentials").
         retry: Retry policy configuration.
@@ -99,6 +106,7 @@ class PolarisCatalogConfig(BaseModel):
         ...     warehouse="my_warehouse",
         ...     client_id="my_client",
         ...     client_secret="my_secret",
+        ...     scope="PRINCIPAL_ROLE:DATA_ENGINEER",
         ... )
         >>> config.uri
         'http://localhost:8181/api/catalog'
@@ -129,8 +137,12 @@ class PolarisCatalogConfig(BaseModel):
         description="Pre-fetched bearer token",
     )
     scope: str = Field(
-        default="PRINCIPAL_ROLE:ALL",
-        description="OAuth2 scope for token requests",
+        ...,
+        description=(
+            "OAuth2 scope for token requests. MUST follow least privilege principle. "
+            "Use 'PRINCIPAL_ROLE:<role_name>' with a narrowly-scoped role. "
+            "NEVER use 'PRINCIPAL_ROLE:ALL' in production."
+        ),
     )
     token_refresh_enabled: bool = Field(
         default=True,
@@ -174,6 +186,25 @@ class PolarisCatalogConfig(BaseModel):
             msg = f"URI must start with http:// or https://, got: {v}"
             raise ValueError(msg)
         return v.rstrip("/")  # Normalize by removing trailing slash
+
+    @field_validator("scope")
+    @classmethod
+    def warn_overly_permissive_scope(cls, v: str) -> str:
+        """Warn if scope violates least privilege principle.
+
+        Security:
+            PRINCIPAL_ROLE:ALL grants unrestricted access to all roles in Polaris.
+            This violates the principle of least privilege and should only be used
+            in development/testing environments, never in production.
+        """
+        if v == "PRINCIPAL_ROLE:ALL":
+            warnings.warn(
+                "scope='PRINCIPAL_ROLE:ALL' grants unrestricted access to all roles. "
+                "Use a narrowly-scoped principal role in production environments.",
+                UserWarning,
+                stacklevel=2,
+            )
+        return v
 
 
 class NamespaceInfo(BaseModel):

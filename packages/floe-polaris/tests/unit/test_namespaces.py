@@ -21,13 +21,17 @@ from floe_polaris.errors import (
     NamespaceNotFoundError,
 )
 
+# Test scope - use a least-privilege role for testing
+TEST_SCOPE = "PRINCIPAL_ROLE:DATA_ENGINEER"
+
 
 @pytest.fixture
 def basic_config() -> PolarisCatalogConfig:
-    """Create basic config without credentials."""
+    """Create basic config with scope (required for security)."""
     return PolarisCatalogConfig(
         uri="http://localhost:8181/api/catalog",
         warehouse="test_warehouse",
+        scope=TEST_SCOPE,
     )
 
 

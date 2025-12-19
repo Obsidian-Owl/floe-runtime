@@ -181,15 +181,14 @@ class PolarisCatalog:
         error_msg = str(exc).lower()
 
         if "401" in error_msg or "unauthorized" in error_msg or "authentication" in error_msg:
+            # Security: Log only non-sensitive details. Do not log client_id or scope.
             self._logger.error(
                 "catalog_authentication_failed",
                 uri=self.config.uri,
-                error=str(exc),
             )
+            # Security: Do not include client_id or scope in exception
             raise CatalogAuthenticationError(
-                f"Authentication failed: {exc}",
-                client_id=self.config.client_id,
-                scope=self.config.scope,
+                "Authentication failed. Check credentials and scope configuration.",
             ) from exc
 
         self._logger.error(

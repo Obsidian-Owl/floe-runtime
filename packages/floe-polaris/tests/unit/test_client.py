@@ -24,6 +24,9 @@ from floe_polaris.errors import (
 )
 from floe_polaris.factory import create_catalog
 
+# Test scope - use a least-privilege role for testing
+TEST_SCOPE = "PRINCIPAL_ROLE:DATA_ENGINEER"
+
 
 @pytest.fixture
 def mock_rest_catalog() -> MagicMock:
@@ -37,6 +40,7 @@ def basic_config() -> PolarisCatalogConfig:
     return PolarisCatalogConfig(
         uri="http://localhost:8181/api/catalog",
         warehouse="test_warehouse",
+        scope=TEST_SCOPE,
     )
 
 
@@ -48,7 +52,7 @@ def oauth_config() -> PolarisCatalogConfig:
         warehouse="test_warehouse",
         client_id="test_client",
         client_secret="test_secret",
-        scope="PRINCIPAL_ROLE:ALL",
+        scope=TEST_SCOPE,
     )
 
 
@@ -58,6 +62,7 @@ def token_config() -> PolarisCatalogConfig:
     return PolarisCatalogConfig(
         uri="http://localhost:8181/api/catalog",
         warehouse="test_warehouse",
+        scope=TEST_SCOPE,
         token="test_bearer_token",
     )
 
@@ -87,7 +92,7 @@ class TestPolarisCatalogInit:
         call_kwargs = mock_rest_catalog_cls.call_args.kwargs
         assert "credential" in call_kwargs
         assert call_kwargs["credential"] == "test_client:test_secret"
-        assert call_kwargs["scope"] == "PRINCIPAL_ROLE:ALL"
+        assert call_kwargs["scope"] == TEST_SCOPE
 
     @patch("floe_polaris.client.RestCatalog")
     def test_token_initialization(
@@ -127,14 +132,19 @@ class TestPolarisCatalogInit:
     def test_auth_error_401_handling(
         self, mock_rest_catalog_cls: MagicMock, oauth_config: PolarisCatalogConfig
     ) -> None:
-        """Test 401 error is converted to CatalogAuthenticationError."""
+        """Test 401 error is converted to CatalogAuthenticationError.
+
+        Note: For security, CatalogAuthenticationError does not expose
+        client_id or scope to prevent information leakage.
+        """
         mock_rest_catalog_cls.side_effect = Exception("401 Unauthorized")
 
         with pytest.raises(CatalogAuthenticationError) as exc_info:
             PolarisCatalog(oauth_config)
 
         assert "Authentication failed" in str(exc_info.value)
-        assert exc_info.value.client_id == "test_client"
+        # Security: client_id is NOT exposed in exception
+        assert "test_client" not in str(exc_info.value)
 
 
 class TestPolarisCatalogConnectionManagement:
@@ -443,7 +453,7 @@ class TestCreateCatalogFactory:
         generic_config.client_id = None
         generic_config.client_secret = None
         generic_config.token = None
-        generic_config.scope = None
+        generic_config.scope = TEST_SCOPE  # Scope is required
 
         mock_catalog = MagicMock()
         mock_catalog_cls.return_value = mock_catalog
@@ -456,6 +466,23 @@ class TestCreateCatalogFactory:
         assert isinstance(call_args, PolarisCatalogConfig)
         assert call_args.uri == "http://localhost:8181/api/catalog"
         assert call_args.warehouse == "test_warehouse"
+        assert call_args.scope == TEST_SCOPE
+
+    def test_create_catalog_with_missing_scope(self) -> None:
+        """Test factory with missing scope raises ValueError (security: least privilege)."""
+        # Create a mock that looks like a CatalogConfig without scope
+        generic_config = MagicMock()
+        generic_config.uri = "http://localhost:8181/api/catalog"
+        generic_config.warehouse = "test_warehouse"
+        generic_config.client_id = None
+        generic_config.client_secret = None
+        generic_config.token = None
+        generic_config.scope = None  # Missing scope
+
+        with pytest.raises(ValueError) as exc_info:
+            create_catalog(generic_config)
+
+        assert "scope is required" in str(exc_info.value)
 
     def test_create_catalog_with_invalid_config(self) -> None:
         """Test factory with invalid config raises ValueError."""

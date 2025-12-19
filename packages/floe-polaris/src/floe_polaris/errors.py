@@ -96,6 +96,11 @@ class CatalogAuthenticationError(FloeStorageError):
     - Token has expired and refresh fails
     - Insufficient permissions for the requested operation
 
+    Security:
+        This exception intentionally does NOT expose sensitive details like
+        client_id or scope in error messages to prevent information leakage.
+        These details are logged internally but not included in the exception.
+
     Example:
         >>> try:
         ...     catalog = create_catalog(invalid_config)
@@ -106,25 +111,18 @@ class CatalogAuthenticationError(FloeStorageError):
     def __init__(
         self,
         message: str = "Authentication failed",
-        *,
-        client_id: str | None = None,
-        scope: str | None = None,
     ) -> None:
         """Initialize CatalogAuthenticationError.
 
         Args:
             message: Human-readable error description.
-            client_id: The client ID that failed authentication.
-            scope: The OAuth2 scope that was requested.
+
+        Note:
+            For security reasons, client_id and scope are not included in
+            the exception to prevent sensitive information leakage.
         """
-        details: dict[str, str] = {}
-        if client_id:
-            details["client_id"] = client_id
-        if scope:
-            details["scope"] = scope
-        super().__init__(message, details=details)
-        self.client_id = client_id
-        self.scope = scope
+        # Security: Do not include client_id or scope in details
+        super().__init__(message, details={})
 
 
 class NamespaceExistsError(FloeStorageError):
