@@ -42,12 +42,19 @@ from floe_polaris import (
 
 
 def get_test_config() -> PolarisCatalogConfig:
-    """Get Polaris configuration from environment or defaults."""
+    """Get Polaris configuration for TESTING ONLY.
+
+    Note: scope="PRINCIPAL_ROLE:ALL" grants maximum privileges and should
+    ONLY be used in test environments. Production deployments must use
+    narrowly-scoped principal roles following least privilege principle.
+    """
     return PolarisCatalogConfig(
         uri=os.environ.get("POLARIS_URI", "http://localhost:8181/api/catalog"),
         warehouse=os.environ.get("POLARIS_WAREHOUSE", "warehouse"),
         client_id=os.environ.get("POLARIS_CLIENT_ID", "root"),
         client_secret=os.environ.get("POLARIS_CLIENT_SECRET", "s3cr3t"),
+        # TESTING ONLY: PRINCIPAL_ROLE:ALL grants all roles - never use in production!
+        scope=os.environ.get("POLARIS_SCOPE", "PRINCIPAL_ROLE:ALL"),
     )
 
 
@@ -190,6 +197,7 @@ class TestCatalogConnection:
             warehouse="test",
             client_id="test",
             client_secret="test",
+            scope="PRINCIPAL_ROLE:ALL",  # Required field
         )
 
         with pytest.raises(CatalogConnectionError) as exc_info:
@@ -205,6 +213,7 @@ class TestCatalogConnection:
             warehouse=os.environ.get("POLARIS_WAREHOUSE", "warehouse"),
             client_id="invalid_client",
             client_secret="invalid_secret",
+            scope="PRINCIPAL_ROLE:ALL",  # Required field
         )
 
         with pytest.raises((CatalogAuthenticationError, CatalogConnectionError)) as exc_info:
