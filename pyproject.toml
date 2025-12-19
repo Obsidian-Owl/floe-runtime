@@ -98,6 +98,13 @@ filterwarnings = [
     "ignore:Property `InputContext.metadata` is deprecated:DeprecationWarning",
     "ignore:Parameter `metadata` of function `build_input_context` is deprecated:DeprecationWarning",
     "ignore:Parameter `metadata` of function `build_output_context` is deprecated:DeprecationWarning",
+    # Dagster-dbt uses deprecated context.op property - in dagster-dbt library code, not ours
+    # We cannot fix this; suppressing until dagster-dbt updates their code
+    "ignore:AssetExecutionContext.op is deprecated:DeprecationWarning:dagster_dbt",
+    # Click parser deprecation in dbt-core library code - not ours
+    # Click 9.0 will remove these; dbt-core needs to update before then
+    "ignore:'parser.OptionParser' is deprecated:DeprecationWarning:dbt",
+    "ignore:'parser.ParsingState' is deprecated:DeprecationWarning:dbt",
     # Hypothesis database location warning in Docker containers with read-only mounts
     # The in-memory fallback works fine for CI
     "ignore:The database setting is not configured:hypothesis.errors.HypothesisWarning",

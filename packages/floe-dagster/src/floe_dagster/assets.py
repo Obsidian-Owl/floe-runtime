@@ -103,7 +103,7 @@ class FloeAssetFactory:
         manifest_dict = cls._load_manifest(manifest_file)
 
         @dbt_assets(manifest=manifest_file, dagster_dbt_translator=translator)
-        def floe_dbt_assets(context, dbt: DbtCliResource):  # type: ignore[no-untyped-def]
+        def floe_dbt_assets(context, dbt: DbtCliResource):  # noqa: ANN001
             """Execute dbt models as Dagster assets with lineage and tracing."""
             # Start tracing span for the dbt run
             with tracing_manager.start_span(
