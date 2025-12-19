@@ -471,39 +471,74 @@ jobs:
   test-integration:
     runs-on: ubuntu-latest
     needs: [lint, test-unit]
+    # Integration tests run inside Docker for reliable hostname resolution
+    # (localstack, polaris, etc. only resolve inside Docker network)
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+      - name: Start Docker infrastructure
+        working-directory: testing/docker
+        run: docker compose --profile full up -d
 
-      - name: Install dependencies
-        run: pip install -e ".[dev]"
+      - name: Wait for polaris-init to complete
+        working-directory: testing/docker
+        run: |
+          echo "Waiting for polaris-init to complete..."
+          timeout 60 bash -c 'until docker inspect -f "{{.State.Status}}" floe-polaris-init 2>/dev/null | grep -q "exited"; do sleep 2; done'
 
-      - name: Run integration tests
-        run: pytest tests/integration -v --timeout=300
+      - name: Wait for all services
+        run: |
+          echo "Waiting for Polaris..."
+          timeout 120 bash -c 'until curl -sf http://localhost:8181/api/catalog/v1/config; do sleep 2; done'
+          echo "Waiting for Cube..."
+          timeout 120 bash -c 'until curl -sf http://localhost:4000/readyz; do sleep 2; done'
+          echo "All services ready"
+
+      - name: Build test-runner container
+        working-directory: testing/docker
+        run: docker compose --profile full --profile test build test-runner
+
+      - name: Run integration tests inside Docker
+        working-directory: testing/docker
+        run: |
+          docker compose --profile full --profile test run --rm test-runner \
+            uv run pytest packages/*/tests/integration/ -v --tb=short
+
+      - name: Show Docker logs on failure
+        if: failure()
+        working-directory: testing/docker
+        run: docker compose --profile full logs --tail=100
+
+      - name: Stop Docker infrastructure
+        if: always()
+        working-directory: testing/docker
+        run: docker compose --profile full down -v
 
   test-e2e:
     runs-on: ubuntu-latest
     needs: [test-integration]
+    # E2E tests also run inside Docker for consistency
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+      - name: Start Docker infrastructure
+        working-directory: testing/docker
+        run: docker compose --profile full up -d
 
-      - name: Install dependencies
-        run: pip install -e ".[dev]"
+      - name: Build test-runner container
+        working-directory: testing/docker
+        run: docker compose --profile full --profile test build test-runner
 
-      - name: Set up Docker Compose
-        run: docker compose version
+      - name: Run E2E tests inside Docker
+        working-directory: testing/docker
+        run: |
+          docker compose --profile full --profile test run --rm test-runner \
+            uv run pytest packages/*/tests/e2e/ -v --timeout=600
 
-      - name: Run E2E tests
-        run: pytest tests/e2e -v --timeout=600
+      - name: Stop Docker infrastructure
+        if: always()
+        working-directory: testing/docker
+        run: docker compose --profile full down -v
 
   build-container:
     runs-on: ubuntu-latest

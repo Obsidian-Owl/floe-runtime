@@ -116,36 +116,51 @@ jobs:
   integration-test:
     name: Integration Tests
     runs-on: ubuntu-latest
+    # Integration tests run inside Docker for reliable hostname resolution
+    # (localstack, polaris, etc. only resolve inside Docker network)
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a  # v4
-        with:
-          enable-cache: true
-
-      - name: Set up Python 3.12
-        run: uv python install 3.12
-
-      - name: Install dependencies
-        run: uv sync --all-packages
 
       - name: Start Docker infrastructure
         working-directory: testing/docker
         run: docker compose --profile full up -d
 
-      - name: Wait for services
+      - name: Wait for polaris-init to complete
+        working-directory: testing/docker
+        run: |
+          echo "Waiting for polaris-init to complete..."
+          timeout 60 bash -c 'until docker inspect -f "{{.State.Status}}" floe-polaris-init 2>/dev/null | grep -q "exited"; do sleep 2; done' || {
+            echo "Error: polaris-init did not complete in time"
+            docker compose logs polaris-init
+            exit 1
+          }
+          EXIT_CODE=$(docker inspect -f "{{.State.ExitCode}}" floe-polaris-init 2>/dev/null || echo "1")
+          if [[ "$EXIT_CODE" != "0" ]]; then
+            echo "Error: polaris-init failed with exit code $EXIT_CODE"
+            docker compose logs polaris-init
+            exit 1
+          fi
+          echo "polaris-init completed successfully"
+
+      - name: Wait for all services
         run: |
           echo "Waiting for Polaris..."
-          timeout 120 bash -c 'until curl -sf http://localhost:8181/api/catalog/v1/config; do sleep 2; done' || echo "Polaris timeout"
+          timeout 120 bash -c 'until curl -sf http://localhost:8181/api/catalog/v1/config; do sleep 2; done'
           echo "Waiting for Cube..."
-          timeout 120 bash -c 'until curl -sf http://localhost:4000/readyz; do sleep 2; done' || echo "Cube timeout"
+          timeout 120 bash -c 'until curl -sf http://localhost:4000/readyz; do sleep 2; done'
           echo "Waiting for Marquez..."
-          timeout 60 bash -c 'until curl -sf http://localhost:5002/api/v1/namespaces; do sleep 2; done' || echo "Marquez timeout"
+          timeout 60 bash -c 'until curl -sf http://localhost:5002/api/v1/namespaces; do sleep 2; done'
           echo "All services ready"
 
-      - name: Run integration tests
-        run: uv run pytest packages/*/tests/integration/ -v --tb=short
+      - name: Build test-runner container
+        working-directory: testing/docker
+        run: docker compose --profile full --profile test build test-runner
+
+      - name: Run ALL integration tests inside Docker
+        working-directory: testing/docker
+        run: |
+          docker compose --profile full --profile test run --rm test-runner \
+            uv run pytest packages/*/tests/integration/ -v --tb=short
 
       - name: Show Docker logs on failure
         if: failure()

@@ -110,6 +110,60 @@ floe-runtime/
   /____________\    Unit (60%): Mocks, fast feedback
 ```
 
+## Test Execution Model (CRITICAL)
+
+**Understanding where tests run is essential for reliable testing.**
+
+| Test Type | Location | Execution Environment | Why |
+|-----------|----------|----------------------|-----|
+| Unit tests | `packages/*/tests/unit/` | Host (`uv run pytest`) | Fast, no external deps |
+| Contract tests | `packages/*/tests/contract/` | Host (`uv run pytest`) | Fast, no external deps |
+| **Integration tests** | `packages/*/tests/integration/` | **Docker (test-runner)** | Requires S3, Polaris, etc. |
+| **E2E tests** | `packages/*/tests/e2e/` | **Docker (test-runner)** | Full pipeline testing |
+
+### Why Integration Tests MUST Run Inside Docker
+
+Integration tests interact with services using Docker internal hostnames:
+- **LocalStack** (S3, STS, IAM) at `localstack:4566`
+- **Polaris** (Iceberg catalog) at `polaris:8181`
+- **PostgreSQL** at `postgres:5432`
+- **Trino** at `trino:8080`
+- **Cube** at `cube:4000`
+
+These hostnames only resolve inside the Docker network. Running integration tests
+from the host will fail with errors like:
+
+```
+Could not resolve host: localstack
+AWS Error NETWORK_CONNECTION during CreateMultipartUpload operation
+```
+
+### Correct Test Execution
+
+```bash
+# ✅ Unit tests - OK to run from host
+uv run pytest packages/floe-core/tests/unit/ -v
+
+# ✅ Integration tests - MUST run inside Docker
+./testing/docker/scripts/run-integration-tests.sh
+# Or:
+make test-integration
+
+# ❌ WRONG - Will fail for S3/Polaris tests
+uv run pytest packages/floe-iceberg/tests/integration/ -v
+```
+
+### CI/Local Parity
+
+Both CI and local development use the same execution model:
+
+| Environment | Unit/Contract Tests | Integration Tests |
+|-------------|---------------------|-------------------|
+| **Local** | `uv run pytest` on host | `make test-integration` (Docker) |
+| **CI (GitHub Actions)** | `uv run pytest` on runner | Docker test-runner container |
+
+This ensures tests behave identically everywhere.
+
 ## pytest Markers
 
 Available markers (defined in `pyproject.toml`):

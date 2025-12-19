@@ -160,32 +160,66 @@ iceberg.rest-catalog.oauth2.scope=PRINCIPAL_ROLE:ALL
 
 ## Running Integration Tests
 
-### Storage Profile Tests (62 tests)
+### Test Execution Model (CRITICAL)
 
-```bash
-# Start storage profile
-docker compose --profile storage up -d
+**All integration tests MUST run inside Docker** for reliable hostname resolution.
 
-# Wait for polaris-init to complete
-docker compose logs polaris-init --tail 20
+| Environment | Unit/Contract Tests | Integration Tests |
+|-------------|---------------------|-------------------|
+| **Local** | `uv run pytest` on host | Docker test-runner container |
+| **CI (GitHub Actions)** | `uv run pytest` on runner | Docker test-runner container |
 
-# Run tests
-source config/polaris-credentials.env
-uv run pytest -m integration packages/floe-polaris/tests/ packages/floe-iceberg/tests/ -v
+**Why Docker?** Services like `localstack`, `polaris`, `trino`, and `cube` use Docker internal
+hostnames that only resolve inside the Docker network. Running integration tests from the host
+will fail with errors like:
+```
+Could not resolve host: localstack
+AWS Error NETWORK_CONNECTION during CreateMultipartUpload operation
 ```
 
-### Full Profile Tests (21 tests)
+### Recommended: Zero-Config Test Runner
+
+The simplest way to run integration tests:
+
+```bash
+# Run all integration tests (handles Docker setup automatically)
+./scripts/run-integration-tests.sh
+
+# Run specific tests
+./scripts/run-integration-tests.sh -k "test_append"
+./scripts/run-integration-tests.sh -v --tb=short
+```
+
+### Manual Docker Compose (Advanced)
+
+For manual control or debugging:
 
 ```bash
 # Start full profile
 docker compose --profile full up -d
 
-# Wait for cube-init to complete (loads 15,500 test rows)
-docker compose logs cube-init --tail 20
+# Wait for polaris-init to complete
+docker compose logs polaris-init --tail 20
 
-# Run Cube integration tests
-uv run pytest packages/floe-cube/tests/integration/ -v
+# Build and run tests inside Docker
+docker compose --profile full --profile test run --rm test-runner \
+    uv run pytest packages/*/tests/integration/ -v
 ```
+
+### CI Execution
+
+GitHub Actions CI runs integration tests using the same Docker-based approach:
+
+```yaml
+# .github/workflows/ci.yml (integration-test job)
+- name: Run ALL integration tests inside Docker
+  working-directory: testing/docker
+  run: |
+    docker compose --profile full --profile test run --rm test-runner \
+      uv run pytest packages/*/tests/integration/ -v --tb=short
+```
+
+This ensures CI and local development use identical test execution.
 
 **cube-init creates:**
 - `iceberg.default` namespace
