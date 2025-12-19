@@ -34,9 +34,42 @@ See Also:
 
 from __future__ import annotations
 
+import logging
+import re
 from typing import Any
+from urllib.parse import quote
+
+import requests
 
 from testing.fixtures.services import get_service_host, is_running_in_docker
+
+logger = logging.getLogger(__name__)
+
+# Pattern for valid service/operation names (alphanumeric, hyphens, underscores, dots)
+_VALID_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9._-]+$")
+
+
+def _validate_name(name: str, param_name: str) -> str:
+    """Validate and sanitize service/operation names to prevent path traversal.
+
+    Args:
+        name: The name to validate.
+        param_name: Parameter name for error messages.
+
+    Returns:
+        The validated name (unchanged if valid).
+
+    Raises:
+        ValueError: If name contains invalid characters or is empty.
+    """
+    if not name:
+        raise ValueError(f"{param_name} cannot be empty")
+    if not _VALID_NAME_PATTERN.match(name):
+        raise ValueError(
+            f"Invalid {param_name}: '{name}'. "
+            "Only alphanumeric characters, hyphens, underscores, and dots are allowed."
+        )
+    return name
 
 
 class JaegerClient:
@@ -77,6 +110,7 @@ class JaegerClient:
         service: str,
         operation: str | None = None,
         limit: int = 20,
+        lookback: str = "1h",
     ) -> list[dict[str, Any]]:
         """Query traces from Jaeger.
 
@@ -84,17 +118,53 @@ class JaegerClient:
             service: Service name to query traces for.
             operation: Optional operation name to filter traces.
             limit: Maximum number of traces to return.
+            lookback: Time window to search for traces (e.g., "1h", "30m").
 
         Returns:
             List of trace dictionaries containing spans and metadata.
+            Each trace contains: traceID, spans, processes, warnings.
 
         Raises:
-            NotImplementedError: Until T009 implements this method.
+            ValueError: If service or operation name contains invalid characters.
+            requests.RequestException: If the Jaeger API request fails.
 
-        Note:
-            Full implementation added in T009.
+        Example:
+            >>> client = JaegerClient()
+            >>> traces = client.get_traces("floe-dagster", operation="run_pipeline")
+            >>> for trace in traces:
+            ...     print(f"Trace {trace['traceID']} has {len(trace['spans'])} spans")
         """
-        raise NotImplementedError("get_traces will be implemented in T009")
+        # Validate inputs to prevent injection
+        _validate_name(service, "service")
+        if operation:
+            _validate_name(operation, "operation")
+
+        # Build query parameters for Jaeger API
+        params: dict[str, Any] = {
+            "service": service,
+            "limit": limit,
+            "lookback": lookback,
+        }
+        if operation:
+            params["operation"] = operation
+
+        url = f"{self.base_url}/api/traces"
+
+        try:
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            traces: list[dict[str, Any]] = data.get("data", [])
+            logger.debug(
+                "Retrieved %d traces for service=%s operation=%s",
+                len(traces),
+                service,
+                operation,
+            )
+            return traces
+        except requests.RequestException as e:
+            logger.warning("Failed to query Jaeger traces: %s", e)
+            raise
 
     def verify_span_attributes(
         self,
@@ -103,20 +173,104 @@ class JaegerClient:
     ) -> bool:
         """Verify a trace contains spans with expected attributes.
 
+        Searches through all spans in the trace to find one that contains
+        all the expected attribute key-value pairs. Tags in Jaeger spans
+        are stored as a list of {"key": k, "value": v} dictionaries.
+
         Args:
             trace: Trace dictionary from get_traces().
             expected: Dictionary of expected attribute key-value pairs.
+                      Values are compared as strings.
 
         Returns:
-            True if all expected attributes are found in any span.
+            True if any span in the trace contains all expected attributes.
+
+        Example:
+            >>> client = JaegerClient()
+            >>> traces = client.get_traces("floe-dagster")
+            >>> if traces:
+            ...     has_http = client.verify_span_attributes(
+            ...         traces[0], {"http.method": "POST"}
+            ...     )
+        """
+        spans = trace.get("spans", [])
+
+        for span in spans:
+            # Jaeger stores tags as list of {"key": k, "value": v}
+            tags = span.get("tags", [])
+            tag_dict = {tag["key"]: str(tag["value"]) for tag in tags}
+
+            # Check if all expected attributes are present
+            if all(tag_dict.get(k) == str(v) for k, v in expected.items()):
+                logger.debug(
+                    "Found matching span %s with attributes %s",
+                    span.get("operationName"),
+                    expected,
+                )
+                return True
+
+        return False
+
+    def get_services(self) -> list[str]:
+        """Get list of services that have reported traces to Jaeger.
+
+        Returns:
+            List of service names.
 
         Raises:
-            NotImplementedError: Until T009 implements this method.
-
-        Note:
-            Full implementation added in T009.
+            requests.RequestException: If the Jaeger API request fails.
         """
-        raise NotImplementedError("verify_span_attributes will be implemented in T009")
+        url = f"{self.base_url}/api/services"
+
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            services: list[str] = data.get("data", [])
+            return services
+        except requests.RequestException as e:
+            logger.warning("Failed to query Jaeger services: %s", e)
+            raise
+
+    def get_operations(self, service: str) -> list[str]:
+        """Get list of operations for a service.
+
+        Args:
+            service: Service name to get operations for.
+
+        Returns:
+            List of operation names.
+
+        Raises:
+            ValueError: If service name contains invalid characters.
+            requests.RequestException: If the Jaeger API request fails.
+        """
+        # Validate and URL-encode to prevent path traversal
+        _validate_name(service, "service")
+        safe_service = quote(service, safe="")
+        url = f"{self.base_url}/api/services/{safe_service}/operations"
+
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            operations: list[str] = data.get("data", [])
+            return operations
+        except requests.RequestException as e:
+            logger.warning("Failed to query Jaeger operations: %s", e)
+            raise
+
+    def is_available(self) -> bool:
+        """Check if Jaeger is available and responding.
+
+        Returns:
+            True if Jaeger is available, False otherwise.
+        """
+        try:
+            response = requests.get(f"{self.base_url}/api/services", timeout=5)
+            return bool(response.status_code == 200)
+        except requests.RequestException:
+            return False
 
 
 class MarquezClient:
