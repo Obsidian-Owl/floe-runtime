@@ -60,7 +60,11 @@ from testing.traceability.models import (
     TraceabilityReport,
 )
 from testing.traceability.parser import parse_requirements
-from testing.traceability.reporter import generate_matrix
+from testing.traceability.reporter import (
+    format_console_report,
+    format_json_report,
+    generate_matrix,
+)
 from testing.traceability.scanner import scan_tests
 
 __all__: list[str] = [
@@ -76,10 +80,11 @@ __all__: list[str] = [
     "TestResult",
     "PackageCoverage",
     "TraceabilityReport",
-    # Functions (T006-T013)
+    # Functions (T006-T015)
     "parse_requirements",
     "scan_tests",
     "map_requirements_to_tests",
     "generate_matrix",
-    # "generate_report",
+    "format_console_report",
+    "format_json_report",
 ]

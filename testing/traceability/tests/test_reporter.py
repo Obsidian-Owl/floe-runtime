@@ -328,3 +328,307 @@ class TestReturnType:
         )
 
         assert isinstance(matrix, TraceabilityMatrix)
+
+
+class TestFormatConsoleReport:
+    """Tests for format_console_report function."""
+
+    def test_format_console_report_can_be_imported(self) -> None:
+        """Verify format_console_report function can be imported."""
+        from testing.traceability.reporter import format_console_report
+
+        assert format_console_report is not None
+        assert callable(format_console_report)
+
+    def test_format_console_report_returns_string(self, tmp_path: Path) -> None:
+        """format_console_report returns a string."""
+        from testing.traceability.reporter import format_console_report, generate_matrix
+
+        matrix = generate_matrix(
+            feature_id="006",
+            feature_name="Integration Testing",
+            spec_files=[],
+            test_dirs=[],
+        )
+
+        output = format_console_report(matrix)
+
+        assert isinstance(output, str)
+
+    def test_format_console_report_includes_feature_info(self, tmp_path: Path) -> None:
+        """Report includes feature ID and name."""
+        from testing.traceability.reporter import format_console_report, generate_matrix
+
+        matrix = generate_matrix(
+            feature_id="006",
+            feature_name="Integration Testing",
+            spec_files=[],
+            test_dirs=[],
+        )
+
+        output = format_console_report(matrix)
+
+        assert "006" in output
+        assert "Integration Testing" in output
+
+    def test_format_console_report_includes_coverage_percentage(self, tmp_path: Path) -> None:
+        """Report includes coverage percentage."""
+        from testing.traceability.reporter import format_console_report, generate_matrix
+
+        spec_file = tmp_path / "spec.md"
+        spec_file.write_text("- **FR-001**: Test requirement")
+
+        matrix = generate_matrix(
+            feature_id="006",
+            feature_name="Integration Testing",
+            spec_files=[spec_file],
+            test_dirs=[],
+        )
+
+        output = format_console_report(matrix)
+
+        # Coverage should be 0% since no tests cover the requirement
+        assert "0" in output or "0.0" in output
+
+    def test_format_console_report_includes_requirement_count(self, tmp_path: Path) -> None:
+        """Report includes total requirement count."""
+        from testing.traceability.reporter import format_console_report, generate_matrix
+
+        spec_content = dedent(
+            """
+            - **FR-001**: First requirement
+            - **FR-002**: Second requirement
+        """
+        )
+        spec_file = tmp_path / "spec.md"
+        spec_file.write_text(spec_content)
+
+        matrix = generate_matrix(
+            feature_id="006",
+            feature_name="Integration Testing",
+            spec_files=[spec_file],
+            test_dirs=[],
+        )
+
+        output = format_console_report(matrix)
+
+        # Should mention 2 requirements somewhere
+        assert "2" in output
+
+    def test_format_console_report_lists_gaps(self, tmp_path: Path) -> None:
+        """Report lists uncovered requirements."""
+        from testing.traceability.reporter import format_console_report, generate_matrix
+
+        spec_file = tmp_path / "spec.md"
+        spec_file.write_text("- **FR-001**: Uncovered requirement")
+
+        matrix = generate_matrix(
+            feature_id="006",
+            feature_name="Integration Testing",
+            spec_files=[spec_file],
+            test_dirs=[],
+        )
+
+        output = format_console_report(matrix)
+
+        assert "FR-001" in output
+
+    def test_format_console_report_shows_covered_requirements(self, tmp_path: Path) -> None:
+        """Report shows covered requirements differently from gaps."""
+        from testing.traceability.reporter import format_console_report, generate_matrix
+
+        spec_file = tmp_path / "spec.md"
+        spec_file.write_text("- **FR-001**: Covered requirement")
+
+        test_dir = tmp_path / "tests"
+        test_dir.mkdir()
+        test_content = dedent(
+            """
+            import pytest
+
+            @pytest.mark.requirement("FR-001")
+            def test_covered():
+                pass
+        """
+        )
+        (test_dir / "test_example.py").write_text(test_content)
+
+        matrix = generate_matrix(
+            feature_id="006",
+            feature_name="Integration Testing",
+            spec_files=[spec_file],
+            test_dirs=[test_dir],
+        )
+
+        output = format_console_report(matrix)
+
+        assert "FR-001" in output
+        assert "100" in output  # 100% coverage
+
+
+class TestFormatJsonReport:
+    """Tests for format_json_report function."""
+
+    def test_format_json_report_can_be_imported(self) -> None:
+        """Verify format_json_report function can be imported."""
+        from testing.traceability.reporter import format_json_report
+
+        assert format_json_report is not None
+        assert callable(format_json_report)
+
+    def test_format_json_report_returns_string(self, tmp_path: Path) -> None:
+        """format_json_report returns a JSON string."""
+        from testing.traceability.reporter import format_json_report, generate_matrix
+
+        matrix = generate_matrix(
+            feature_id="006",
+            feature_name="Integration Testing",
+            spec_files=[],
+            test_dirs=[],
+        )
+
+        output = format_json_report(matrix)
+
+        assert isinstance(output, str)
+
+    def test_format_json_report_is_valid_json(self, tmp_path: Path) -> None:
+        """format_json_report returns valid JSON."""
+        import json
+
+        from testing.traceability.reporter import format_json_report, generate_matrix
+
+        matrix = generate_matrix(
+            feature_id="006",
+            feature_name="Integration Testing",
+            spec_files=[],
+            test_dirs=[],
+        )
+
+        output = format_json_report(matrix)
+        data = json.loads(output)
+
+        assert isinstance(data, dict)
+
+    def test_format_json_report_includes_feature_info(self, tmp_path: Path) -> None:
+        """JSON output includes feature ID and name."""
+        import json
+
+        from testing.traceability.reporter import format_json_report, generate_matrix
+
+        matrix = generate_matrix(
+            feature_id="006",
+            feature_name="Integration Testing",
+            spec_files=[],
+            test_dirs=[],
+        )
+
+        output = format_json_report(matrix)
+        data = json.loads(output)
+
+        assert data["feature_id"] == "006"
+        assert data["feature_name"] == "Integration Testing"
+
+    def test_format_json_report_includes_coverage_percentage(self, tmp_path: Path) -> None:
+        """JSON output includes coverage percentage."""
+        import json
+
+        from testing.traceability.reporter import format_json_report, generate_matrix
+
+        spec_file = tmp_path / "spec.md"
+        spec_file.write_text("- **FR-001**: Test requirement")
+
+        matrix = generate_matrix(
+            feature_id="006",
+            feature_name="Integration Testing",
+            spec_files=[spec_file],
+            test_dirs=[],
+        )
+
+        output = format_json_report(matrix)
+        data = json.loads(output)
+
+        assert "coverage_percentage" in data
+        assert data["coverage_percentage"] == 0.0
+
+    def test_format_json_report_includes_requirements(self, tmp_path: Path) -> None:
+        """JSON output includes requirements list."""
+        import json
+
+        from testing.traceability.reporter import format_json_report, generate_matrix
+
+        spec_file = tmp_path / "spec.md"
+        spec_file.write_text("- **FR-001**: First requirement")
+
+        matrix = generate_matrix(
+            feature_id="006",
+            feature_name="Integration Testing",
+            spec_files=[spec_file],
+            test_dirs=[],
+        )
+
+        output = format_json_report(matrix)
+        data = json.loads(output)
+
+        assert "requirements" in data
+        assert len(data["requirements"]) == 1
+        assert data["requirements"][0]["id"] == "FR-001"
+
+    def test_format_json_report_includes_gaps(self, tmp_path: Path) -> None:
+        """JSON output includes coverage gaps."""
+        import json
+
+        from testing.traceability.reporter import format_json_report, generate_matrix
+
+        spec_file = tmp_path / "spec.md"
+        spec_file.write_text("- **FR-001**: Uncovered requirement")
+
+        matrix = generate_matrix(
+            feature_id="006",
+            feature_name="Integration Testing",
+            spec_files=[spec_file],
+            test_dirs=[],
+        )
+
+        output = format_json_report(matrix)
+        data = json.loads(output)
+
+        assert "gaps" in data
+        assert len(data["gaps"]) == 1
+        assert data["gaps"][0]["id"] == "FR-001"
+
+    def test_format_json_report_includes_mappings(self, tmp_path: Path) -> None:
+        """JSON output includes requirement-test mappings."""
+        import json
+
+        from testing.traceability.reporter import format_json_report, generate_matrix
+
+        spec_file = tmp_path / "spec.md"
+        spec_file.write_text("- **FR-001**: Test requirement")
+
+        test_dir = tmp_path / "tests"
+        test_dir.mkdir()
+        test_content = dedent(
+            """
+            import pytest
+
+            @pytest.mark.requirement("FR-001")
+            def test_covered():
+                pass
+        """
+        )
+        (test_dir / "test_example.py").write_text(test_content)
+
+        matrix = generate_matrix(
+            feature_id="006",
+            feature_name="Integration Testing",
+            spec_files=[spec_file],
+            test_dirs=[test_dir],
+        )
+
+        output = format_json_report(matrix)
+        data = json.loads(output)
+
+        assert "mappings" in data
+        assert len(data["mappings"]) == 1
+        assert data["mappings"][0]["requirement_id"] == "FR-001"
+        assert data["mappings"][0]["coverage_status"] == "covered"
