@@ -43,6 +43,86 @@ def _check_dagster_available() -> None:
         )
 
 
+# =============================================================================
+# Shared Fixtures (module-level)
+# =============================================================================
+
+
+@pytest.fixture
+def dbt_project_dir(tmp_path: Path) -> Path:
+    """Create minimal dbt project for testing."""
+    project_dir = tmp_path / "dbt_project"
+    project_dir.mkdir()
+
+    dbt_project = {
+        "name": "test_project",
+        "version": "1.0.0",
+        "config-version": 2,
+        "profile": "floe",
+    }
+    (project_dir / "dbt_project.yml").write_text(yaml.safe_dump(dbt_project))
+
+    models_dir = project_dir / "models"
+    models_dir.mkdir()
+    (models_dir / "example.sql").write_text("SELECT 1 as id, 'test' as name")
+
+    return project_dir
+
+
+@pytest.fixture
+def profiles_dir(tmp_path: Path) -> Path:
+    """Create profiles directory with DuckDB profile."""
+    profiles_path = tmp_path / "profiles"
+    profiles_path.mkdir()
+
+    profile = {
+        "floe": {
+            "target": "dev",
+            "outputs": {
+                "dev": {
+                    "type": "duckdb",
+                    "path": str(tmp_path / "warehouse.duckdb"),
+                    "threads": 1,
+                }
+            },
+        }
+    }
+    (profiles_path / "profiles.yml").write_text(yaml.safe_dump(profile))
+    return profiles_path
+
+
+@pytest.fixture
+def compiled_manifest(dbt_project_dir: Path, profiles_dir: Path) -> Path:
+    """Compile dbt project to get manifest.json."""
+    result = subprocess.run(
+        [
+            "dbt",
+            "compile",
+            "--project-dir",
+            str(dbt_project_dir),
+            "--profiles-dir",
+            str(profiles_dir),
+        ],
+        capture_output=True,
+        text=True,
+        cwd=dbt_project_dir,
+    )
+
+    if result.returncode != 0:
+        pytest.fail(f"dbt compile failed: {result.stderr}")
+
+    manifest_path = dbt_project_dir / "target" / "manifest.json"
+    if not manifest_path.exists():
+        pytest.fail(f"manifest.json not found at {manifest_path}")
+
+    return manifest_path
+
+
+# =============================================================================
+# Test Classes
+# =============================================================================
+
+
 class TestCompiledArtifactsToDagster:
     """Test CompiledArtifacts → Dagster Definitions contract.
 
@@ -53,71 +133,6 @@ class TestCompiledArtifactsToDagster:
     def check_dependencies(self) -> None:
         """Ensure dagster is available before running tests."""
         _check_dagster_available()
-
-    @pytest.fixture
-    def dbt_project_dir(self, tmp_path: Path) -> Path:
-        """Create minimal dbt project for testing."""
-        project_dir = tmp_path / "dbt_project"
-        project_dir.mkdir()
-
-        dbt_project = {
-            "name": "test_project",
-            "version": "1.0.0",
-            "config-version": 2,
-            "profile": "floe",
-        }
-        (project_dir / "dbt_project.yml").write_text(yaml.safe_dump(dbt_project))
-
-        models_dir = project_dir / "models"
-        models_dir.mkdir()
-        (models_dir / "example.sql").write_text("SELECT 1 as id, 'test' as name")
-
-        return project_dir
-
-    @pytest.fixture
-    def profiles_dir(self, tmp_path: Path) -> Path:
-        """Create profiles directory with DuckDB profile."""
-        profiles_path = tmp_path / "profiles"
-        profiles_path.mkdir()
-
-        profile = {
-            "floe": {
-                "target": "dev",
-                "outputs": {
-                    "dev": {
-                        "type": "duckdb",
-                        "path": str(tmp_path / "warehouse.duckdb"),
-                        "threads": 1,
-                    }
-                },
-            }
-        }
-        (profiles_path / "profiles.yml").write_text(yaml.safe_dump(profile))
-        return profiles_path
-
-    @pytest.fixture
-    def compiled_manifest(self, dbt_project_dir: Path, profiles_dir: Path) -> Path:
-        """Compile dbt project and return manifest path."""
-        result = subprocess.run(
-            [
-                "dbt",
-                "compile",
-                "--project-dir",
-                str(dbt_project_dir),
-                "--profiles-dir",
-                str(profiles_dir),
-            ],
-            capture_output=True,
-            text=True,
-            cwd=dbt_project_dir,
-        )
-
-        if result.returncode != 0:
-            pytest.fail(f"dbt compile failed: {result.stderr}")
-
-        manifest_path = dbt_project_dir / "target" / "manifest.json"
-        assert manifest_path.exists(), "manifest.json not created"
-        return manifest_path
 
     @pytest.fixture
     def compiled_artifacts(

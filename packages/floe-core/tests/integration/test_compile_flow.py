@@ -16,6 +16,7 @@ Covers:
 from __future__ import annotations
 
 import json
+import warnings
 from pathlib import Path
 
 import pytest
@@ -135,9 +136,11 @@ class TestFullCompileFlow:
 
         (project_dir / "floe.yaml").write_text(yaml.dump(floe_config))
 
-        # Compile
+        # Compile (suppress PRINCIPAL_ROLE:ALL warning since we're testing that scope)
         compiler = Compiler()
-        artifacts = compiler.compile(project_dir / "floe.yaml")
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="scope='PRINCIPAL_ROLE:ALL'")
+            artifacts = compiler.compile(project_dir / "floe.yaml")
 
         # Verify all sections
         assert artifacts.compute.target.value == "snowflake"

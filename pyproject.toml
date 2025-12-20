@@ -109,6 +109,11 @@ filterwarnings = [
     # Hypothesis database location warning in Docker containers with read-only mounts
     # The in-memory fallback works fine for CI
     "ignore:The database setting is not configured:hypothesis.errors.HypothesisWarning",
+    # ResourceWarning for unclosed sockets in httpx/requests clients during tests
+    # These are cleaned up by garbage collection; not a real leak
+    "ignore:unclosed.*socket:ResourceWarning",
+    # PytestUnraisableExceptionWarning wrapping ResourceWarning - same underlying issue
+    "ignore:Exception ignored in.*socket:pytest.PytestUnraisableExceptionWarning",
 ]
 pythonpath = ["."]
 markers = [
