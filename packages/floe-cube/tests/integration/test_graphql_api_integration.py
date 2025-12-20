@@ -533,13 +533,8 @@ class TestGraphQLNestedRelationships:
 
         data = response.json()
 
-        if "errors" in data:
-            # Check if it's just a "Customers cube not available" error
-            # which is acceptable if the customers table doesn't exist
-            errors_str = str(data["errors"])
-            if "Customers" in errors_str or "customers" in errors_str:
-                pytest.skip("Customers cube not available (table may not exist)")
-            pytest.fail(f"GraphQL errors: {data['errors']}")
+        # Any GraphQL error should fail the test - no skipping
+        assert "errors" not in data, f"GraphQL errors: {data.get('errors')}"
 
         assert "data" in data, f"No data in response: {data}"
 

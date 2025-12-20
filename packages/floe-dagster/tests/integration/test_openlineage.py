@@ -108,17 +108,13 @@ class TestOpenLineageEmission:
         # Allow time for Marquez to process the event
         time.sleep(1)
 
-        # Query Marquez for the job
-        try:
-            jobs = marquez_client.get_jobs(namespace=namespace)
-            job_names = [j.get("name", "") for j in jobs]
-            # The job should be registered in Marquez
-            # Note: Job may not appear immediately if Marquez is slow
-            if job_name in job_names:
-                assert job_name in job_names
-        except Exception:
-            # Graceful degradation - log but don't fail if Marquez query fails
-            pytest.skip("Marquez query failed - service may be initializing")
+        # Query Marquez for the job - if infrastructure fails, test fails
+        jobs = marquez_client.get_jobs(namespace=namespace)
+        job_names = [j.get("name", "") for j in jobs]
+        # The job should be registered in Marquez
+        # Note: Job may not appear immediately if Marquez is slow
+        if job_name in job_names:
+            assert job_name in job_names
 
     @pytest.mark.requirement("006-FR-029")
     @pytest.mark.requirement("003-FR-012")
@@ -142,19 +138,15 @@ class TestOpenLineageEmission:
         # Allow time for Marquez to process
         time.sleep(1)
 
-        # Query Marquez for run events
-        try:
-            events = marquez_client.get_lineage_events(
-                job_name=job_name,
-                namespace=openlineage_config["namespace"],
-            )
-            # If events exist, verify structure
-            if events:
-                # Check that at least one event exists
-                assert len(events) >= 1
-        except Exception:
-            # Graceful degradation for slow service initialization
-            pytest.skip("Marquez query failed - service may be initializing")
+        # Query Marquez for run events - if infrastructure fails, test fails
+        events = marquez_client.get_lineage_events(
+            job_name=job_name,
+            namespace=openlineage_config["namespace"],
+        )
+        # If events exist, verify structure
+        if events:
+            # Check that at least one event exists
+            assert len(events) >= 1
 
     @pytest.mark.requirement("006-FR-029")
     @pytest.mark.requirement("003-FR-013")

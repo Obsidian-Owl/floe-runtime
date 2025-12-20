@@ -146,8 +146,8 @@ def manifest_json(dbt_project: Path, profiles_dir: Path) -> Path:
         cwd=dbt_project,
     )
 
-    if result.returncode != 0:
-        pytest.skip(f"dbt compile failed: {result.stderr}")
+    # If dbt compile fails, the test should fail - no skipping
+    assert result.returncode == 0, f"dbt compile failed: {result.stderr}"
 
     manifest_path = dbt_project / "target" / "manifest.json"
     assert manifest_path.exists(), "manifest.json not created"

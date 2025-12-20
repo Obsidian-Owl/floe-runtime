@@ -116,14 +116,11 @@ class TestOTelSpanEmission:
         # Allow time for span to be exported to Jaeger
         time.sleep(2)
 
-        # Query Jaeger for the service
-        try:
-            services = jaeger_client.get_services()
-            # Service should be registered (may take a moment)
-            # Note: New services may not appear immediately
-            assert isinstance(services, list)
-        except Exception:
-            pytest.skip("Jaeger query failed - service may be initializing")
+        # Query Jaeger for the service - if infrastructure fails, test fails
+        services = jaeger_client.get_services()
+        # Service should be registered (may take a moment)
+        # Note: New services may not appear immediately
+        assert isinstance(services, list)
 
     @pytest.mark.requirement("006-FR-030")
     @pytest.mark.requirement("003-FR-017")
@@ -158,17 +155,14 @@ class TestOTelSpanEmission:
         # Allow export
         time.sleep(2)
 
-        # Query Jaeger for traces
-        try:
-            traces = jaeger_client.get_traces(
-                service=service_name,
-                limit=10,
-                lookback="5m",
-            )
-            # Should have traces (even if this specific one isn't found)
-            assert isinstance(traces, list)
-        except Exception:
-            pytest.skip("Jaeger query failed - service may be initializing")
+        # Query Jaeger for traces - if infrastructure fails, test fails
+        traces = jaeger_client.get_traces(
+            service=service_name,
+            limit=10,
+            lookback="5m",
+        )
+        # Should have traces (even if this specific one isn't found)
+        assert isinstance(traces, list)
 
     @pytest.mark.requirement("006-FR-030")
     @pytest.mark.requirement("003-FR-016")
