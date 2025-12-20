@@ -208,9 +208,12 @@ class TestQueryFiltering:
     Note: These tests verify that the Cube REST API can filter by dimension.
     In production with RLS enabled, these filters would be automatically
     injected by the queryRewrite function based on security context.
+
+    Covers: FR-017, FR-026 (Cube RLS filters with configurable claims)
     """
 
     @pytest.mark.requirement("FR-017")
+    @pytest.mark.requirement("FR-026")
     def test_filter_by_region_returns_subset(
         self,
         cube_client: httpx.Client,
@@ -266,6 +269,7 @@ class TestQueryFiltering:
         )
 
     @pytest.mark.requirement("FR-017")
+    @pytest.mark.requirement("FR-026")
     def test_different_regions_return_different_data(
         self,
         cube_client: httpx.Client,
@@ -698,11 +702,12 @@ class TestRLSEndToEnd:
 
     These tests simulate complete RLS workflows from JWT to query filtering.
 
-    Covers: FR-016, FR-017, FR-027 (full RLS workflow)
+    Covers: FR-016, FR-017, FR-026, FR-027 (full RLS workflow)
     """
 
     @pytest.mark.requirement("FR-016")
     @pytest.mark.requirement("FR-017")
+    @pytest.mark.requirement("FR-026")
     @pytest.mark.requirement("FR-027")
     def test_complete_rls_workflow_simulation(
         self,
@@ -772,6 +777,7 @@ class TestRLSEndToEnd:
         )
 
     @pytest.mark.requirement("FR-017")
+    @pytest.mark.requirement("FR-026")
     def test_multi_claim_filter_scenario(
         self,
         cube_client: httpx.Client,

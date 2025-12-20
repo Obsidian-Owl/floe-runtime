@@ -6,6 +6,10 @@ real file I/O and command execution.
 T026: test_validate_command
 T027: test_compile_command
 T028: test_init_command
+
+Covers:
+- FR-006: Integration tests MUST use environment-based configuration
+- FR-009: floe-cli MUST have integration tests covering command execution
 """
 
 from __future__ import annotations
@@ -46,9 +50,13 @@ compute:
 
 
 class TestValidateCommandIntegration:
-    """Integration tests for floe validate command."""
+    """Integration tests for floe validate command.
+
+    Covers: FR-009 (floe-cli command tests)
+    """
 
     @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("FR-009")
     def test_validate_with_valid_config(self, tmp_path: Path) -> None:
         """Verify validate command succeeds with valid configuration."""
         runner = CliRunner()
@@ -64,6 +72,7 @@ class TestValidateCommandIntegration:
         assert "valid" in result.output.lower()
 
     @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("FR-009")
     def test_validate_with_invalid_config(self, tmp_path: Path) -> None:
         """Verify validate command fails with invalid configuration."""
         runner = CliRunner()
@@ -80,6 +89,7 @@ class TestValidateCommandIntegration:
         assert "name" in result.output.lower() or "error" in result.output.lower()
 
     @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("FR-009")
     def test_validate_with_missing_file(self, tmp_path: Path) -> None:
         """Verify validate command fails gracefully when file is missing."""
         runner = CliRunner()
@@ -92,6 +102,7 @@ class TestValidateCommandIntegration:
         assert "not found" in result.output.lower()
 
     @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("FR-009")
     def test_validate_default_path_without_file(self) -> None:
         """Verify validate command fails when default floe.yaml doesn't exist."""
         runner = CliRunner()
@@ -103,6 +114,7 @@ class TestValidateCommandIntegration:
             assert "not found" in result.output.lower()
 
     @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("FR-009")
     def test_validate_default_path_with_file(self) -> None:
         """Verify validate command uses default ./floe.yaml path."""
         runner = CliRunner()
@@ -118,9 +130,13 @@ class TestValidateCommandIntegration:
 
 
 class TestCompileCommandIntegration:
-    """Integration tests for floe compile command."""
+    """Integration tests for floe compile command.
+
+    Covers: FR-009 (floe-cli command tests)
+    """
 
     @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("FR-009")
     def test_compile_produces_artifacts(self, tmp_path: Path) -> None:
         """Verify compile command generates CompiledArtifacts JSON."""
         runner = CliRunner()
@@ -151,6 +167,7 @@ class TestCompileCommandIntegration:
         assert "transforms" in artifacts
 
     @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("FR-009")
     def test_compile_creates_output_directory(self, tmp_path: Path) -> None:
         """Verify compile command creates output directory if it doesn't exist."""
         runner = CliRunner()
@@ -170,6 +187,7 @@ class TestCompileCommandIntegration:
         assert (output_dir / "compiled_artifacts.json").exists()
 
     @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("FR-009")
     def test_compile_with_invalid_config(self, tmp_path: Path) -> None:
         """Verify compile command fails with invalid configuration."""
         runner = CliRunner()
@@ -186,6 +204,7 @@ class TestCompileCommandIntegration:
         assert result.exit_code == 1
 
     @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("FR-009")
     def test_compile_with_missing_file(self, tmp_path: Path) -> None:
         """Verify compile command fails when source file is missing."""
         runner = CliRunner()
@@ -201,6 +220,7 @@ class TestCompileCommandIntegration:
         assert "not found" in result.output.lower()
 
     @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("FR-009")
     def test_compile_default_output_directory(self) -> None:
         """Verify compile command uses default .floe/ output directory."""
         runner = CliRunner()
@@ -215,9 +235,13 @@ class TestCompileCommandIntegration:
 
 
 class TestInitCommandIntegration:
-    """Integration tests for floe init command."""
+    """Integration tests for floe init command.
+
+    Covers: FR-009 (floe-cli command tests)
+    """
 
     @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("FR-009")
     def test_init_creates_floe_yaml(self) -> None:
         """Verify init command creates floe.yaml file."""
         runner = CliRunner()
@@ -237,6 +261,7 @@ class TestInitCommandIntegration:
             assert "name:" in content
 
     @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("FR-009")
     def test_init_creates_readme(self) -> None:
         """Verify init command creates README.md file."""
         runner = CliRunner()
@@ -252,6 +277,7 @@ class TestInitCommandIntegration:
             assert "test-project" in readme.read_text()
 
     @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("FR-009")
     def test_init_with_custom_target(self) -> None:
         """Verify init command accepts custom compute target."""
         runner = CliRunner()
@@ -267,6 +293,7 @@ class TestInitCommandIntegration:
             assert "target: snowflake" in content
 
     @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("FR-009")
     def test_init_refuses_overwrite_without_force(self) -> None:
         """Verify init command refuses to overwrite existing floe.yaml."""
         runner = CliRunner()
@@ -281,6 +308,7 @@ class TestInitCommandIntegration:
             assert "already exists" in result.output.lower() or "force" in result.output.lower()
 
     @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("FR-009")
     def test_init_overwrites_with_force(self) -> None:
         """Verify init command overwrites with --force flag."""
         runner = CliRunner()
@@ -298,6 +326,7 @@ class TestInitCommandIntegration:
             assert "existing" not in content
 
     @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("FR-009")
     def test_init_uses_directory_name_as_default(self) -> None:
         """Verify init command uses current directory name when no name specified."""
         runner = CliRunner()
@@ -313,6 +342,7 @@ class TestInitCommandIntegration:
             assert dir_name in content
 
     @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("FR-009")
     def test_init_validates_project_name(self) -> None:
         """Verify init command validates project name format."""
         runner = CliRunner()
@@ -325,9 +355,13 @@ class TestInitCommandIntegration:
 
 
 class TestCommandChaining:
-    """Integration tests for command chaining workflows."""
+    """Integration tests for command chaining workflows.
+
+    Covers: FR-009 (floe-cli command tests)
+    """
 
     @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("FR-009")
     def test_init_then_validate_workflow(self) -> None:
         """Verify init creates config that passes validation."""
         runner = CliRunner()
@@ -343,6 +377,7 @@ class TestCommandChaining:
             assert "valid" in validate_result.output.lower()
 
     @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("FR-009")
     def test_init_then_compile_workflow(self) -> None:
         """Verify init creates config that can be compiled."""
         runner = CliRunner()
@@ -358,6 +393,7 @@ class TestCommandChaining:
             assert Path(".floe/compiled_artifacts.json").exists()
 
     @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("FR-009")
     def test_full_workflow_init_validate_compile(self) -> None:
         """Verify complete init → validate → compile workflow."""
         runner = CliRunner()
