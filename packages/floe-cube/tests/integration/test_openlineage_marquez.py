@@ -129,8 +129,12 @@ def emit_openlineage_event(
 
 
 class TestOpenLineageEventEmission:
-    """T080: Integration test events appear in Marquez."""
+    """T080: Integration test events appear in Marquez.
 
+    Covers: FR-025 (OpenLineage lineage emission to Marquez)
+    """
+
+    @pytest.mark.requirement("FR-025")
     def test_start_event_creates_run(
         self,
         marquez_client: httpx.Client,
@@ -168,6 +172,7 @@ class TestOpenLineageEventEmission:
         run_ids = [r["id"] for r in runs]
         assert run_id in run_ids, f"Run {run_id} not found in Marquez"
 
+    @pytest.mark.requirement("FR-025")
     def test_complete_event_marks_run_finished(
         self,
         marquez_client: httpx.Client,
@@ -213,6 +218,7 @@ class TestOpenLineageEventEmission:
             f"Expected COMPLETED, got {run_data.get('state')}"
         )
 
+    @pytest.mark.requirement("FR-025")
     def test_fail_event_marks_run_failed(
         self,
         marquez_client: httpx.Client,
@@ -255,6 +261,7 @@ class TestOpenLineageEventEmission:
         assert run_data is not None, f"Run {run_id} not found"
         assert run_data.get("state") == "FAILED", f"Expected FAILED, got {run_data.get('state')}"
 
+    @pytest.mark.requirement("FR-025")
     def test_namespace_created(
         self,
         marquez_client: httpx.Client,
@@ -280,6 +287,7 @@ class TestOpenLineageEventEmission:
         assert ns_response.status_code == 200
         assert ns_response.json()["name"] == OPENLINEAGE_NAMESPACE
 
+    @pytest.mark.requirement("FR-025")
     def test_job_created_with_inputs(
         self,
         marquez_client: httpx.Client,
@@ -313,8 +321,12 @@ class TestOpenLineageEventEmission:
 
 
 class TestQueryLineageEmitterIntegration:
-    """Test QueryLineageEmitter with real Marquez backend."""
+    """Test QueryLineageEmitter with real Marquez backend.
 
+    Covers: FR-025 (OpenLineage lineage emission)
+    """
+
+    @pytest.mark.requirement("FR-025")
     def test_emitter_sends_to_marquez(
         self,
         marquez_client: httpx.Client,
@@ -365,6 +377,7 @@ class TestQueryLineageEmitterIntegration:
             run_ids = [r["id"]["runId"] for r in runs]
             assert run_id in run_ids, f"Run {run_id} not found in Marquez"
 
+    @pytest.mark.requirement("FR-025")
     def test_emitter_handles_connection_error_gracefully(self) -> None:
         """Emitter should handle connection errors without raising."""
         from floe_cube.lineage import QueryLineageEmitter

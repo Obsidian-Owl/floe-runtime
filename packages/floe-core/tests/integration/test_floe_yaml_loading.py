@@ -2,6 +2,9 @@
 
 T019: [US1] Integration test for floe.yaml loading
 End-to-end tests for loading real floe.yaml configurations.
+
+Covers: FR-008 (floe-core MUST have integration tests covering YAML loading,
+compilation flow, and round-trip serialization)
 """
 
 from __future__ import annotations
@@ -19,6 +22,7 @@ if TYPE_CHECKING:
 class TestFloeYamlIntegration:
     """Integration tests for floe.yaml loading."""
 
+    @pytest.mark.requirement("FR-008")
     def test_load_minimal_floe_yaml(self, tmp_path: Path) -> None:
         """Integration test: Load minimal floe.yaml."""
         from floe_core.schemas import ComputeTarget, FloeSpec
@@ -47,6 +51,7 @@ compute:
         assert spec.observability.traces is True
         assert spec.catalog is None
 
+    @pytest.mark.requirement("FR-008")
     def test_load_snowflake_floe_yaml(self, tmp_path: Path) -> None:
         """Integration test: Load Snowflake production floe.yaml."""
         from floe_core.schemas import ComputeTarget, FloeSpec
@@ -134,6 +139,7 @@ catalog:
         assert spec.catalog.scope == "PRINCIPAL_ROLE:DATA_ENGINEER"
         assert spec.catalog.token_refresh_enabled is True
 
+    @pytest.mark.requirement("FR-008")
     def test_load_development_floe_yaml(self, tmp_path: Path) -> None:
         """Integration test: Load development floe.yaml with minimal config."""
         from floe_core.schemas import ComputeTarget, FloeSpec
@@ -175,6 +181,7 @@ observability:
         assert spec.observability.traces is False
         assert spec.catalog is None
 
+    @pytest.mark.requirement("FR-008")
     def test_load_bigquery_floe_yaml(self, tmp_path: Path) -> None:
         """Integration test: Load BigQuery floe.yaml."""
         from floe_core.schemas import ComputeTarget, FloeSpec
@@ -208,6 +215,7 @@ consumption:
         assert spec.compute.properties["project"] == "my-gcp-project"
         assert spec.consumption.database_type == "bigquery"
 
+    @pytest.mark.requirement("FR-008")
     def test_load_with_glue_catalog(self, tmp_path: Path) -> None:
         """Integration test: Load floe.yaml with Glue catalog."""
         from floe_core.schemas import FloeSpec
@@ -244,6 +252,7 @@ catalog:
         assert spec.catalog.type == "glue"
         assert spec.catalog.properties["region"] == "us-east-1"
 
+    @pytest.mark.requirement("FR-008")
     def test_load_with_nessie_catalog(self, tmp_path: Path) -> None:
         """Integration test: Load floe.yaml with Nessie catalog."""
         from floe_core.schemas import FloeSpec
@@ -277,6 +286,7 @@ catalog:
         assert spec.catalog.type == "nessie"
         assert spec.catalog.properties["branch"] == "main"
 
+    @pytest.mark.requirement("FR-008")
     def test_roundtrip_yaml_json_yaml(self, tmp_path: Path) -> None:
         """Integration test: Roundtrip from YAML to JSON and back."""
         import json
@@ -317,6 +327,7 @@ consumption:
         assert len(spec.transforms) == len(spec2.transforms)
         assert spec.consumption.enabled == spec2.consumption.enabled
 
+    @pytest.mark.requirement("FR-008")
     def test_conftest_fixture_compatibility(self, sample_floe_yaml: dict[str, Any]) -> None:
         """Integration test: Verify conftest fixture produces valid FloeSpec."""
         from floe_core.schemas import FloeSpec
@@ -332,6 +343,7 @@ consumption:
 class TestFloeYamlErrorHandling:
     """Integration tests for error handling during YAML loading."""
 
+    @pytest.mark.requirement("FR-008")
     def test_error_message_shows_line_number(self, tmp_path: Path) -> None:
         """Error messages should help locate the issue."""
         from pydantic import ValidationError
@@ -354,6 +366,7 @@ compute:
         error_str = str(exc_info.value)
         assert "target" in error_str or "compute" in error_str
 
+    @pytest.mark.requirement("FR-008")
     def test_error_on_empty_file(self, tmp_path: Path) -> None:
         """FloeSpec.from_yaml() should handle empty YAML file."""
         from floe_core.schemas import FloeSpec
@@ -364,6 +377,7 @@ compute:
         with pytest.raises((TypeError, ValidationError)):
             FloeSpec.from_yaml(yaml_file)
 
+    @pytest.mark.requirement("FR-008")
     def test_error_on_yaml_list_instead_of_dict(self, tmp_path: Path) -> None:
         """FloeSpec.from_yaml() should reject YAML that parses to list."""
         from floe_core.schemas import FloeSpec
