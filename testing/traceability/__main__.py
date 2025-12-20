@@ -1,14 +1,16 @@
 """CLI entry point for traceability reporting.
 
 Allows running the traceability module as a command:
-    python -m testing.traceability --feature-id 006 --spec-files specs/006/spec.md
+    python -m testing.traceability --all  # Multi-feature report
+    python -m testing.traceability --feature-id 006  # Single feature
 
 Usage:
     python -m testing.traceability [OPTIONS]
 
 Options:
-    --feature-id        Feature identifier (required)
-    --feature-name      Human-readable feature name (required)
+    --all               Generate report for all features (001-006+)
+    --feature-id        Feature identifier (required if not --all)
+    --feature-name      Human-readable feature name (optional with --feature-id)
     --spec-files        Comma-separated list of spec file paths
     --test-dirs         Comma-separated list of test directory paths
     --format            Output format: console (default) or json
@@ -23,9 +25,13 @@ from pathlib import Path
 import sys
 
 from testing.traceability.reporter import (
+    FEATURE_NAMES,
     format_console_report,
     format_json_report,
+    format_multi_feature_console,
+    format_multi_feature_json,
     generate_matrix,
+    generate_multi_feature_report,
 )
 
 
@@ -43,16 +49,21 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
         description="Generate traceability reports mapping requirements to tests.",
     )
 
-    parser.add_argument(
+    # Mode selection
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument(
+        "--all",
+        action="store_true",
+        help="Generate report for all features (001-006+)",
+    )
+    mode_group.add_argument(
         "--feature-id",
-        required=True,
         help="Feature identifier (e.g., '006')",
     )
 
     parser.add_argument(
         "--feature-name",
-        required=True,
-        help="Human-readable feature name",
+        help="Human-readable feature name (optional, auto-detected from feature-id)",
     )
 
     parser.add_argument(
@@ -81,6 +92,13 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
         help="Minimum coverage percentage (0-100), exit 1 if not met",
     )
 
+    parser.add_argument(
+        "--project-root",
+        type=Path,
+        default=None,
+        help="Project root directory (auto-detected if not specified)",
+    )
+
     return parser.parse_args(args)
 
 
@@ -95,6 +113,65 @@ def main(args: list[str] | None = None) -> int:
     """
     parsed = parse_args(args)
 
+    # Multi-feature mode
+    if parsed.all:
+        return _run_multi_feature_report(parsed)
+
+    # Single feature mode requires feature-id
+    if not parsed.feature_id:
+        print(
+            "Error: Either --all or --feature-id is required",
+            file=sys.stderr,
+        )
+        return 1
+
+    return _run_single_feature_report(parsed)
+
+
+def _run_multi_feature_report(parsed: argparse.Namespace) -> int:
+    """Run multi-feature report mode.
+
+    Args:
+        parsed: Parsed command line arguments.
+
+    Returns:
+        Exit code.
+    """
+    report = generate_multi_feature_report(project_root=parsed.project_root)
+
+    # Output report
+    if parsed.format == "json":
+        print(format_multi_feature_json(report))
+    else:
+        print(format_multi_feature_console(report))
+
+    # Check threshold
+    if parsed.threshold is not None:
+        coverage = report.total_coverage_percentage
+        if coverage < parsed.threshold:
+            print(
+                f"\nCoverage {coverage:.1f}% is below threshold {parsed.threshold:.1f}%",
+                file=sys.stderr,
+            )
+            return 1
+
+    return 0
+
+
+def _run_single_feature_report(parsed: argparse.Namespace) -> int:
+    """Run single feature report mode.
+
+    Args:
+        parsed: Parsed command line arguments.
+
+    Returns:
+        Exit code.
+    """
+    # Auto-detect feature name if not provided
+    feature_name = parsed.feature_name
+    if not feature_name:
+        feature_name = FEATURE_NAMES.get(parsed.feature_id, f"Feature {parsed.feature_id}")
+
     # Parse file paths
     spec_files: list[Path] = []
     if parsed.spec_files:
@@ -107,7 +184,7 @@ def main(args: list[str] | None = None) -> int:
     # Generate matrix
     matrix = generate_matrix(
         feature_id=parsed.feature_id,
-        feature_name=parsed.feature_name,
+        feature_name=feature_name,
         spec_files=spec_files,
         test_dirs=test_dirs,
     )

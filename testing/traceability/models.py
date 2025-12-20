@@ -419,3 +419,51 @@ class TraceabilityReport(BaseModel):
     packages: list[PackageCoverage]
     test_results: list[TestResult]
     gaps: list[str]
+
+
+class FeatureCoverage(BaseModel):
+    """Coverage summary for a single feature.
+
+    Provides breakdown of requirement coverage for one feature (e.g., 006).
+
+    Attributes:
+        feature_id: Feature identifier (e.g., "006")
+        feature_name: Human-readable name (e.g., "Integration Testing")
+        total_requirements: Total FRs in spec
+        covered: Covered count
+        uncovered: Uncovered count
+        coverage_percentage: Feature coverage percentage
+        total_markers: Total @pytest.mark.requirement markers for this feature
+    """
+
+    feature_id: str
+    feature_name: str
+    total_requirements: int
+    covered: int
+    uncovered: int
+    coverage_percentage: float
+    total_markers: int = 0
+
+
+class MultiFeatureReport(BaseModel):
+    """Multi-feature traceability report.
+
+    Provides comprehensive coverage matrix across all features (001-006+).
+
+    Attributes:
+        generated_at: ISO 8601 timestamp
+        features: Per-feature coverage breakdown
+        total_requirements: Total FRs across all specs
+        total_covered: Total covered count
+        total_coverage_percentage: Overall coverage percentage
+        total_markers: Total requirement markers in tests
+        gaps_by_feature: Uncovered requirements grouped by feature
+    """
+
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    features: list[FeatureCoverage] = Field(default_factory=list)
+    total_requirements: int = 0
+    total_covered: int = 0
+    total_coverage_percentage: float = 0.0
+    total_markers: int = 0
+    gaps_by_feature: dict[str, list[str]] = Field(default_factory=dict)
