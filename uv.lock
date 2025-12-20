@@ -19,6 +19,7 @@ members = [
     "floe-iceberg",
     "floe-polaris",
     "floe-runtime",
+    "floe-synthetic",
 ]
 
 [[package]]
@@ -1255,6 +1256,18 @@ wheels = [
 ]
 
 [[package]]
+name = "faker"
+version = "39.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "tzdata" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/30/b9/0897fb5888ddda099dc0f314a8a9afb5faa7e52eaf6865c00686dfb394db/faker-39.0.0.tar.gz", hash = "sha256:ddae46d3b27e01cea7894651d687b33bcbe19a45ef044042c721ceac6d3da0ff", size = 1941757, upload-time = "2025-12-17T19:19:04.762Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/eb/5a/26cdb1b10a55ac6eb11a738cea14865fa753606c4897d7be0f5dc230df00/faker-39.0.0-py3-none-any.whl", hash = "sha256:c72f1fca8f1a24b8da10fcaa45739135a19772218ddd61b86b7ea1b8c790dce7", size = 1980775, upload-time = "2025-12-17T19:19:02.926Z" },
+]
+
+[[package]]
 name = "fastjsonschema"
 version = "2.21.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1623,6 +1636,52 @@ dev = [
     { name = "safety", specifier = ">=3.2" },
     { name = "types-pyyaml", specifier = ">=6.0" },
 ]
+
+[[package]]
+name = "floe-synthetic"
+version = "0.1.0"
+source = { editable = "packages/floe-synthetic" }
+dependencies = [
+    { name = "faker" },
+    { name = "pandas" },
+    { name = "polyfactory" },
+    { name = "pyarrow" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "pyiceberg" },
+    { name = "structlog" },
+]
+
+[package.optional-dependencies]
+dagster = [
+    { name = "dagster" },
+]
+dev = [
+    { name = "hypothesis" },
+    { name = "mypy" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "dagster", marker = "extra == 'dagster'", specifier = ">=1.9.0" },
+    { name = "faker", specifier = ">=33.0.0" },
+    { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.120.0" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11.0" },
+    { name = "pandas", specifier = ">=2.0.0" },
+    { name = "polyfactory", specifier = ">=2.18.0" },
+    { name = "pyarrow", specifier = ">=14.0.0" },
+    { name = "pydantic", specifier = ">=2.0.0" },
+    { name = "pydantic-settings", specifier = ">=2.0.0" },
+    { name = "pyiceberg", specifier = ">=0.8.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
+    { name = "structlog", specifier = ">=24.0.0" },
+]
+provides-extras = ["dagster", "dev"]
 
 [[package]]
 name = "fsspec"
@@ -3823,6 +3882,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe6ef3fa267035b518369d9511ffab804f839851d2779/pluggy-1.6.0.tar.gz", hash = "sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3", size = 69412, upload-time = "2025-05-15T12:30:07.975Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746", size = 20538, upload-time = "2025-05-15T12:30:06.134Z" },
+]
+
+[[package]]
+name = "polyfactory"
+version = "3.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "faker" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c9/3a/db522ea17e0e8d38f3128889b5b600b3a1d5728ae0724f43a0ed5ed1f82e/polyfactory-3.1.0.tar.gz", hash = "sha256:9061c0a282e0594502576455230fce534f2915042be77715256c1e6bbbf24ac5", size = 344189, upload-time = "2025-11-25T08:10:16.555Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/94/7c/535646d75a1c510065169ea65693613c7a6bc64491bea13e7dad4f028ff3/polyfactory-3.1.0-py3-none-any.whl", hash = "sha256:78171232342c25906d542513c9f00ebf41eadec2c67b498490a577024dd7e867", size = 61836, upload-time = "2025-11-25T08:10:14.893Z" },
 ]
 
 [[package]]

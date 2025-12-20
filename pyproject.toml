@@ -40,7 +40,7 @@ target-version = ['py310', 'py311', 'py312']
 [tool.isort]
 profile = "black"
 line_length = 100
-known_first_party = ["floe_core", "floe_cli", "floe_dagster", "floe_dbt", "floe_iceberg", "floe_polaris", "floe_cube", "testing"]
+known_first_party = ["floe_core", "floe_cli", "floe_dagster", "floe_dbt", "floe_iceberg", "floe_polaris", "floe_cube", "floe_synthetic", "testing"]
 
 [tool.mypy]
 strict = true
@@ -62,7 +62,7 @@ target-version = "py310"
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["floe_core", "floe_cli", "floe_dagster", "floe_dbt", "floe_iceberg", "floe_polaris", "floe_cube"]
+known-first-party = ["floe_core", "floe_cli", "floe_dagster", "floe_dbt", "floe_iceberg", "floe_polaris", "floe_cube", "floe_synthetic"]
 # Align with isort's black profile for consistent sorting
 force-sort-within-sections = true
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
@@ -77,6 +77,7 @@ testpaths = [
     "packages/floe-iceberg/tests",
     "packages/floe-polaris/tests",
     "packages/floe-cube/tests",
+    "packages/floe-synthetic/tests",
 ]
 addopts = "--import-mode=importlib"
 filterwarnings = [
@@ -120,6 +121,7 @@ markers = [
     "requires_container: marks tests that require Docker containers",
     "requirement: marks test with a single functional requirement ID (FR-XXX) for traceability",
     "requirements: marks test with multiple functional requirement IDs for traceability",
+    "unit: marks tests as unit tests (fast, no external dependencies)",
 ]
 
 [tool.coverage.run]
