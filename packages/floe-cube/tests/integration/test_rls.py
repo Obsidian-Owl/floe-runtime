@@ -119,12 +119,16 @@ class TestSecurityContextFromJWT:
     """FR-016: Test security context extraction from JWT tokens."""
 
     @pytest.mark.requirement("006-FR-016")
+    @pytest.mark.requirement("005-FR-016")
     def test_extract_security_context_with_filter_claims(self) -> None:
         """Security context extracts filter claims from JWT payload.
 
         Given a JWT payload with filter claims (organization_id, region),
         When extract_security_context is called,
         Then the filter_claims dictionary contains the expected values.
+
+        Covers:
+        - 005-FR-016: RLS via security context from JWT claims
         """
         future_exp = int(time.time()) + 3600
         payload = {
@@ -144,12 +148,16 @@ class TestSecurityContextFromJWT:
         assert ctx.filter_claims["region"] == "north"
 
     @pytest.mark.requirement("006-FR-016")
+    @pytest.mark.requirement("005-FR-016")
     def test_extract_from_jwt_token_string(self) -> None:
         """Security context can be extracted from JWT token string.
 
         Given a JWT token with claims,
         When JWTValidator.extract_context_from_token is called,
         Then the security context is populated correctly.
+
+        Covers:
+        - 005-FR-016: RLS via security context from JWT claims
         """
         future_exp = int(time.time()) + 3600
         payload = {
@@ -169,12 +177,16 @@ class TestSecurityContextFromJWT:
         assert ctx.filter_claims["department"] == "engineering"
 
     @pytest.mark.requirement("006-FR-016")
+    @pytest.mark.requirement("005-FR-016")
     def test_security_context_with_custom_claim_names(self) -> None:
         """Security context supports custom claim name mappings.
 
         Given a JWT with non-standard claim names,
         When JWTValidator is configured with custom claim names,
         Then claims are extracted correctly.
+
+        Covers:
+        - 005-FR-016: RLS via security context from JWT claims
         """
         future_exp = int(time.time()) + 3600
         payload = {
@@ -214,6 +226,7 @@ class TestQueryFiltering:
 
     @pytest.mark.requirement("006-FR-017")
     @pytest.mark.requirement("006-FR-026")
+    @pytest.mark.requirement("005-FR-017")
     def test_filter_by_region_returns_subset(
         self,
         cube_client: httpx.Client,
@@ -223,6 +236,9 @@ class TestQueryFiltering:
         Given an Orders cube with region dimension,
         When querying with filter on region='north',
         Then only rows with region='north' are counted.
+
+        Covers:
+        - 005-FR-017: Filter queries by configured filter_column when RLS enabled
         """
         # Query with filter (simulating what RLS would inject)
         filtered_response = cube_client.post(
@@ -270,6 +286,7 @@ class TestQueryFiltering:
 
     @pytest.mark.requirement("006-FR-017")
     @pytest.mark.requirement("006-FR-026")
+    @pytest.mark.requirement("005-FR-017")
     def test_different_regions_return_different_data(
         self,
         cube_client: httpx.Client,
@@ -279,6 +296,9 @@ class TestQueryFiltering:
         Given Orders table with multiple regions,
         When querying with different region filters,
         Then different subsets of data are returned.
+
+        Covers:
+        - 005-FR-017: Filter queries by configured filter_column when RLS enabled
         """
         counts_by_region: dict[str, int] = {}
 
@@ -333,12 +353,16 @@ class TestInvalidJWTRejection:
     """
 
     @pytest.mark.requirement("006-FR-018")
+    @pytest.mark.requirement("005-FR-018")
     def test_reject_expired_jwt(self) -> None:
         """Expired JWT token is rejected.
 
         Given a JWT with past expiration,
         When validate_expiration is called,
         Then JWTValidationError is raised.
+
+        Covers:
+        - 005-FR-018: Reject queries without valid JWT when RLS required
         """
         validator = JWTValidator()
         payload = {
@@ -352,12 +376,16 @@ class TestInvalidJWTRejection:
         assert "expired" in str(exc_info.value).lower()
 
     @pytest.mark.requirement("006-FR-018")
+    @pytest.mark.requirement("005-FR-018")
     def test_reject_missing_user_id(self) -> None:
         """JWT without user_id claim is rejected.
 
         Given a JWT payload missing the user_id claim,
         When extract_context is called,
         Then JWTValidationError is raised.
+
+        Covers:
+        - 005-FR-018: Reject queries without valid JWT when RLS required
         """
         validator = JWTValidator()
         payload = {
@@ -371,12 +399,16 @@ class TestInvalidJWTRejection:
         assert "sub" in str(exc_info.value)
 
     @pytest.mark.requirement("006-FR-018")
+    @pytest.mark.requirement("005-FR-018")
     def test_reject_empty_user_id(self) -> None:
         """JWT with empty user_id is rejected.
 
         Given a JWT payload with empty user_id,
         When extract_context is called,
         Then JWTValidationError is raised.
+
+        Covers:
+        - 005-FR-018: Reject queries without valid JWT when RLS required
         """
         validator = JWTValidator()
         payload = {
@@ -390,12 +422,16 @@ class TestInvalidJWTRejection:
         assert "empty" in str(exc_info.value).lower()
 
     @pytest.mark.requirement("006-FR-018")
+    @pytest.mark.requirement("005-FR-018")
     def test_reject_malformed_jwt_token(self) -> None:
         """Malformed JWT token string is rejected.
 
         Given an invalid JWT string,
         When decode_token is called,
         Then JWTValidationError is raised.
+
+        Covers:
+        - 005-FR-018: Reject queries without valid JWT when RLS required
         """
         validator = JWTValidator()
 
@@ -405,12 +441,16 @@ class TestInvalidJWTRejection:
         assert "malformed" in str(exc_info.value).lower()
 
     @pytest.mark.requirement("006-FR-018")
+    @pytest.mark.requirement("005-FR-018")
     def test_reject_invalid_base64_payload(self) -> None:
         """JWT with invalid base64 payload is rejected.
 
         Given a JWT with corrupted payload,
         When decode_token is called,
         Then JWTValidationError is raised.
+
+        Covers:
+        - 005-FR-018: Reject queries without valid JWT when RLS required
         """
         validator = JWTValidator()
         invalid_token = "header.!!!invalid!!!.signature"
@@ -434,6 +474,7 @@ class TestConcurrentContextIsolation:
     """
 
     @pytest.mark.requirement("006-FR-019")
+    @pytest.mark.requirement("005-FR-019")
     def test_concurrent_queries_with_different_regions(
         self,
         cube_client: httpx.Client,
@@ -443,6 +484,9 @@ class TestConcurrentContextIsolation:
         Given multiple concurrent queries with different region filters,
         When all queries complete,
         Then each query returns only its filtered data.
+
+        Covers:
+        - 005-FR-019: Prevent cross-context data access in concurrent scenarios
         """
         regions = ["north", "south", "east", "west"]
         results: dict[str, int | None] = dict.fromkeys(regions)
@@ -487,12 +531,16 @@ class TestConcurrentContextIsolation:
         assert all(c is not None for c in results.values())
 
     @pytest.mark.requirement("006-FR-019")
+    @pytest.mark.requirement("005-FR-019")
     def test_security_context_immutability(self) -> None:
         """SecurityContext is immutable and thread-safe.
 
         Given a SecurityContext instance,
         When attempting to modify it,
         Then ValidationError is raised (frozen=True).
+
+        Covers:
+        - 005-FR-019: Prevent cross-context data access in concurrent scenarios
         """
         from pydantic import ValidationError
 
@@ -511,12 +559,16 @@ class TestConcurrentContextIsolation:
             ctx.filter_claims = {"different": "value"}
 
     @pytest.mark.requirement("006-FR-019")
+    @pytest.mark.requirement("005-FR-019")
     def test_separate_validator_instances(self) -> None:
         """Separate JWTValidator instances don't share state.
 
         Given two JWTValidator instances with different configs,
         When extracting contexts,
         Then each uses its own configuration.
+
+        Covers:
+        - 005-FR-019: Prevent cross-context data access in concurrent scenarios
         """
         validator1 = JWTValidator(
             user_id_claim="sub",
@@ -571,12 +623,16 @@ class TestSecurityConfigGeneration:
     """
 
     @pytest.mark.requirement("006-FR-027")
+    @pytest.mark.requirement("005-FR-027")
     def test_generate_check_auth_with_rls_enabled(self) -> None:
         """Generate checkAuth function when RLS is enabled.
 
         Given a security config with row_level=True,
         When generate_check_auth is called,
         Then valid JavaScript is generated with claim extraction.
+
+        Covers:
+        - 005-FR-027: Verify JWT signature before extracting security context
         """
         config = {
             "row_level": True,
@@ -596,12 +652,16 @@ class TestSecurityConfigGeneration:
         assert "sub" in js_code
 
     @pytest.mark.requirement("006-FR-027")
+    @pytest.mark.requirement("005-FR-027")
     def test_generate_query_rewrite_with_filter_claims(self) -> None:
         """Generate queryRewrite function with filter claims.
 
         Given a security config with filter_claims,
         When generate_query_rewrite is called,
         Then JavaScript injects filters for each claim.
+
+        Covers:
+        - 005-FR-027: Verify JWT signature before extracting security context
         """
         config = {
             "row_level": True,
@@ -619,12 +679,16 @@ class TestSecurityConfigGeneration:
         assert "equals" in js_code
 
     @pytest.mark.requirement("006-FR-027")
+    @pytest.mark.requirement("005-FR-027")
     def test_generate_passthrough_when_rls_disabled(self) -> None:
         """Generate passthrough functions when RLS is disabled.
 
         Given a security config with row_level=False,
         When generating security functions,
         Then passthrough functions are generated.
+
+        Covers:
+        - 005-FR-027: Verify JWT signature before extracting security context
         """
         config = {"row_level": False}
         generator = CubeSecurityGenerator(config)
@@ -638,12 +702,16 @@ class TestSecurityConfigGeneration:
         assert "return {}" in check_auth or "return query" in query_rewrite
 
     @pytest.mark.requirement("006-FR-027")
+    @pytest.mark.requirement("005-FR-027")
     def test_write_security_config_to_file(self) -> None:
         """Write security configuration to file.
 
         Given a security config,
         When write_security_config is called,
         Then security.js is written with valid content.
+
+        Covers:
+        - 005-FR-027: Verify JWT signature before extracting security context
         """
         config = {
             "row_level": True,
@@ -663,12 +731,16 @@ class TestSecurityConfigGeneration:
             assert "queryRewrite" in content
 
     @pytest.mark.requirement("006-FR-027")
+    @pytest.mark.requirement("005-FR-027")
     def test_generate_env_vars_with_jwt_config(self) -> None:
         """Generate environment variables for JWT configuration.
 
         Given a security config with JWT settings,
         When generate_env_vars is called,
         Then environment variables are generated correctly.
+
+        Covers:
+        - 005-FR-027: Verify JWT signature before extracting security context
         """
         config = {
             "row_level": True,
@@ -709,6 +781,9 @@ class TestRLSEndToEnd:
     @pytest.mark.requirement("006-FR-017")
     @pytest.mark.requirement("006-FR-026")
     @pytest.mark.requirement("006-FR-027")
+    @pytest.mark.requirement("005-FR-016")
+    @pytest.mark.requirement("005-FR-017")
+    @pytest.mark.requirement("005-FR-027")
     def test_complete_rls_workflow_simulation(
         self,
         cube_client: httpx.Client,
@@ -723,6 +798,11 @@ class TestRLSEndToEnd:
 
         Note: In production, steps 2-4 happen automatically via Cube's
         queryRewrite function. Here we simulate the workflow.
+
+        Covers:
+        - 005-FR-016: RLS via security context from JWT claims
+        - 005-FR-017: Filter queries by configured filter_column when RLS enabled
+        - 005-FR-027: Verify JWT signature before extracting security context
         """
         # Step 1: Create JWT and extract security context
         future_exp = int(time.time()) + 3600
@@ -778,6 +858,7 @@ class TestRLSEndToEnd:
 
     @pytest.mark.requirement("006-FR-017")
     @pytest.mark.requirement("006-FR-026")
+    @pytest.mark.requirement("005-FR-017")
     def test_multi_claim_filter_scenario(
         self,
         cube_client: httpx.Client,
@@ -787,6 +868,9 @@ class TestRLSEndToEnd:
         Given a JWT with multiple filter claims (region and status),
         When applying both filters,
         Then data is filtered by both dimensions.
+
+        Covers:
+        - 005-FR-017: Filter queries by configured filter_column when RLS enabled
         """
         # Create context with multiple claims
         future_exp = int(time.time()) + 3600

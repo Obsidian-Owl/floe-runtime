@@ -80,6 +80,7 @@ class TestCompiledArtifactsToProfiles:
         return profiles_path
 
     @pytest.mark.requirement("006-FR-033")
+    @pytest.mark.requirement("003-FR-001")
     def test_artifacts_generate_valid_profiles_yml(
         self,
         minimal_compiled_artifacts: dict[str, Any],
@@ -89,6 +90,9 @@ class TestCompiledArtifactsToProfiles:
 
         Verifies that the contract between CompiledArtifacts and ProfileFactory
         produces structurally valid YAML that follows dbt's expected format.
+
+        Covers:
+        - 003-FR-001: Generate valid dbt profiles.yml from CompiledArtifacts
         """
         from floe_dbt.factory import ProfileFactory
         from floe_dbt.profiles.base import ProfileGeneratorConfig
@@ -128,6 +132,8 @@ class TestCompiledArtifactsToProfiles:
         assert "dev" in parsed["floe"]["outputs"], "Target 'dev' not in outputs"
 
     @pytest.mark.requirement("006-FR-033")
+    @pytest.mark.requirement("003-FR-001")
+    @pytest.mark.requirement("003-FR-005")
     def test_profiles_yml_parseable_by_dbt(
         self,
         minimal_compiled_artifacts: dict[str, Any],
@@ -138,6 +144,10 @@ class TestCompiledArtifactsToProfiles:
 
         This is the ultimate contract test: dbt itself can parse and use
         the generated profile.
+
+        Covers:
+        - 003-FR-001: Generate valid dbt profiles.yml from CompiledArtifacts
+        - 003-FR-005: Write profiles to the specified path
         """
         from floe_dbt.factory import ProfileFactory
         from floe_dbt.profiles.base import ProfileGeneratorConfig
@@ -184,6 +194,7 @@ class TestCompiledArtifactsToProfiles:
         )
 
     @pytest.mark.requirement("006-FR-033")
+    @pytest.mark.requirement("003-FR-004")
     def test_target_configs_resolve_correctly(
         self,
         minimal_compiled_artifacts: dict[str, Any],
@@ -192,6 +203,9 @@ class TestCompiledArtifactsToProfiles:
 
         Verifies that compute.properties from CompiledArtifacts are correctly
         propagated to the generated profile output.
+
+        Covers:
+        - 003-FR-004: Allow properties override via FloeSpec compute.properties
         """
         from floe_dbt.factory import ProfileFactory
         from floe_dbt.profiles.base import ProfileGeneratorConfig
@@ -215,6 +229,7 @@ class TestCompiledArtifactsToProfiles:
             assert dev_config["path"] == properties.get("path", ":memory:")
 
     @pytest.mark.requirement("006-FR-033")
+    @pytest.mark.requirement("003-FR-002")
     def test_all_supported_targets_generate_profiles(
         self,
         base_metadata: dict[str, Any],
@@ -223,6 +238,9 @@ class TestCompiledArtifactsToProfiles:
 
         Verifies that the contract supports all 7 compute targets defined
         in CompiledArtifacts.compute.target.
+
+        Covers:
+        - 003-FR-002: Support all 7 compute targets
         """
         from floe_dbt.factory import ProfileFactory
         from floe_dbt.profiles.base import ProfileGeneratorConfig
@@ -276,6 +294,7 @@ class TestCompiledArtifactsContractVersioning:
         _check_dbt_available()
 
     @pytest.mark.requirement("006-FR-033")
+    @pytest.mark.requirement("003-FR-001")
     def test_v1_artifacts_structure_supported(
         self,
         base_metadata: dict[str, Any],
@@ -283,6 +302,9 @@ class TestCompiledArtifactsContractVersioning:
         """v1.0.0 CompiledArtifacts structure generates valid profiles.
 
         Ensures backward compatibility with the original contract version.
+
+        Covers:
+        - 003-FR-001: Generate valid dbt profiles.yml from CompiledArtifacts
         """
         from floe_dbt.factory import ProfileFactory
         from floe_dbt.profiles.base import ProfileGeneratorConfig
@@ -306,6 +328,7 @@ class TestCompiledArtifactsContractVersioning:
         assert outputs["dev"]["type"] == "duckdb"
 
     @pytest.mark.requirement("006-FR-033")
+    @pytest.mark.requirement("003-FR-003")
     def test_optional_fields_handled_gracefully(
         self,
         base_metadata: dict[str, Any],
@@ -313,6 +336,9 @@ class TestCompiledArtifactsContractVersioning:
         """Profile generation handles optional CompiledArtifacts fields.
 
         Optional fields like connection_secret_ref should not break generation.
+
+        Covers:
+        - 003-FR-003: Use environment variable references for credentials
         """
         from floe_dbt.factory import ProfileFactory
         from floe_dbt.profiles.base import ProfileGeneratorConfig

@@ -74,12 +74,17 @@ class TestDatabricksProfileGeneration:
         return ProfileFactory
 
     @pytest.mark.requirement("006-FR-010")
+    @pytest.mark.requirement("003-FR-002")
     def test_generate_databricks_profile_structure(
         self,
         factory: Any,
         base_metadata: dict[str, Any],
     ) -> None:
-        """Test Databricks profile generation produces correct structure."""
+        """Test Databricks profile generation produces correct structure.
+
+        Covers:
+        - 003-FR-002: Support all 7 compute targets (Databricks)
+        """
         from floe_dbt.profiles.base import ProfileGeneratorConfig
 
         artifacts = {
@@ -110,12 +115,17 @@ class TestDatabricksProfileGeneration:
         assert profile["schema"] == "default"
 
     @pytest.mark.requirement("006-FR-010")
+    @pytest.mark.requirement("003-FR-003")
     def test_databricks_profile_env_var_security(
         self,
         factory: Any,
         base_metadata: dict[str, Any],
     ) -> None:
-        """Test Databricks token uses env_var template (never hardcoded)."""
+        """Test Databricks token uses env_var template (never hardcoded).
+
+        Covers:
+        - 003-FR-003: Use environment variable references for credentials
+        """
         from floe_dbt.profiles.base import ProfileGeneratorConfig
 
         artifacts = {

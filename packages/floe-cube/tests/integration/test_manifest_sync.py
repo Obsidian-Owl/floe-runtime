@@ -143,6 +143,8 @@ class TestManifestToCubeSync:
         }
 
     @pytest.mark.requirement("006-FR-034")
+    @pytest.mark.requirement("005-FR-005")
+    @pytest.mark.requirement("005-FR-006")
     def test_dbt_models_appear_in_cube_meta(
         self,
         cube_client: httpx.Client,
@@ -151,6 +153,10 @@ class TestManifestToCubeSync:
 
         Verifies that Cube has cubes corresponding to the expected
         data models (Orders, Customers).
+
+        Covers:
+        - 005-FR-005: Generate Cube schema from CompiledArtifacts
+        - 005-FR-006: Auto-generate cubes for dbt models with floe.cube.enabled=true
         """
         # Query Cube's meta endpoint to get available cubes
         response = cube_client.get("/cubejs-api/v1/meta")
@@ -167,6 +173,7 @@ class TestManifestToCubeSync:
         assert "Customers" in cube_names, "Customers cube should exist in Cube schema"
 
     @pytest.mark.requirement("006-FR-034")
+    @pytest.mark.requirement("005-FR-007")
     def test_dbt_model_columns_in_cube_dimensions(
         self,
         cube_client: httpx.Client,
@@ -175,6 +182,9 @@ class TestManifestToCubeSync:
 
         Verifies that columns defined in dbt models are available
         as dimensions in the corresponding Cube schema.
+
+        Covers:
+        - 005-FR-007: Map dbt columns to Cube dimensions with type inference
         """
         response = cube_client.get("/cubejs-api/v1/meta")
         assert response.status_code == 200
@@ -195,6 +205,7 @@ class TestManifestToCubeSync:
         assert "Orders.region" in dimension_names, "region dimension should exist"
 
     @pytest.mark.requirement("006-FR-034")
+    @pytest.mark.requirement("005-FR-005")
     def test_cube_query_uses_dbt_table(
         self,
         cube_client: httpx.Client,
@@ -203,6 +214,9 @@ class TestManifestToCubeSync:
 
         Verifies that querying a Cube returns data from the underlying
         table that would be created by dbt.
+
+        Covers:
+        - 005-FR-005: Generate Cube schema from CompiledArtifacts
         """
         query = {
             "measures": ["Orders.count"],
@@ -218,6 +232,8 @@ class TestManifestToCubeSync:
         assert "data" in result, "Query result should have 'data' key"
 
     @pytest.mark.requirement("006-FR-034")
+    @pytest.mark.requirement("005-FR-006")
+    @pytest.mark.requirement("005-FR-010")
     def test_manifest_model_metadata_extractable(
         self,
         sample_dbt_manifest: dict[str, Any],
@@ -226,6 +242,10 @@ class TestManifestToCubeSync:
 
         Verifies that the manifest structure allows extracting the
         information needed for Cube schema generation.
+
+        Covers:
+        - 005-FR-006: Auto-generate cubes for dbt models with floe.cube.enabled=true
+        - 005-FR-010: Support custom measure definitions via meta.floe.cube.measures
         """
         # Extract models from manifest
         nodes = sample_dbt_manifest.get("nodes", {})
@@ -264,11 +284,15 @@ class TestManifestToCubeContract:
         _check_cube_available()
 
     @pytest.mark.requirement("006-FR-034")
+    @pytest.mark.requirement("005-FR-005")
     def test_manifest_provides_table_reference(self) -> None:
         """Manifest provides information needed for Cube sql property.
 
         The Cube sql property (e.g., `SELECT * FROM iceberg.default.orders`)
         requires database, schema, and table name from manifest.
+
+        Covers:
+        - 005-FR-005: Generate Cube schema from CompiledArtifacts
         """
         manifest_node = {
             "unique_id": "model.project.orders",
@@ -286,11 +310,15 @@ class TestManifestToCubeContract:
         assert sql == "SELECT * FROM iceberg.default.orders"
 
     @pytest.mark.requirement("006-FR-034")
+    @pytest.mark.requirement("005-FR-007")
     def test_manifest_columns_map_to_cube_dimensions(self) -> None:
         """Manifest columns provide dimension definitions.
 
         Column definitions in manifest can be used to generate
         Cube dimension properties.
+
+        Covers:
+        - 005-FR-007: Map dbt columns to Cube dimensions with type inference
         """
         manifest_column = {
             "name": "status",
@@ -310,11 +338,15 @@ class TestManifestToCubeContract:
         assert dimension["type"] == "string"
 
     @pytest.mark.requirement("006-FR-034")
+    @pytest.mark.requirement("005-FR-010")
     def test_manifest_meta_configures_cube_measures(self) -> None:
         """Manifest meta.floe.cube configures Cube measures.
 
         Custom meta in dbt models can specify measure configurations
         for Cube schema generation.
+
+        Covers:
+        - 005-FR-010: Support custom measure definitions via meta.floe.cube.measures
         """
         manifest_meta = {
             "floe": {

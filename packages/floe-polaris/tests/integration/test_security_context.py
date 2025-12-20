@@ -105,6 +105,10 @@ class TestSecurityContextPropagation:
             pass
 
     @pytest.mark.requirement("006-FR-028")
+    @pytest.mark.requirement("004-FR-001")
+    @pytest.mark.requirement("004-FR-002")
+    @pytest.mark.requirement("004-FR-007")
+    @pytest.mark.requirement("004-FR-008")
     def test_principal_credentials_propagate(
         self,
         valid_config: PolarisCatalogConfig,
@@ -114,6 +118,12 @@ class TestSecurityContextPropagation:
 
         Verifies that client_id/client_secret credentials are correctly
         propagated and used for OAuth2 authentication with Polaris.
+
+        Covers:
+        - 004-FR-001: Connect to Polaris REST catalogs
+        - 004-FR-002: OAuth2 client credentials authentication
+        - 004-FR-007: Creating namespaces
+        - 004-FR-008: Listing namespaces
         """
         # Create catalog with valid credentials
         catalog = create_catalog(valid_config)
@@ -128,11 +138,15 @@ class TestSecurityContextPropagation:
         assert test_namespace in str(namespaces)
 
     @pytest.mark.requirement("006-FR-028")
+    @pytest.mark.requirement("004-FR-002")
     def test_invalid_credentials_fail(self) -> None:
         """Invalid credentials raise CatalogAuthenticationError.
 
         Verifies that incorrect client_id or client_secret results
         in proper authentication failure handling.
+
+        Covers:
+        - 004-FR-002: OAuth2 authentication (rejects invalid credentials)
         """
         host = _get_polaris_host()
 
@@ -152,6 +166,8 @@ class TestSecurityContextPropagation:
             create_catalog(invalid_config)
 
     @pytest.mark.requirement("006-FR-028")
+    @pytest.mark.requirement("004-FR-001")
+    @pytest.mark.requirement("004-FR-002")
     def test_scope_configures_access(
         self,
         valid_config: PolarisCatalogConfig,
@@ -160,6 +176,10 @@ class TestSecurityContextPropagation:
 
         Verifies that the scope parameter is included in OAuth2
         token requests and affects the access context.
+
+        Covers:
+        - 004-FR-001: Connect to Polaris REST catalogs
+        - 004-FR-002: OAuth2 client credentials authentication
         """
         # The scope should be set in the config
         assert valid_config.scope is not None
@@ -174,10 +194,14 @@ class TestSecurityContextPropagation:
         assert catalog.is_connected()
 
     @pytest.mark.requirement("006-FR-028")
+    @pytest.mark.requirement("004-FR-002")
     def test_invalid_client_id_authentication_error(self) -> None:
         """Invalid client_id raises authentication error.
 
         Verifies specific error handling for wrong client_id.
+
+        Covers:
+        - 004-FR-002: OAuth2 authentication (rejects invalid client_id)
         """
         host = _get_polaris_host()
 
@@ -195,10 +219,14 @@ class TestSecurityContextPropagation:
             create_catalog(config)
 
     @pytest.mark.requirement("006-FR-028")
+    @pytest.mark.requirement("004-FR-002")
     def test_invalid_client_secret_authentication_error(self) -> None:
         """Invalid client_secret raises authentication error.
 
         Verifies specific error handling for wrong client_secret.
+
+        Covers:
+        - 004-FR-002: OAuth2 authentication (rejects invalid secret)
         """
         host = _get_polaris_host()
 
@@ -257,6 +285,10 @@ class TestSecurityContextInOperations:
             pass
 
     @pytest.mark.requirement("006-FR-028")
+    @pytest.mark.requirement("004-FR-002")
+    @pytest.mark.requirement("004-FR-007")
+    @pytest.mark.requirement("004-FR-008")
+    @pytest.mark.requirement("004-FR-009")
     def test_security_context_persists_across_operations(
         self,
         catalog: PolarisCatalog,
@@ -266,6 +298,12 @@ class TestSecurityContextInOperations:
 
         Verifies that authenticated context is maintained through
         a sequence of catalog operations.
+
+        Covers:
+        - 004-FR-002: OAuth2 authentication (persistent context)
+        - 004-FR-007: Creating namespaces
+        - 004-FR-008: Listing namespaces
+        - 004-FR-009: Deleting empty namespaces
         """
         # Multiple operations should all succeed with same context
         catalog.create_namespace(test_namespace)
@@ -277,6 +315,8 @@ class TestSecurityContextInOperations:
         assert True
 
     @pytest.mark.requirement("006-FR-028")
+    @pytest.mark.requirement("004-FR-002")
+    @pytest.mark.requirement("004-FR-004")
     def test_reconnect_preserves_security_context(
         self,
         catalog: PolarisCatalog,
@@ -285,6 +325,10 @@ class TestSecurityContextInOperations:
         """Reconnect preserves security context.
 
         Verifies that security context is maintained after reconnection.
+
+        Covers:
+        - 004-FR-002: OAuth2 authentication
+        - 004-FR-004: Automatic token refresh (reconnect)
         """
         # Initial operation
         catalog.create_namespace(test_namespace)

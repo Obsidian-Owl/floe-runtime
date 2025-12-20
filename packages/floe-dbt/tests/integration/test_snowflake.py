@@ -74,12 +74,17 @@ class TestSnowflakeProfileGeneration:
         return ProfileFactory
 
     @pytest.mark.requirement("006-FR-010")
+    @pytest.mark.requirement("003-FR-002")
     def test_generate_snowflake_profile_structure(
         self,
         factory: Any,
         base_metadata: dict[str, Any],
     ) -> None:
-        """Test Snowflake profile generation produces correct structure."""
+        """Test Snowflake profile generation produces correct structure.
+
+        Covers:
+        - 003-FR-002: Support all 7 compute targets (Snowflake)
+        """
         from floe_dbt.profiles.base import ProfileGeneratorConfig
 
         artifacts = {
@@ -112,12 +117,17 @@ class TestSnowflakeProfileGeneration:
         assert profile["role"] == "TRANSFORMER"
 
     @pytest.mark.requirement("006-FR-010")
+    @pytest.mark.requirement("003-FR-003")
     def test_snowflake_profile_env_var_security(
         self,
         factory: Any,
         base_metadata: dict[str, Any],
     ) -> None:
-        """Test Snowflake credentials use env_var template (never hardcoded)."""
+        """Test Snowflake credentials use env_var template (never hardcoded).
+
+        Covers:
+        - 003-FR-003: Use environment variable references for credentials
+        """
         from floe_dbt.profiles.base import ProfileGeneratorConfig
 
         artifacts = {

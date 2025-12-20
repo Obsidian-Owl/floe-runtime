@@ -153,6 +153,8 @@ class TestArtifactsToCatalogConfig:
             pass
 
     @pytest.mark.requirement("006-FR-035")
+    @pytest.mark.requirement("004-FR-001")
+    @pytest.mark.requirement("004-FR-006")
     def test_catalog_uri_from_artifacts(
         self,
         compiled_artifacts_with_catalog: dict[str, Any],
@@ -162,6 +164,10 @@ class TestArtifactsToCatalogConfig:
 
         Verifies that the catalog.uri from artifacts is a valid
         Polaris REST API endpoint.
+
+        Covers:
+        - 004-FR-001: Connect to Polaris REST catalogs
+        - 004-FR-006: All URIs configurable
         """
         catalog = create_catalog(polaris_config_from_artifacts)
 
@@ -174,6 +180,7 @@ class TestArtifactsToCatalogConfig:
         assert artifacts_uri == config_uri
 
     @pytest.mark.requirement("006-FR-035")
+    @pytest.mark.requirement("004-FR-006")
     def test_warehouse_config_propagates(
         self,
         compiled_artifacts_with_catalog: dict[str, Any],
@@ -183,6 +190,9 @@ class TestArtifactsToCatalogConfig:
 
         Verifies that the catalog.warehouse field from CompiledArtifacts
         is correctly propagated to the Polaris connection.
+
+        Covers:
+        - 004-FR-006: All URIs configurable (warehouse name)
         """
         artifacts_warehouse = compiled_artifacts_with_catalog["catalog"]["warehouse"]
         config_warehouse = polaris_config_from_artifacts.warehouse
@@ -191,6 +201,9 @@ class TestArtifactsToCatalogConfig:
         assert config_warehouse == "warehouse"  # Expected default
 
     @pytest.mark.requirement("006-FR-035")
+    @pytest.mark.requirement("004-FR-001")
+    @pytest.mark.requirement("004-FR-007")
+    @pytest.mark.requirement("004-FR-008")
     def test_namespace_creation_from_config(
         self,
         catalog_from_artifacts: PolarisCatalog,
@@ -200,6 +213,11 @@ class TestArtifactsToCatalogConfig:
 
         Verifies that the catalog connection derived from CompiledArtifacts
         can successfully create namespaces in Polaris.
+
+        Covers:
+        - 004-FR-001: Connect to Polaris REST catalogs
+        - 004-FR-007: Creating namespaces
+        - 004-FR-008: Listing namespaces
         """
         # Create namespace using artifacts-derived catalog connection
         catalog_from_artifacts.create_namespace(test_namespace)

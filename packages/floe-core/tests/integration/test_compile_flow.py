@@ -26,8 +26,17 @@ class TestFullCompileFlow:
     """Integration tests for the complete compile workflow."""
 
     @pytest.mark.requirement("006-FR-008")
+    @pytest.mark.requirement("001-FR-016")
+    @pytest.mark.requirement("001-FR-009")
+    @pytest.mark.requirement("001-FR-010")
     def test_end_to_end_compile_minimal(self, tmp_path: Path) -> None:
-        """Test end-to-end compilation with minimal configuration."""
+        """Test end-to-end compilation with minimal configuration.
+
+        Covers:
+        - 001-FR-016: Compiler accepts FloeSpec, returns CompiledArtifacts
+        - 001-FR-009: CompiledArtifacts is immutable Pydantic model
+        - 001-FR-010: Metadata section includes compiled_at, source_hash
+        """
         from floe_core.compiler import CompiledArtifacts, Compiler
 
         # Create minimal floe.yaml
@@ -66,12 +75,18 @@ class TestFullCompileFlow:
 
     @pytest.mark.requirement("006-FR-008")
     @pytest.mark.requirement("006-FR-022")
+    @pytest.mark.requirement("001-FR-016")
+    @pytest.mark.requirement("001-FR-011")
+    @pytest.mark.requirement("001-FR-028")
     def test_end_to_end_compile_full(self, tmp_path: Path) -> None:
         """Test end-to-end compilation with full configuration.
 
         Covers:
-        - FR-008: Integration test for compilation flow
-        - FR-022: CompiledArtifacts with production-like configurations
+        - 006-FR-008: Integration test for compilation flow
+        - 006-FR-022: CompiledArtifacts with production-like configurations
+        - 001-FR-016: Compiler accepts FloeSpec, returns CompiledArtifacts
+        - 001-FR-011: CompiledArtifacts sections (compute, consumption, governance, observability)
+        - 001-FR-028: CatalogConfig includes type, uri, warehouse, scope
         """
         from floe_core.compiler import Compiler
 
@@ -136,10 +151,13 @@ class TestFullCompileFlow:
         assert artifacts.catalog.scope == "PRINCIPAL_ROLE:ALL"
 
     @pytest.mark.requirement("006-FR-008")
+    @pytest.mark.requirement("001-FR-018")
     def test_end_to_end_with_dbt_classifications(self, tmp_path: Path) -> None:
         """Test end-to-end compilation with dbt classification extraction.
 
-        Covers: FR-008 (compilation flow with classification extraction)
+        Covers:
+        - 006-FR-008: Compilation flow with classification extraction
+        - 001-FR-018: Extract column classifications from dbt manifest meta tags
         """
         from floe_core.compiler import Compiler
 
@@ -250,10 +268,13 @@ class TestFullCompileFlow:
         assert order_cols["order_id"].classification == "identifier"
 
     @pytest.mark.requirement("006-FR-008")
+    @pytest.mark.requirement("001-FR-009")
     def test_compile_then_serialize_round_trip(self, tmp_path: Path) -> None:
         """Test compile output can be serialized and deserialized.
 
-        Covers: FR-008 (round-trip serialization)
+        Covers:
+        - 006-FR-008: Round-trip serialization
+        - 001-FR-009: CompiledArtifacts is immutable and JSON-serializable
         """
         from floe_core.compiler import CompiledArtifacts, Compiler
 
@@ -291,10 +312,13 @@ class TestFullCompileFlow:
         assert loaded.metadata.source_hash == original.metadata.source_hash
 
     @pytest.mark.requirement("006-FR-008")
+    @pytest.mark.requirement("001-FR-005")
     def test_compile_multiple_transforms(self, tmp_path: Path) -> None:
         """Test compilation with multiple transform configurations.
 
-        Covers: FR-008 (compilation flow with multiple transforms)
+        Covers:
+        - 006-FR-008: Compilation flow with multiple transforms
+        - 001-FR-005: TransformConfig for each dbt project reference
         """
         from floe_core.compiler import Compiler
 
@@ -324,12 +348,16 @@ class TestFullCompileFlow:
 
     @pytest.mark.requirement("006-FR-008")
     @pytest.mark.requirement("006-FR-022")
+    @pytest.mark.requirement("001-FR-002")
+    @pytest.mark.requirement("001-FR-003")
     def test_compile_all_compute_targets(self, tmp_path: Path) -> None:
         """Test compilation works for all compute targets.
 
         Covers:
-        - FR-008: Integration test for compilation flow
-        - FR-022: CompiledArtifacts with production-like configurations
+        - 006-FR-008: Integration test for compilation flow
+        - 006-FR-022: CompiledArtifacts with production-like configurations
+        - 001-FR-002: Support 7 compute targets (Snowflake, BigQuery, Redshift, etc.)
+        - 001-FR-003: ComputeTarget enum with target values
         """
         from floe_core.compiler import Compiler
         from floe_core.schemas import ComputeTarget
@@ -359,10 +387,13 @@ class TestCompileFlowGracefulDegradation:
     """Tests for graceful degradation in compile flow."""
 
     @pytest.mark.requirement("006-FR-031")
+    @pytest.mark.requirement("001-FR-025")
     def test_compile_without_dbt_manifest(self, tmp_path: Path) -> None:
         """Test compilation continues without dbt manifest.
 
-        Covers: FR-031 (CompiledArtifacts without optional fields execute correctly)
+        Covers:
+        - 006-FR-031: CompiledArtifacts without optional fields execute correctly
+        - 001-FR-025: Graceful degradation when dbt manifest missing
         """
         from floe_core.compiler import Compiler
 
@@ -391,10 +422,13 @@ class TestCompileFlowGracefulDegradation:
         assert artifacts.column_classifications is None
 
     @pytest.mark.requirement("006-FR-031")
+    @pytest.mark.requirement("001-FR-025")
     def test_compile_with_empty_manifest(self, tmp_path: Path) -> None:
         """Test compilation handles empty manifest.
 
-        Covers: FR-031 (graceful degradation with empty manifest)
+        Covers:
+        - 006-FR-031: Graceful degradation with empty manifest
+        - 001-FR-025: Graceful degradation when manifest has no classifications
         """
         from floe_core.compiler import Compiler
 
@@ -427,11 +461,14 @@ class TestCompileFlowGracefulDegradation:
         assert artifacts.column_classifications is None or artifacts.column_classifications == {}
 
     @pytest.mark.requirement("006-FR-031")
+    @pytest.mark.requirement("001-FR-020")
     def test_compile_standalone_first(self, tmp_path: Path) -> None:
         """Test compile works completely standalone (no SaaS dependencies).
 
-        Covers: FR-031 (CompiledArtifacts without optional EnvironmentContext
-        fields still execute correctly in standalone mode)
+        Covers:
+        - 006-FR-031: CompiledArtifacts without optional EnvironmentContext
+          fields still execute correctly in standalone mode
+        - 001-FR-020: Standalone execution without SaaS context
         """
         from floe_core.compiler import Compiler
 

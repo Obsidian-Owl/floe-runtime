@@ -83,13 +83,18 @@ class TestOpenLineageEmission:
     """Tests for OpenLineage event emission to Marquez."""
 
     @pytest.mark.requirement("006-FR-029")
+    @pytest.mark.requirement("003-FR-011")
     def test_emit_start_event(
         self,
         lineage_emitter,
         marquez_client: MarquezClient,
         openlineage_config: dict[str, Any],
     ) -> None:
-        """Test emitting START event to Marquez."""
+        """Test emitting START event to Marquez.
+
+        Covers:
+        - 003-FR-011: OpenLineage START event when dbt execution begins
+        """
         job_name = f"test_job_start_{int(time.time())}"
         namespace = openlineage_config["namespace"]
 
@@ -116,13 +121,18 @@ class TestOpenLineageEmission:
             pytest.skip("Marquez query failed - service may be initializing")
 
     @pytest.mark.requirement("006-FR-029")
+    @pytest.mark.requirement("003-FR-012")
     def test_emit_complete_event(
         self,
         lineage_emitter,
         marquez_client: MarquezClient,
         openlineage_config: dict[str, Any],
     ) -> None:
-        """Test emitting COMPLETE event to Marquez."""
+        """Test emitting COMPLETE event to Marquez.
+
+        Covers:
+        - 003-FR-012: OpenLineage COMPLETE event with schema facets
+        """
         job_name = f"test_job_complete_{int(time.time())}"
 
         # Emit START then COMPLETE
@@ -147,12 +157,17 @@ class TestOpenLineageEmission:
             pytest.skip("Marquez query failed - service may be initializing")
 
     @pytest.mark.requirement("006-FR-029")
+    @pytest.mark.requirement("003-FR-013")
     def test_emit_fail_event(
         self,
         lineage_emitter,
         openlineage_config: dict[str, Any],
     ) -> None:
-        """Test emitting FAIL event to Marquez."""
+        """Test emitting FAIL event to Marquez.
+
+        Covers:
+        - 003-FR-013: OpenLineage FAIL event with error details
+        """
         job_name = f"test_job_fail_{int(time.time())}"
         error_message = "Test error: simulated failure"
 
@@ -169,11 +184,18 @@ class TestOpenLineageEmission:
         assert run_id is not None
 
     @pytest.mark.requirement("006-FR-029")
+    @pytest.mark.requirement("003-FR-011")
+    @pytest.mark.requirement("003-FR-012")
     def test_run_context_manager_success(
         self,
         lineage_emitter,
     ) -> None:
-        """Test run_context context manager for successful execution."""
+        """Test run_context context manager for successful execution.
+
+        Covers:
+        - 003-FR-011: OpenLineage START event
+        - 003-FR-012: OpenLineage COMPLETE event
+        """
         job_name = f"test_job_context_success_{int(time.time())}"
 
         # Use context manager
@@ -185,11 +207,18 @@ class TestOpenLineageEmission:
         # Context exited cleanly - COMPLETE should have been emitted
 
     @pytest.mark.requirement("006-FR-029")
+    @pytest.mark.requirement("003-FR-011")
+    @pytest.mark.requirement("003-FR-013")
     def test_run_context_manager_failure(
         self,
         lineage_emitter,
     ) -> None:
-        """Test run_context context manager for failed execution."""
+        """Test run_context context manager for failed execution.
+
+        Covers:
+        - 003-FR-011: OpenLineage START event
+        - 003-FR-013: OpenLineage FAIL event
+        """
         job_name = f"test_job_context_fail_{int(time.time())}"
 
         with (
@@ -206,8 +235,13 @@ class TestOpenLineageGracefulDegradation:
     """Tests for graceful degradation when Marquez is unavailable."""
 
     @pytest.mark.requirement("006-FR-029")
+    @pytest.mark.requirement("003-FR-021")
     def test_disabled_emitter_does_not_fail(self) -> None:
-        """Test that disabled emitter handles operations gracefully."""
+        """Test that disabled emitter handles operations gracefully.
+
+        Covers:
+        - 003-FR-021: Lineage disabled gracefully without endpoint
+        """
         from floe_dagster.lineage import OpenLineageConfig, OpenLineageEmitter
 
         # Create disabled config (no endpoint)
@@ -228,8 +262,13 @@ class TestOpenLineageGracefulDegradation:
         emitter.emit_fail(run_id=run_id, job_name="test_job", error_message="error")
 
     @pytest.mark.requirement("006-FR-029")
+    @pytest.mark.requirement("003-FR-021")
     def test_emitter_with_unavailable_endpoint(self) -> None:
-        """Test emitter gracefully handles unavailable endpoint."""
+        """Test emitter gracefully handles unavailable endpoint.
+
+        Covers:
+        - 003-FR-021: Lineage disabled gracefully when endpoint unreachable
+        """
         from floe_dagster.lineage import OpenLineageConfig, OpenLineageEmitter
 
         # Create config with unreachable endpoint
@@ -252,11 +291,16 @@ class TestOpenLineageDatasets:
     """Tests for dataset tracking in lineage events."""
 
     @pytest.mark.requirement("006-FR-029")
+    @pytest.mark.requirement("003-FR-014")
     def test_emit_with_input_datasets(
         self,
         lineage_emitter,
     ) -> None:
-        """Test emitting events with input datasets."""
+        """Test emitting events with input datasets.
+
+        Covers:
+        - 003-FR-014: Input/output dataset information in lineage events
+        """
         from floe_dagster.lineage import LineageDataset
 
         job_name = f"test_job_inputs_{int(time.time())}"
@@ -287,11 +331,16 @@ class TestOpenLineageDatasets:
         )
 
     @pytest.mark.requirement("006-FR-029")
+    @pytest.mark.requirement("003-FR-014")
     def test_emit_with_output_datasets(
         self,
         lineage_emitter,
     ) -> None:
-        """Test emitting events with output datasets."""
+        """Test emitting events with output datasets.
+
+        Covers:
+        - 003-FR-014: Input/output dataset information in lineage events
+        """
         from floe_dagster.lineage import LineageDataset
 
         job_name = f"test_job_outputs_{int(time.time())}"

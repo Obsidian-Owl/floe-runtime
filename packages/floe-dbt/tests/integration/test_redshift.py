@@ -74,12 +74,17 @@ class TestRedshiftProfileGeneration:
         return ProfileFactory
 
     @pytest.mark.requirement("006-FR-010")
+    @pytest.mark.requirement("003-FR-002")
     def test_generate_redshift_profile_structure(
         self,
         factory: Any,
         base_metadata: dict[str, Any],
     ) -> None:
-        """Test Redshift profile generation produces correct structure."""
+        """Test Redshift profile generation produces correct structure.
+
+        Covers:
+        - 003-FR-002: Support all 7 compute targets (Redshift)
+        """
         from floe_dbt.profiles.base import ProfileGeneratorConfig
 
         artifacts = {
@@ -110,12 +115,17 @@ class TestRedshiftProfileGeneration:
         assert profile["schema"] == "public"
 
     @pytest.mark.requirement("006-FR-010")
+    @pytest.mark.requirement("003-FR-003")
     def test_redshift_profile_env_var_security(
         self,
         factory: Any,
         base_metadata: dict[str, Any],
     ) -> None:
-        """Test Redshift credentials use env_var template (never hardcoded)."""
+        """Test Redshift credentials use env_var template (never hardcoded).
+
+        Covers:
+        - 003-FR-003: Use environment variable references for credentials
+        """
         from floe_dbt.profiles.base import ProfileGeneratorConfig
 
         artifacts = {

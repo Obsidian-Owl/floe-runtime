@@ -90,13 +90,18 @@ class TestOTelSpanEmission:
     """Tests for OpenTelemetry span emission to Jaeger."""
 
     @pytest.mark.requirement("006-FR-030")
+    @pytest.mark.requirement("003-FR-016")
     def test_start_span_creates_trace(
         self,
         tracing_manager,
         jaeger_client: JaegerClient,
         tracing_config: dict[str, Any],
     ) -> None:
-        """Test that start_span creates a trace in Jaeger."""
+        """Test that start_span creates a trace in Jaeger.
+
+        Covers:
+        - 003-FR-016: Create trace spans for each asset materialization
+        """
         # Create a span with unique operation name
         operation_name = f"test_operation_{int(time.time())}"
 
@@ -121,13 +126,20 @@ class TestOTelSpanEmission:
             pytest.skip("Jaeger query failed - service may be initializing")
 
     @pytest.mark.requirement("006-FR-030")
+    @pytest.mark.requirement("003-FR-017")
+    @pytest.mark.requirement("003-FR-018")
     def test_span_attributes(
         self,
         tracing_manager,
         jaeger_client: JaegerClient,
         tracing_config: dict[str, Any],
     ) -> None:
-        """Test that span attributes are recorded correctly."""
+        """Test that span attributes are recorded correctly.
+
+        Covers:
+        - 003-FR-017: Asset name, duration, status as span attributes
+        - 003-FR-018: Tenant context from observability.attributes
+        """
         service_name = tracing_config["service_name"]
         operation_name = f"test_attributes_{int(time.time())}"
 
@@ -159,11 +171,16 @@ class TestOTelSpanEmission:
             pytest.skip("Jaeger query failed - service may be initializing")
 
     @pytest.mark.requirement("006-FR-030")
+    @pytest.mark.requirement("003-FR-016")
     def test_nested_spans(
         self,
         tracing_manager,
     ) -> None:
-        """Test nested span creation."""
+        """Test nested span creation.
+
+        Covers:
+        - 003-FR-016: Create trace spans
+        """
         with tracing_manager.start_span(
             "parent_operation",
             attributes={"level": "parent"},
@@ -184,11 +201,16 @@ class TestOTelSpanEmission:
                 )
 
     @pytest.mark.requirement("006-FR-030")
+    @pytest.mark.requirement("003-FR-017")
     def test_span_status_ok(
         self,
         tracing_manager,
     ) -> None:
-        """Test setting span status to OK."""
+        """Test setting span status to OK.
+
+        Covers:
+        - 003-FR-017: Status as span attribute
+        """
         with tracing_manager.start_span("success_operation") as span:
             # Simulate successful execution
             tracing_manager.set_status_ok(span)
@@ -196,11 +218,16 @@ class TestOTelSpanEmission:
             assert span.get_span_context().is_valid
 
     @pytest.mark.requirement("006-FR-030")
+    @pytest.mark.requirement("003-FR-017")
     def test_span_status_error(
         self,
         tracing_manager,
     ) -> None:
-        """Test setting span status to ERROR."""
+        """Test setting span status to ERROR.
+
+        Covers:
+        - 003-FR-017: Status as span attribute
+        """
         with tracing_manager.start_span("error_operation") as span:
             # Simulate error
             tracing_manager.set_status_error(span, "Test error description")
@@ -226,8 +253,13 @@ class TestTracingGracefulDegradation:
     """Tests for graceful degradation when Jaeger is unavailable."""
 
     @pytest.mark.requirement("006-FR-030")
+    @pytest.mark.requirement("003-FR-022")
     def test_disabled_tracing_does_not_fail(self) -> None:
-        """Test that disabled tracing handles operations gracefully."""
+        """Test that disabled tracing handles operations gracefully.
+
+        Covers:
+        - 003-FR-022: Traces disabled gracefully without endpoint
+        """
         from floe_dagster.observability import TracingConfig, TracingManager
 
         # Create disabled config (no endpoint)
@@ -251,8 +283,13 @@ class TestTracingGracefulDegradation:
             manager.shutdown()
 
     @pytest.mark.requirement("006-FR-030")
+    @pytest.mark.requirement("003-FR-022")
     def test_tracing_with_unavailable_endpoint(self) -> None:
-        """Test tracing gracefully handles unavailable endpoint."""
+        """Test tracing gracefully handles unavailable endpoint.
+
+        Covers:
+        - 003-FR-022: Traces disabled gracefully when endpoint unreachable
+        """
         from floe_dagster.observability import TracingConfig, TracingManager
 
         # Create config with unreachable endpoint
@@ -282,11 +319,16 @@ class TestTracingContext:
     """Tests for trace context management."""
 
     @pytest.mark.requirement("006-FR-030")
+    @pytest.mark.requirement("003-FR-019")
     def test_get_current_trace_context(
         self,
         tracing_manager,
     ) -> None:
-        """Test retrieving current trace context."""
+        """Test retrieving current trace context.
+
+        Covers:
+        - 003-FR-019: trace_id and span_id injection
+        """
         with tracing_manager.start_span("context_test"):
             context = tracing_manager.get_current_trace_context()
 
@@ -299,11 +341,16 @@ class TestTracingContext:
             assert len(context["span_id"]) == 16  # 64-bit span ID
 
     @pytest.mark.requirement("006-FR-030")
+    @pytest.mark.requirement("003-FR-019")
     def test_trace_context_outside_span(
         self,
         tracing_manager,
     ) -> None:
-        """Test trace context when no span is active."""
+        """Test trace context when no span is active.
+
+        Covers:
+        - 003-FR-019: trace_id and span_id handling
+        """
         # Outside any span, context should have None values
         context = tracing_manager.get_current_trace_context()
 

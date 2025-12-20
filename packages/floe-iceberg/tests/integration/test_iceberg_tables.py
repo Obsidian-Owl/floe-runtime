@@ -227,13 +227,18 @@ class TestTableCreation:
 
     @pytest.mark.requirement("006-FR-013")
     @pytest.mark.requirement("006-FR-023")
+    @pytest.mark.requirement("004-FR-012")
     def test_create_table_with_arrow_schema(
         self,
         table_manager: IcebergTableManager,
         test_table_name: str,
         sample_schema: pa.Schema,
     ) -> None:
-        """Test creating a table with PyArrow schema."""
+        """Test creating a table with PyArrow schema.
+
+        Covers:
+        - 004-FR-012: Creating new Iceberg tables with defined schemas
+        """
         try:
             table = table_manager.create_table(test_table_name, sample_schema)
 
@@ -244,13 +249,18 @@ class TestTableCreation:
                 table_manager.drop_table(test_table_name)
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-012")
     def test_create_table_with_properties(
         self,
         table_manager: IcebergTableManager,
         test_table_name: str,
         sample_schema: pa.Schema,
     ) -> None:
-        """Test creating a table with custom properties."""
+        """Test creating a table with custom properties.
+
+        Covers:
+        - 004-FR-012: Creating new Iceberg tables with defined schemas
+        """
         properties = {
             "owner": "test_team",
             "description": "Test table",
@@ -270,13 +280,20 @@ class TestTableCreation:
                 table_manager.drop_table(test_table_name)
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-012")
+    @pytest.mark.requirement("004-FR-018")
     def test_create_partitioned_table(
         self,
         table_manager: IcebergTableManager,
         test_table_name: str,
         sample_schema: pa.Schema,
     ) -> None:
-        """Test creating a partitioned table."""
+        """Test creating a partitioned table.
+
+        Covers:
+        - 004-FR-012: Creating new Iceberg tables with defined schemas
+        - 004-FR-018: Creating partitioned tables
+        """
         partition_spec = [
             PartitionTransform(
                 source_column="created_at",
@@ -300,13 +317,18 @@ class TestTableCreation:
                 table_manager.drop_table(test_table_name)
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-012")
     def test_create_table_already_exists(
         self,
         table_manager: IcebergTableManager,
         test_table_name: str,
         sample_schema: pa.Schema,
     ) -> None:
-        """Test that creating an existing table raises error."""
+        """Test that creating an existing table raises error.
+
+        Covers:
+        - 004-FR-012: Creating new Iceberg tables (error handling)
+        """
         try:
             table_manager.create_table(test_table_name, sample_schema)
 
@@ -317,13 +339,18 @@ class TestTableCreation:
                 table_manager.drop_table(test_table_name)
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-012")
     def test_create_table_if_not_exists(
         self,
         table_manager: IcebergTableManager,
         test_table_name: str,
         sample_schema: pa.Schema,
     ) -> None:
-        """Test idempotent table creation."""
+        """Test idempotent table creation.
+
+        Covers:
+        - 004-FR-012: Creating new Iceberg tables (idempotent)
+        """
         try:
             # First creation
             table1 = table_manager.create_table_if_not_exists(
@@ -343,12 +370,17 @@ class TestTableCreation:
                 table_manager.drop_table(test_table_name)
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-012")
     def test_create_table_namespace_not_found(
         self,
         table_manager: IcebergTableManager,
         sample_schema: pa.Schema,
     ) -> None:
-        """Test creating table in non-existent namespace."""
+        """Test creating table in non-existent namespace.
+
+        Covers:
+        - 004-FR-012: Creating new Iceberg tables (error handling)
+        """
         with pytest.raises(NamespaceNotFoundError):
             table_manager.create_table(
                 "nonexistent_ns_12345.test_table",
@@ -365,13 +397,20 @@ class TestTableOperations:
     """Tests for table load, drop, and list operations."""
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-013")
+    @pytest.mark.requirement("004-FR-017")
     def test_load_table(
         self,
         table_manager: IcebergTableManager,
         test_table_name: str,
         sample_schema: pa.Schema,
     ) -> None:
-        """Test loading an existing table."""
+        """Test loading an existing table.
+
+        Covers:
+        - 004-FR-013: Loading existing Iceberg tables by name
+        - 004-FR-017: Retrieving table schema information
+        """
         try:
             table_manager.create_table(test_table_name, sample_schema)
 
@@ -384,23 +423,33 @@ class TestTableOperations:
                 table_manager.drop_table(test_table_name)
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-013")
     def test_load_table_not_found(
         self,
         table_manager: IcebergTableManager,
         test_namespace: str,
     ) -> None:
-        """Test loading non-existent table raises error."""
+        """Test loading non-existent table raises error.
+
+        Covers:
+        - 004-FR-013: Loading existing Iceberg tables (error handling)
+        """
         with pytest.raises(TableNotFoundError):
             table_manager.load_table(f"{test_namespace}.nonexistent_table_12345")
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-015")
     def test_drop_table(
         self,
         table_manager: IcebergTableManager,
         test_table_name: str,
         sample_schema: pa.Schema,
     ) -> None:
-        """Test dropping a table."""
+        """Test dropping a table.
+
+        Covers:
+        - 004-FR-015: Dropping (deleting) tables from the catalog
+        """
         table_manager.create_table(test_table_name, sample_schema)
 
         table_manager.drop_table(test_table_name)
@@ -408,23 +457,33 @@ class TestTableOperations:
         assert not table_manager.table_exists(test_table_name)
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-015")
     def test_drop_table_not_found(
         self,
         table_manager: IcebergTableManager,
         test_namespace: str,
     ) -> None:
-        """Test dropping non-existent table raises error."""
+        """Test dropping non-existent table raises error.
+
+        Covers:
+        - 004-FR-015: Dropping tables (error handling)
+        """
         with pytest.raises(TableNotFoundError):
             table_manager.drop_table(f"{test_namespace}.nonexistent_table_12345")
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-016")
     def test_table_exists(
         self,
         table_manager: IcebergTableManager,
         test_table_name: str,
         sample_schema: pa.Schema,
     ) -> None:
-        """Test table_exists check."""
+        """Test table_exists check.
+
+        Covers:
+        - 004-FR-016: Checking table existence before operations
+        """
         assert not table_manager.table_exists(test_table_name)
 
         try:
@@ -436,13 +495,18 @@ class TestTableOperations:
                 table_manager.drop_table(test_table_name)
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-014")
     def test_list_tables(
         self,
         table_manager: IcebergTableManager,
         test_namespace: str,
         sample_schema: pa.Schema,
     ) -> None:
-        """Test listing tables in namespace."""
+        """Test listing tables in namespace.
+
+        Covers:
+        - 004-FR-014: Listing tables within a namespace
+        """
         table1 = f"{test_namespace}.list_test_1_{uuid.uuid4().hex[:8]}"
         table2 = f"{test_namespace}.list_test_2_{uuid.uuid4().hex[:8]}"
 
@@ -471,6 +535,9 @@ class TestDataOperations:
     """Tests for append, overwrite, and scan operations."""
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-019")
+    @pytest.mark.requirement("004-FR-021")
+    @pytest.mark.requirement("004-FR-025")
     def test_append_arrow_table(
         self,
         table_manager: IcebergTableManager,
@@ -478,7 +545,13 @@ class TestDataOperations:
         sample_schema: pa.Schema,
         sample_data: pa.Table,
     ) -> None:
-        """Test appending PyArrow Table data."""
+        """Test appending PyArrow Table data.
+
+        Covers:
+        - 004-FR-019: Appending data with ACID guarantees
+        - 004-FR-021: Reading data via table scans
+        - 004-FR-025: Output modes (append)
+        """
         try:
             table_manager.create_table(test_table_name, sample_schema)
 
@@ -496,6 +569,7 @@ class TestDataOperations:
                 table_manager.drop_table(test_table_name)
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-019")
     def test_append_dataframe(
         self,
         table_manager: IcebergTableManager,
@@ -503,7 +577,11 @@ class TestDataOperations:
         sample_schema: pa.Schema,
         sample_dataframe: pd.DataFrame,
     ) -> None:
-        """Test appending Pandas DataFrame."""
+        """Test appending Pandas DataFrame.
+
+        Covers:
+        - 004-FR-019: Appending data with ACID guarantees
+        """
         try:
             table_manager.create_table(test_table_name, sample_schema)
 
@@ -519,6 +597,7 @@ class TestDataOperations:
                 table_manager.drop_table(test_table_name)
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-019")
     def test_append_multiple_batches(
         self,
         table_manager: IcebergTableManager,
@@ -526,7 +605,11 @@ class TestDataOperations:
         sample_schema: pa.Schema,
         sample_data: pa.Table,
     ) -> None:
-        """Test multiple append operations."""
+        """Test multiple append operations.
+
+        Covers:
+        - 004-FR-019: Appending data with ACID guarantees
+        """
         try:
             table_manager.create_table(test_table_name, sample_schema)
 
@@ -543,6 +626,8 @@ class TestDataOperations:
                 table_manager.drop_table(test_table_name)
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-020")
+    @pytest.mark.requirement("004-FR-025")
     def test_overwrite_data(
         self,
         table_manager: IcebergTableManager,
@@ -550,7 +635,12 @@ class TestDataOperations:
         sample_schema: pa.Schema,
         sample_data: pa.Table,
     ) -> None:
-        """Test overwrite operation replaces all data."""
+        """Test overwrite operation replaces all data.
+
+        Covers:
+        - 004-FR-020: Overwriting data with ACID guarantees
+        - 004-FR-025: Output modes (overwrite)
+        """
         try:
             table_manager.create_table(test_table_name, sample_schema)
 
@@ -585,6 +675,7 @@ class TestDataOperations:
                 table_manager.drop_table(test_table_name)
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-021")
     def test_scan_all_data(
         self,
         table_manager: IcebergTableManager,
@@ -592,7 +683,11 @@ class TestDataOperations:
         sample_schema: pa.Schema,
         sample_data: pa.Table,
     ) -> None:
-        """Test scanning all table data."""
+        """Test scanning all table data.
+
+        Covers:
+        - 004-FR-021: Reading data via table scans
+        """
         try:
             table_manager.create_table(test_table_name, sample_schema)
             table_manager.append(test_table_name, sample_data)
@@ -606,6 +701,8 @@ class TestDataOperations:
                 table_manager.drop_table(test_table_name)
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-021")
+    @pytest.mark.requirement("004-FR-022")
     def test_scan_select_columns(
         self,
         table_manager: IcebergTableManager,
@@ -613,7 +710,12 @@ class TestDataOperations:
         sample_schema: pa.Schema,
         sample_data: pa.Table,
     ) -> None:
-        """Test column projection in scan."""
+        """Test column projection in scan.
+
+        Covers:
+        - 004-FR-021: Reading data via table scans
+        - 004-FR-022: Column projection
+        """
         try:
             table_manager.create_table(test_table_name, sample_schema)
             table_manager.append(test_table_name, sample_data)
@@ -632,6 +734,8 @@ class TestDataOperations:
                 table_manager.drop_table(test_table_name)
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-021")
+    @pytest.mark.requirement("004-FR-024")
     def test_scan_with_limit(
         self,
         table_manager: IcebergTableManager,
@@ -639,7 +743,12 @@ class TestDataOperations:
         sample_schema: pa.Schema,
         sample_data: pa.Table,
     ) -> None:
-        """Test scan with row limit."""
+        """Test scan with row limit.
+
+        Covers:
+        - 004-FR-021: Reading data via table scans
+        - 004-FR-024: Limit-based scanning
+        """
         try:
             table_manager.create_table(test_table_name, sample_schema)
             table_manager.append(test_table_name, sample_data)
@@ -661,6 +770,7 @@ class TestSnapshotOperations:
     """Tests for snapshot management."""
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-027")
     def test_list_snapshots(
         self,
         table_manager: IcebergTableManager,
@@ -668,7 +778,11 @@ class TestSnapshotOperations:
         sample_schema: pa.Schema,
         sample_data: pa.Table,
     ) -> None:
-        """Test listing table snapshots."""
+        """Test listing table snapshots.
+
+        Covers:
+        - 004-FR-027: Snapshot listing and management
+        """
         try:
             table_manager.create_table(test_table_name, sample_schema)
             table_manager.append(test_table_name, sample_data)
@@ -685,6 +799,7 @@ class TestSnapshotOperations:
                 table_manager.drop_table(test_table_name)
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-027")
     def test_get_current_snapshot(
         self,
         table_manager: IcebergTableManager,
@@ -692,7 +807,11 @@ class TestSnapshotOperations:
         sample_schema: pa.Schema,
         sample_data: pa.Table,
     ) -> None:
-        """Test getting current snapshot."""
+        """Test getting current snapshot.
+
+        Covers:
+        - 004-FR-027: Snapshot listing and management
+        """
         try:
             table_manager.create_table(test_table_name, sample_schema)
             append_result = table_manager.append(test_table_name, sample_data)
@@ -706,6 +825,7 @@ class TestSnapshotOperations:
                 table_manager.drop_table(test_table_name)
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-026")
     def test_time_travel_scan(
         self,
         table_manager: IcebergTableManager,
@@ -713,7 +833,11 @@ class TestSnapshotOperations:
         sample_schema: pa.Schema,
         sample_data: pa.Table,
     ) -> None:
-        """Test time travel by scanning specific snapshot."""
+        """Test time travel by scanning specific snapshot.
+
+        Covers:
+        - 004-FR-026: Time-travel queries by snapshot ID/timestamp
+        """
         try:
             table_manager.create_table(test_table_name, sample_schema)
 
@@ -758,6 +882,8 @@ class TestSchemaEvolution:
     """Tests for automatic schema evolution."""
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-028")
+    @pytest.mark.requirement("004-FR-030")
     def test_append_with_new_columns(
         self,
         table_manager: IcebergTableManager,
@@ -765,7 +891,12 @@ class TestSchemaEvolution:
         sample_schema: pa.Schema,
         sample_data: pa.Table,
     ) -> None:
-        """Test that new columns are added automatically."""
+        """Test that new columns are added automatically.
+
+        Covers:
+        - 004-FR-028: Adding columns
+        - 004-FR-030: Adding optional columns with defaults
+        """
         try:
             table_manager.create_table(test_table_name, sample_schema)
             table_manager.append(test_table_name, sample_data)
@@ -801,12 +932,27 @@ class TestIntegrationScenarios:
     """End-to-end integration scenarios."""
 
     @pytest.mark.requirement("006-FR-013")
+    @pytest.mark.requirement("004-FR-012")
+    @pytest.mark.requirement("004-FR-015")
+    @pytest.mark.requirement("004-FR-016")
+    @pytest.mark.requirement("004-FR-019")
+    @pytest.mark.requirement("004-FR-020")
+    @pytest.mark.requirement("004-FR-021")
     def test_full_table_lifecycle(
         self,
         table_manager: IcebergTableManager,
         test_namespace: str,
     ) -> None:
-        """Test complete table lifecycle: create, write, read, drop."""
+        """Test complete table lifecycle: create, write, read, drop.
+
+        Covers:
+        - 004-FR-012: Creating new Iceberg tables
+        - 004-FR-015: Dropping tables
+        - 004-FR-016: Checking table existence
+        - 004-FR-019: Appending data with ACID
+        - 004-FR-020: Overwriting data with ACID
+        - 004-FR-021: Reading data via table scans
+        """
         table_name = f"{test_namespace}.lifecycle_test_{uuid.uuid4().hex[:8]}"
 
         schema = pa.schema(

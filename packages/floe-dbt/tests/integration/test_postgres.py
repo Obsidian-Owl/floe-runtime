@@ -122,12 +122,17 @@ class TestPostgreSQLProfileGeneration:
         return ProfileWriter()
 
     @pytest.mark.requirement("006-FR-010")
+    @pytest.mark.requirement("003-FR-002")
     def test_generate_postgres_profile_structure(
         self,
         factory: Any,
         base_metadata: dict[str, Any],
     ) -> None:
-        """Test PostgreSQL profile generation produces correct structure."""
+        """Test PostgreSQL profile generation produces correct structure.
+
+        Covers:
+        - 003-FR-002: Support all 7 compute targets (PostgreSQL)
+        """
         from floe_dbt.profiles.base import ProfileGeneratorConfig
 
         artifacts = {
@@ -219,12 +224,17 @@ class TestPostgreSQLProfileGeneration:
         assert outputs["dev"]["port"] == 5432
 
     @pytest.mark.requirement("006-FR-010")
+    @pytest.mark.requirement("003-FR-003")
     def test_postgres_profile_env_var_security(
         self,
         factory: Any,
         base_metadata: dict[str, Any],
     ) -> None:
-        """Test PostgreSQL credentials use env_var template (never hardcoded)."""
+        """Test PostgreSQL credentials use env_var template (never hardcoded).
+
+        Covers:
+        - 003-FR-003: Use environment variable references for credentials
+        """
         from floe_dbt.profiles.base import ProfileGeneratorConfig
 
         artifacts = {

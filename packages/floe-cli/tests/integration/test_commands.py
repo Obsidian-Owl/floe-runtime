@@ -57,8 +57,17 @@ class TestValidateCommandIntegration:
 
     @pytest.mark.requirement("006-FR-006")
     @pytest.mark.requirement("006-FR-009")
+    @pytest.mark.requirement("002-FR-001")
+    @pytest.mark.requirement("002-FR-010")
+    @pytest.mark.requirement("002-FR-015")
     def test_validate_with_valid_config(self, tmp_path: Path) -> None:
-        """Verify validate command succeeds with valid configuration."""
+        """Verify validate command succeeds with valid configuration.
+
+        Covers:
+        - 002-FR-001: floe validate command validates floe.yaml
+        - 002-FR-010: --file option for alternate config paths
+        - 002-FR-015: Exit code 0 on success
+        """
         runner = CliRunner()
 
         # Create valid floe.yaml
@@ -73,8 +82,17 @@ class TestValidateCommandIntegration:
 
     @pytest.mark.requirement("006-FR-006")
     @pytest.mark.requirement("006-FR-009")
+    @pytest.mark.requirement("002-FR-001")
+    @pytest.mark.requirement("002-FR-009")
+    @pytest.mark.requirement("002-FR-015")
     def test_validate_with_invalid_config(self, tmp_path: Path) -> None:
-        """Verify validate command fails with invalid configuration."""
+        """Verify validate command fails with invalid configuration.
+
+        Covers:
+        - 002-FR-001: floe validate command validates floe.yaml
+        - 002-FR-009: User-friendly error messages without stack traces
+        - 002-FR-015: Non-zero exit code on failure
+        """
         runner = CliRunner()
 
         # Create invalid floe.yaml (missing name)
@@ -90,8 +108,15 @@ class TestValidateCommandIntegration:
 
     @pytest.mark.requirement("006-FR-006")
     @pytest.mark.requirement("006-FR-009")
+    @pytest.mark.requirement("002-FR-001")
+    @pytest.mark.requirement("002-FR-009")
     def test_validate_with_missing_file(self, tmp_path: Path) -> None:
-        """Verify validate command fails gracefully when file is missing."""
+        """Verify validate command fails gracefully when file is missing.
+
+        Covers:
+        - 002-FR-001: floe validate command
+        - 002-FR-009: User-friendly error messages
+        """
         runner = CliRunner()
 
         nonexistent = tmp_path / "nonexistent.yaml"
@@ -103,8 +128,15 @@ class TestValidateCommandIntegration:
 
     @pytest.mark.requirement("006-FR-006")
     @pytest.mark.requirement("006-FR-009")
+    @pytest.mark.requirement("002-FR-001")
+    @pytest.mark.requirement("002-FR-009")
     def test_validate_default_path_without_file(self) -> None:
-        """Verify validate command fails when default floe.yaml doesn't exist."""
+        """Verify validate command fails when default floe.yaml doesn't exist.
+
+        Covers:
+        - 002-FR-001: floe validate command
+        - 002-FR-009: User-friendly error messages
+        """
         runner = CliRunner()
 
         with runner.isolated_filesystem():
@@ -115,8 +147,15 @@ class TestValidateCommandIntegration:
 
     @pytest.mark.requirement("006-FR-006")
     @pytest.mark.requirement("006-FR-009")
+    @pytest.mark.requirement("002-FR-001")
+    @pytest.mark.requirement("002-FR-015")
     def test_validate_default_path_with_file(self) -> None:
-        """Verify validate command uses default ./floe.yaml path."""
+        """Verify validate command uses default ./floe.yaml path.
+
+        Covers:
+        - 002-FR-001: floe validate command
+        - 002-FR-015: Exit code 0 on success
+        """
         runner = CliRunner()
 
         with runner.isolated_filesystem():
@@ -137,8 +176,17 @@ class TestCompileCommandIntegration:
 
     @pytest.mark.requirement("006-FR-006")
     @pytest.mark.requirement("006-FR-009")
+    @pytest.mark.requirement("002-FR-002")
+    @pytest.mark.requirement("002-FR-010")
+    @pytest.mark.requirement("002-FR-011")
     def test_compile_produces_artifacts(self, tmp_path: Path) -> None:
-        """Verify compile command generates CompiledArtifacts JSON."""
+        """Verify compile command generates CompiledArtifacts JSON.
+
+        Covers:
+        - 002-FR-002: floe compile transforms FloeSpec into CompiledArtifacts
+        - 002-FR-010: --file option for alternate config paths
+        - 002-FR-011: --output option for output location
+        """
         runner = CliRunner()
 
         # Create valid floe.yaml
@@ -168,8 +216,15 @@ class TestCompileCommandIntegration:
 
     @pytest.mark.requirement("006-FR-006")
     @pytest.mark.requirement("006-FR-009")
+    @pytest.mark.requirement("002-FR-002")
+    @pytest.mark.requirement("002-FR-011")
     def test_compile_creates_output_directory(self, tmp_path: Path) -> None:
-        """Verify compile command creates output directory if it doesn't exist."""
+        """Verify compile command creates output directory if it doesn't exist.
+
+        Covers:
+        - 002-FR-002: floe compile command
+        - 002-FR-011: --output option creates directories
+        """
         runner = CliRunner()
 
         floe_yaml = tmp_path / "floe.yaml"
@@ -188,8 +243,15 @@ class TestCompileCommandIntegration:
 
     @pytest.mark.requirement("006-FR-006")
     @pytest.mark.requirement("006-FR-009")
+    @pytest.mark.requirement("002-FR-002")
+    @pytest.mark.requirement("002-FR-015")
     def test_compile_with_invalid_config(self, tmp_path: Path) -> None:
-        """Verify compile command fails with invalid configuration."""
+        """Verify compile command fails with invalid configuration.
+
+        Covers:
+        - 002-FR-002: floe compile command
+        - 002-FR-015: Non-zero exit code on failure
+        """
         runner = CliRunner()
 
         floe_yaml = tmp_path / "floe.yaml"
@@ -205,8 +267,15 @@ class TestCompileCommandIntegration:
 
     @pytest.mark.requirement("006-FR-006")
     @pytest.mark.requirement("006-FR-009")
+    @pytest.mark.requirement("002-FR-002")
+    @pytest.mark.requirement("002-FR-009")
     def test_compile_with_missing_file(self, tmp_path: Path) -> None:
-        """Verify compile command fails when source file is missing."""
+        """Verify compile command fails when source file is missing.
+
+        Covers:
+        - 002-FR-002: floe compile command
+        - 002-FR-009: User-friendly error messages
+        """
         runner = CliRunner()
 
         nonexistent = tmp_path / "nonexistent.yaml"
@@ -221,8 +290,13 @@ class TestCompileCommandIntegration:
 
     @pytest.mark.requirement("006-FR-006")
     @pytest.mark.requirement("006-FR-009")
+    @pytest.mark.requirement("002-FR-002")
     def test_compile_default_output_directory(self) -> None:
-        """Verify compile command uses default .floe/ output directory."""
+        """Verify compile command uses default .floe/ output directory.
+
+        Covers:
+        - 002-FR-002: floe compile uses default .floe/ output
+        """
         runner = CliRunner()
 
         with runner.isolated_filesystem():
@@ -242,8 +316,15 @@ class TestInitCommandIntegration:
 
     @pytest.mark.requirement("006-FR-006")
     @pytest.mark.requirement("006-FR-009")
+    @pytest.mark.requirement("002-FR-003")
+    @pytest.mark.requirement("002-FR-015")
     def test_init_creates_floe_yaml(self) -> None:
-        """Verify init command creates floe.yaml file."""
+        """Verify init command creates floe.yaml file.
+
+        Covers:
+        - 002-FR-003: floe init scaffolds new project with template files
+        - 002-FR-015: Exit code 0 on success
+        """
         runner = CliRunner()
 
         with runner.isolated_filesystem():
@@ -262,8 +343,13 @@ class TestInitCommandIntegration:
 
     @pytest.mark.requirement("006-FR-006")
     @pytest.mark.requirement("006-FR-009")
+    @pytest.mark.requirement("002-FR-003")
     def test_init_creates_readme(self) -> None:
-        """Verify init command creates README.md file."""
+        """Verify init command creates README.md file.
+
+        Covers:
+        - 002-FR-003: floe init creates template files including README
+        """
         runner = CliRunner()
 
         with runner.isolated_filesystem():
@@ -278,8 +364,13 @@ class TestInitCommandIntegration:
 
     @pytest.mark.requirement("006-FR-006")
     @pytest.mark.requirement("006-FR-009")
+    @pytest.mark.requirement("002-FR-003")
     def test_init_with_custom_target(self) -> None:
-        """Verify init command accepts custom compute target."""
+        """Verify init command accepts custom compute target.
+
+        Covers:
+        - 002-FR-003: floe init with --target option
+        """
         runner = CliRunner()
 
         with runner.isolated_filesystem():
@@ -294,8 +385,15 @@ class TestInitCommandIntegration:
 
     @pytest.mark.requirement("006-FR-006")
     @pytest.mark.requirement("006-FR-009")
+    @pytest.mark.requirement("002-FR-003")
+    @pytest.mark.requirement("002-FR-015")
     def test_init_refuses_overwrite_without_force(self) -> None:
-        """Verify init command refuses to overwrite existing floe.yaml."""
+        """Verify init command refuses to overwrite existing floe.yaml.
+
+        Covers:
+        - 002-FR-003: floe init respects existing files
+        - 002-FR-015: Non-zero exit code on failure
+        """
         runner = CliRunner()
 
         with runner.isolated_filesystem():
@@ -309,8 +407,13 @@ class TestInitCommandIntegration:
 
     @pytest.mark.requirement("006-FR-006")
     @pytest.mark.requirement("006-FR-009")
+    @pytest.mark.requirement("002-FR-003")
     def test_init_overwrites_with_force(self) -> None:
-        """Verify init command overwrites with --force flag."""
+        """Verify init command overwrites with --force flag.
+
+        Covers:
+        - 002-FR-003: floe init --force overwrites existing files
+        """
         runner = CliRunner()
 
         with runner.isolated_filesystem():
@@ -327,8 +430,13 @@ class TestInitCommandIntegration:
 
     @pytest.mark.requirement("006-FR-006")
     @pytest.mark.requirement("006-FR-009")
+    @pytest.mark.requirement("002-FR-003")
     def test_init_uses_directory_name_as_default(self) -> None:
-        """Verify init command uses current directory name when no name specified."""
+        """Verify init command uses current directory name when no name specified.
+
+        Covers:
+        - 002-FR-003: floe init uses sensible defaults
+        """
         runner = CliRunner()
 
         with runner.isolated_filesystem(temp_dir=None) as temp_dir:
@@ -343,8 +451,15 @@ class TestInitCommandIntegration:
 
     @pytest.mark.requirement("006-FR-006")
     @pytest.mark.requirement("006-FR-009")
+    @pytest.mark.requirement("002-FR-003")
+    @pytest.mark.requirement("002-FR-009")
     def test_init_validates_project_name(self) -> None:
-        """Verify init command validates project name format."""
+        """Verify init command validates project name format.
+
+        Covers:
+        - 002-FR-003: floe init validates input
+        - 002-FR-009: User-friendly error messages
+        """
         runner = CliRunner()
 
         with runner.isolated_filesystem():
@@ -362,8 +477,15 @@ class TestCommandChaining:
 
     @pytest.mark.requirement("006-FR-006")
     @pytest.mark.requirement("006-FR-009")
+    @pytest.mark.requirement("002-FR-001")
+    @pytest.mark.requirement("002-FR-003")
     def test_init_then_validate_workflow(self) -> None:
-        """Verify init creates config that passes validation."""
+        """Verify init creates config that passes validation.
+
+        Covers:
+        - 002-FR-001: floe validate works on init output
+        - 002-FR-003: floe init creates valid configuration
+        """
         runner = CliRunner()
 
         with runner.isolated_filesystem():
@@ -378,8 +500,15 @@ class TestCommandChaining:
 
     @pytest.mark.requirement("006-FR-006")
     @pytest.mark.requirement("006-FR-009")
+    @pytest.mark.requirement("002-FR-002")
+    @pytest.mark.requirement("002-FR-003")
     def test_init_then_compile_workflow(self) -> None:
-        """Verify init creates config that can be compiled."""
+        """Verify init creates config that can be compiled.
+
+        Covers:
+        - 002-FR-002: floe compile works on init output
+        - 002-FR-003: floe init creates compilable configuration
+        """
         runner = CliRunner()
 
         with runner.isolated_filesystem():
@@ -394,8 +523,17 @@ class TestCommandChaining:
 
     @pytest.mark.requirement("006-FR-006")
     @pytest.mark.requirement("006-FR-009")
+    @pytest.mark.requirement("002-FR-001")
+    @pytest.mark.requirement("002-FR-002")
+    @pytest.mark.requirement("002-FR-003")
     def test_full_workflow_init_validate_compile(self) -> None:
-        """Verify complete init → validate → compile workflow."""
+        """Verify complete init → validate → compile workflow.
+
+        Covers:
+        - 002-FR-001: floe validate command
+        - 002-FR-002: floe compile command
+        - 002-FR-003: floe init command
+        """
         runner = CliRunner()
 
         with runner.isolated_filesystem():

@@ -73,12 +73,17 @@ class TestSparkProfileGeneration:
         return ProfileFactory
 
     @pytest.mark.requirement("006-FR-010")
+    @pytest.mark.requirement("003-FR-002")
     def test_generate_spark_profile_structure(
         self,
         factory: Any,
         base_metadata: dict[str, Any],
     ) -> None:
-        """Test Spark profile generation produces correct structure."""
+        """Test Spark profile generation produces correct structure.
+
+        Covers:
+        - 003-FR-002: Support all 7 compute targets (Spark)
+        """
         from floe_dbt.profiles.base import ProfileGeneratorConfig
 
         artifacts = {

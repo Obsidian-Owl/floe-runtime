@@ -168,6 +168,8 @@ class TestCompiledArtifactsToDagster:
         return artifacts_path
 
     @pytest.mark.requirement("006-FR-032")
+    @pytest.mark.requirement("003-FR-006")
+    @pytest.mark.requirement("003-FR-008")
     def test_load_artifacts_creates_definitions(
         self,
         artifacts_json_file: Path,
@@ -176,6 +178,10 @@ class TestCompiledArtifactsToDagster:
 
         Verifies that the load_definitions_from_artifacts function
         successfully consumes the CompiledArtifacts contract.
+
+        Covers:
+        - 003-FR-006: Create Dagster SDA from dbt manifest
+        - 003-FR-008: Configure DbtCliResource with generated profiles
         """
         from floe_dagster.definitions import load_definitions_from_artifacts
 
@@ -189,6 +195,7 @@ class TestCompiledArtifactsToDagster:
         assert "dbt" in definitions.resources
 
     @pytest.mark.requirement("006-FR-032")
+    @pytest.mark.requirement("003-FR-006")
     def test_load_artifacts_from_dict(
         self,
         compiled_artifacts: dict[str, Any],
@@ -197,6 +204,9 @@ class TestCompiledArtifactsToDagster:
 
         Verifies that the load_definitions_from_dict function
         works with in-memory artifacts (useful for testing).
+
+        Covers:
+        - 003-FR-006: Create Dagster SDA from dbt manifest
         """
         from floe_dagster.definitions import load_definitions_from_dict
 
@@ -207,6 +217,8 @@ class TestCompiledArtifactsToDagster:
         assert definitions.resources is not None
 
     @pytest.mark.requirement("006-FR-032")
+    @pytest.mark.requirement("003-FR-006")
+    @pytest.mark.requirement("003-FR-010")
     def test_asset_metadata_from_artifacts(
         self,
         compiled_artifacts: dict[str, Any],
@@ -215,6 +227,10 @@ class TestCompiledArtifactsToDagster:
 
         Verifies that asset metadata (version, project path) is
         correctly propagated from the artifacts.
+
+        Covers:
+        - 003-FR-006: Create Dagster SDA from dbt manifest
+        - 003-FR-010: Attach metadata from dbt models to Dagster assets
         """
         from floe_dagster.assets import FloeAssetFactory
 
@@ -225,6 +241,7 @@ class TestCompiledArtifactsToDagster:
         assert assets
 
     @pytest.mark.requirement("006-FR-032")
+    @pytest.mark.requirement("003-FR-008")
     def test_transforms_configure_dbt_project(
         self,
         compiled_artifacts: dict[str, Any],
@@ -233,6 +250,9 @@ class TestCompiledArtifactsToDagster:
 
         Verifies that artifacts.transforms is used to configure
         the dbt project path and settings.
+
+        Covers:
+        - 003-FR-008: Configure DbtCliResource with generated profiles
         """
         from floe_dagster.definitions import load_definitions_from_dict
 
@@ -287,6 +307,7 @@ class TestObservabilityConfigPropagation:
         _check_dagster_available()
 
     @pytest.mark.requirement("006-FR-032")
+    @pytest.mark.requirement("003-FR-020")
     def test_observability_config_from_artifacts(
         self,
         base_metadata: dict[str, Any],
@@ -295,6 +316,9 @@ class TestObservabilityConfigPropagation:
 
         Verifies that artifacts.observability settings can be read
         for configuring tracing and lineage.
+
+        Covers:
+        - 003-FR-020: Support OTLP export when endpoint is configured
         """
         artifacts = {
             "version": "1.0.0",
@@ -330,6 +354,7 @@ class TestCompiledArtifactsVersioning:
         _check_dagster_available()
 
     @pytest.mark.requirement("006-FR-032")
+    @pytest.mark.requirement("003-FR-006")
     def test_v1_artifacts_supported(
         self,
         base_metadata: dict[str, Any],
@@ -340,6 +365,9 @@ class TestCompiledArtifactsVersioning:
         """v1.0.0 CompiledArtifacts structure is consumable.
 
         Ensures backward compatibility with the original contract version.
+
+        Covers:
+        - 003-FR-006: Create Dagster SDA from dbt manifest
         """
         from floe_dagster.definitions import load_definitions_from_dict
 
@@ -362,6 +390,8 @@ class TestCompiledArtifactsVersioning:
         assert definitions is not None
 
     @pytest.mark.requirement("006-FR-032")
+    @pytest.mark.requirement("003-FR-021")
+    @pytest.mark.requirement("003-FR-022")
     def test_optional_fields_default_gracefully(
         self,
         base_metadata: dict[str, Any],
@@ -372,6 +402,10 @@ class TestCompiledArtifactsVersioning:
         """Optional fields in CompiledArtifacts default gracefully.
 
         Verifies that missing optional fields don't break consumption.
+
+        Covers:
+        - 003-FR-021: Function without OpenLineage endpoint (graceful)
+        - 003-FR-022: Function without OTLP endpoint (graceful)
         """
         from floe_dagster.definitions import load_definitions_from_dict
 

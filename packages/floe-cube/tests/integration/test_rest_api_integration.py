@@ -96,12 +96,17 @@ class TestRestApiJsonResponse:
 
     @pytest.mark.requirement("006-FR-016")
     @pytest.mark.requirement("006-FR-023")
+    @pytest.mark.requirement("005-FR-011")
     def test_valid_query_returns_json(
         self,
         cube_client: httpx.Client,
         authenticated_headers: dict[str, str],
     ) -> None:
-        """Valid query should return JSON response with 'data' key."""
+        """Valid query should return JSON response with 'data' key.
+
+        Covers:
+        - 005-FR-011: System MUST expose REST API for JSON-formatted queries
+        """
         response = cube_client.post(
             "/cubejs-api/v1/load",
             headers=authenticated_headers,
@@ -348,12 +353,17 @@ class TestRestApiPagination:
     FR-007: REST API supports pagination for large result sets
     """
 
+    @pytest.mark.requirement("005-FR-014")
     def test_pagination_with_limit(
         self,
         cube_client: httpx.Client,
         authenticated_headers: dict[str, str],
     ) -> None:
-        """REST API should respect limit parameter."""
+        """REST API should respect limit parameter.
+
+        Covers:
+        - 005-FR-014: System MUST support pagination for large result sets
+        """
         response = cube_client.post(
             "/cubejs-api/v1/load",
             headers=authenticated_headers,
@@ -371,12 +381,17 @@ class TestRestApiPagination:
         assert "data" in data
         assert len(data["data"]) <= 100
 
+    @pytest.mark.requirement("005-FR-014")
     def test_pagination_with_offset(
         self,
         cube_client: httpx.Client,
         authenticated_headers: dict[str, str],
     ) -> None:
-        """REST API should support offset parameter."""
+        """REST API should support offset parameter.
+
+        Covers:
+        - 005-FR-014: System MUST support pagination for large result sets
+        """
         response = cube_client.post(
             "/cubejs-api/v1/load",
             headers=authenticated_headers,
@@ -457,6 +472,7 @@ class TestRestApiPagination:
 
         assert response.status_code == 200
 
+    @pytest.mark.requirement("005-FR-014")
     def test_pagination_over_10k_rows(
         self,
         cube_client: httpx.Client,
@@ -466,6 +482,9 @@ class TestRestApiPagination:
 
         This test verifies that multiple pages can be fetched sequentially.
         Requires sufficient test data (15k+ rows loaded by cube-init).
+
+        Covers:
+        - 005-FR-014: System MUST support pagination for large result sets
         """
         pages_fetched = 0
         page_size = 5000
@@ -504,12 +523,17 @@ class TestRestApiPagination:
 class TestRestApiErrorHandling:
     """Tests for REST API error handling."""
 
+    @pytest.mark.requirement("005-FR-015")
     def test_invalid_cube_name_returns_error(
         self,
         cube_client: httpx.Client,
         authenticated_headers: dict[str, str],
     ) -> None:
-        """Query with non-existent cube should return error."""
+        """Query with non-existent cube should return error.
+
+        Covers:
+        - 005-FR-015: System MUST return appropriate HTTP error codes for failed requests
+        """
         response = cube_client.post(
             "/cubejs-api/v1/load",
             headers=authenticated_headers,
@@ -567,12 +591,17 @@ class TestPreAggregations:
     (instead of GCS which is required for Trino export bucket).
     """
 
+    @pytest.mark.requirement("005-FR-025")
     def test_pre_aggregation_status_api_accessible(
         self,
         cube_client: httpx.Client,
         authenticated_headers: dict[str, str],
     ) -> None:
-        """Pre-aggregation status API should be accessible."""
+        """Pre-aggregation status API should be accessible.
+
+        Covers:
+        - 005-FR-025: System MUST support pre-aggregation refresh schedules
+        """
         response = cube_client.get(
             "/cubejs-api/v1/pre-aggregations/jobs",
             headers=authenticated_headers,
@@ -584,6 +613,7 @@ class TestPreAggregations:
             404,
         ), f"Pre-aggregation jobs API failed: {response.status_code}: {response.text}"
 
+    @pytest.mark.requirement("005-FR-026")
     def test_query_can_use_pre_aggregation(
         self,
         cube_client: httpx.Client,
@@ -597,6 +627,9 @@ class TestPreAggregations:
         - timeDimension: createdAt with day granularity
 
         This query matches that definition.
+
+        Covers:
+        - 005-FR-026: System MUST automatically use pre-aggregated data when queries match
         """
         response = cube_client.post(
             "/cubejs-api/v1/load",

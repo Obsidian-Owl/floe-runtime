@@ -135,12 +135,17 @@ class TestOpenLineageEventEmission:
     """
 
     @pytest.mark.requirement("006-FR-025")
+    @pytest.mark.requirement("005-FR-020")
     def test_start_event_creates_run(
         self,
         marquez_client: httpx.Client,
         unique_job_name: str,
     ) -> None:
-        """START event should create a run in Marquez."""
+        """START event should create a run in Marquez.
+
+        Covers:
+        - 005-FR-020: Emit OpenLineage START event before query execution
+        """
         run_id = str(uuid.uuid4())
 
         # Emit START event
@@ -173,12 +178,17 @@ class TestOpenLineageEventEmission:
         assert run_id in run_ids, f"Run {run_id} not found in Marquez"
 
     @pytest.mark.requirement("006-FR-025")
+    @pytest.mark.requirement("005-FR-021")
     def test_complete_event_marks_run_finished(
         self,
         marquez_client: httpx.Client,
         unique_job_name: str,
     ) -> None:
-        """COMPLETE event should mark run as finished."""
+        """COMPLETE event should mark run as finished.
+
+        Covers:
+        - 005-FR-021: Emit OpenLineage COMPLETE event after query success
+        """
         run_id = str(uuid.uuid4())
 
         # Emit START event
@@ -219,12 +229,17 @@ class TestOpenLineageEventEmission:
         )
 
     @pytest.mark.requirement("006-FR-025")
+    @pytest.mark.requirement("005-FR-022")
     def test_fail_event_marks_run_failed(
         self,
         marquez_client: httpx.Client,
         unique_job_name: str,
     ) -> None:
-        """FAIL event should mark run as failed."""
+        """FAIL event should mark run as failed.
+
+        Covers:
+        - 005-FR-022: Emit OpenLineage FAIL event after query failure
+        """
         run_id = str(uuid.uuid4())
 
         # Emit START event
@@ -262,12 +277,17 @@ class TestOpenLineageEventEmission:
         assert run_data.get("state") == "FAILED", f"Expected FAILED, got {run_data.get('state')}"
 
     @pytest.mark.requirement("006-FR-025")
+    @pytest.mark.requirement("005-FR-023")
     def test_namespace_created(
         self,
         marquez_client: httpx.Client,
         unique_job_name: str,
     ) -> None:
-        """Namespace should be created when event is emitted."""
+        """Namespace should be created when event is emitted.
+
+        Covers:
+        - 005-FR-023: Include cube name and query metadata in lineage events
+        """
         run_id = str(uuid.uuid4())
 
         # Emit event to create namespace
@@ -288,12 +308,19 @@ class TestOpenLineageEventEmission:
         assert ns_response.json()["name"] == OPENLINEAGE_NAMESPACE
 
     @pytest.mark.requirement("006-FR-025")
+    @pytest.mark.requirement("005-FR-023")
+    @pytest.mark.requirement("005-FR-024")
     def test_job_created_with_inputs(
         self,
         marquez_client: httpx.Client,
         unique_job_name: str,
     ) -> None:
-        """Job should be created with input datasets."""
+        """Job should be created with input datasets.
+
+        Covers:
+        - 005-FR-023: Include cube name and query metadata in lineage events
+        - 005-FR-024: Include input/output dataset references in lineage events
+        """
         run_id = str(uuid.uuid4())
         inputs = ["orders", "customers"]
 
@@ -327,11 +354,18 @@ class TestQueryLineageEmitterIntegration:
     """
 
     @pytest.mark.requirement("006-FR-025")
+    @pytest.mark.requirement("005-FR-020")
+    @pytest.mark.requirement("005-FR-021")
     def test_emitter_sends_to_marquez(
         self,
         marquez_client: httpx.Client,
     ) -> None:
-        """QueryLineageEmitter should send events to Marquez."""
+        """QueryLineageEmitter should send events to Marquez.
+
+        Covers:
+        - 005-FR-020: Emit OpenLineage START event before query execution
+        - 005-FR-021: Emit OpenLineage COMPLETE event after query success
+        """
         from floe_cube.lineage import QueryLineageEmitter
 
         # Create emitter pointing to Marquez
@@ -378,8 +412,13 @@ class TestQueryLineageEmitterIntegration:
             assert run_id in run_ids, f"Run {run_id} not found in Marquez"
 
     @pytest.mark.requirement("006-FR-025")
+    @pytest.mark.requirement("005-FR-029")
     def test_emitter_handles_connection_error_gracefully(self) -> None:
-        """Emitter should handle connection errors without raising."""
+        """Emitter should handle connection errors without raising.
+
+        Covers:
+        - 005-FR-029: Support disabling lineage via configuration (graceful degradation)
+        """
         from floe_cube.lineage import QueryLineageEmitter
 
         # Create emitter pointing to non-existent endpoint
