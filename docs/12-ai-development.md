@@ -143,6 +143,12 @@ When working with Pydantic schemas, the pydantic-schemas skill will:
 - Shows classification propagation
 - Generates Mermaid diagrams
 
+**`/traceability [--feature-id ID] [--threshold N]`** - Generate coverage report
+- Shows requirement-to-test traceability matrix
+- Verifies 100% coverage requirement
+- Identifies gaps for remediation
+- JSON output for CI integration (`--format json`)
+
 ## Modular Rules
 
 Rules are modular and can be @imported into CLAUDE.md or referenced independently:
@@ -150,7 +156,7 @@ Rules are modular and can be @imported into CLAUDE.md or referenced independentl
 ### `.claude/rules/python-standards.md`
 - Type safety requirements (`mypy --strict`)
 - Code quality tools (Black, isort, Ruff)
-- Testing standards (> 80% coverage)
+- Testing standards (100% requirement traceability)
 - Google-style docstrings
 
 ### `.claude/rules/security.md`
@@ -233,8 +239,9 @@ uv run pytest packages/*/tests/unit/ --cov=packages --cov-report=term-missing
 ./testing/docker/scripts/run-integration-tests.sh
 # Or: make test-integration
 
-# Check coverage
-# Goal: > 80%
+# Check coverage and traceability
+# Goal: 100% requirement coverage
+python -m testing.traceability --all --threshold 100
 ```
 
 **IMPORTANT**: Integration tests MUST run inside Docker. Running from host will fail
@@ -264,6 +271,50 @@ Document [feature] with:
 2. Type hints on all signatures
 3. Usage examples in docstrings
 4. Update architecture docs if needed
+```
+
+### 5. Traceability Phase
+
+After implementing and testing, verify requirement coverage:
+
+```bash
+# 1. Identify requirements: Which FR-XXX requirements does this feature address?
+# Review the spec file for your feature (e.g., specs/006-integration-testing/spec.md)
+
+# 2. Add markers: Ensure all tests have @pytest.mark.requirement() markers
+# Example:
+# @pytest.mark.requirement("006-FR-012")  # Feature 006, Requirement FR-012
+# def test_polaris_catalog_connection():
+#     ...
+
+# 3. Verify coverage: Run traceability report
+python -m testing.traceability --feature-id 006 --threshold 100
+
+# 4. Multi-feature report (all features 001-006)
+python -m testing.traceability --all --threshold 100
+```
+
+**Requirement ID Format**: Use feature-scoped format `{feature}-FR-{id}`:
+- `006-FR-012` = Feature 006 (Integration Testing), Requirement FR-012
+- `004-FR-001` = Feature 004 (Storage Catalog), Requirement FR-001
+
+**Multi-Marker Pattern**: A single test can satisfy requirements from multiple features:
+```python
+@pytest.mark.requirement("006-FR-012")  # Meta: tests exist
+@pytest.mark.requirement("004-FR-001")  # Functional: REST connection
+@pytest.mark.requirement("004-FR-002")  # Functional: OAuth2 auth
+def test_polaris_connection():
+    """Test that covers multiple requirements from multiple features."""
+    pass
+```
+
+**AI Prompt**:
+```
+Verify traceability for [feature]:
+1. Which FR-XXX requirements does this implementation cover?
+2. Add @pytest.mark.requirement() markers to all tests
+3. Run /traceability to verify 100% coverage
+4. Fix any gaps before marking work complete
 ```
 
 ## Best Practices for AI Assistance

@@ -174,6 +174,13 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Each item should reference: spec section `[Spec §X.Y]`, or use markers: `[Gap]`, `[Ambiguity]`, `[Conflict]`, `[Assumption]`
    - If no ID system exists: "Is a requirement & acceptance criteria ID scheme established? [Traceability]"
 
+   **Test-to-Requirement Traceability** (MANDATORY):
+   For implementation-related checklists, include these items:
+   - "Does each FR-XXX requirement have at least one test with `@pytest.mark.requirement()` marker? [Traceability]"
+   - "Do test docstrings document which requirements they cover? [Clarity]"
+   - "Does the traceability report show 100% coverage for this feature? [Completeness]"
+   - "Are tests using feature-scoped IDs (e.g., `006-FR-012`, not `FR-012`)? [Consistency]"
+
    **Surface & Resolve Issues** (Requirements Quality Problems):
    Ask questions about the requirements themselves:
    - Ambiguities: "Is the term 'fast' quantified with specific metrics? [Ambiguity, Spec §NFR-1]"

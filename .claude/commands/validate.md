@@ -58,19 +58,34 @@ For each check:
 - Report coverage percentage
 - Highlight if coverage < 80% (goal is > 80%)
 
-### 5. Summary Report
+### 5. Verify Requirement Traceability
+
+Run the traceability report to verify 100% requirement coverage:
+
+```bash
+python -m testing.traceability --all --threshold 100
+```
+
+- If traceability check passes: Report coverage percentages per feature
+- If traceability check fails:
+  - Show which features have gaps
+  - List uncovered requirements
+  - Advise: "Add `@pytest.mark.requirement()` markers or write new tests"
+
+### 6. Summary Report
 
 Provide a final summary:
 
 ```
-✅ Validation Summary
+Validation Summary
 ==================
-floe.yaml:       [PASS/FAIL]
-Type checking:   [PASS/FAIL]
-Code formatting: [PASS/FAIL]
-Linting:         [PASS/FAIL]
-Security scan:   [PASS/FAIL]
-Tests:           [PASS/FAIL] (XX% coverage)
+floe.yaml:        [PASS/FAIL]
+Type checking:    [PASS/FAIL]
+Code formatting:  [PASS/FAIL]
+Linting:          [PASS/FAIL]
+Security scan:    [PASS/FAIL]
+Tests:            [PASS/FAIL] (XX% code coverage)
+Traceability:     [PASS/FAIL] (XX% requirement coverage)
 
 [Action items if any failures]
 ```

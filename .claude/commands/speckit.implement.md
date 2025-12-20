@@ -125,10 +125,28 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Suggest next steps if implementation cannot proceed
    - **IMPORTANT** For completed tasks, make sure to mark the task off as [X] in the tasks file.
 
-9. Completion validation:
+9. **Traceability Verification** (MANDATORY):
+   After implementing a task, verify requirement coverage:
+
+   - **Identify requirements**: Which FR-XXX requirements does this task address?
+   - **Add markers**: Ensure all tests have `@pytest.mark.requirement("{feature}-FR-{id}")` markers
+   - **Run traceability report**: `python -m testing.traceability --feature-id {feature} --threshold 100`
+   - **Fix gaps**: If gaps exist, create tests before marking task complete
+
+   Example marker usage:
+   ```python
+   @pytest.mark.requirement("006-FR-012")  # Meta: tests exist
+   @pytest.mark.requirement("004-FR-001")  # Functional: specific requirement
+   def test_something():
+       """Document which requirements this test covers."""
+       pass
+   ```
+
+10. Completion validation:
    - Verify all required tasks are completed
    - Check that implemented features match the original specification
    - Validate that tests pass and coverage meets requirements
+   - **Verify traceability report shows 100% coverage for affected features**
    - Confirm the implementation follows the technical plan
    - Report final status with summary of completed work
 
