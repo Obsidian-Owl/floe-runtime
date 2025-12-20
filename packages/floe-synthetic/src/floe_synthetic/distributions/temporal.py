@@ -49,7 +49,8 @@ class TemporalDistribution:
         self.weekend_factor = weekend_factor
         self.trend_percent = trend_percent
         self.noise_percent = noise_percent
-        self._rng = random.Random(seed)  # noqa: S311 - synthetic data, not crypto
+        # S311: Using random for synthetic data generation, not cryptographic purposes
+        self._rng = random.Random(seed)  # noqa: S311
 
     def daily_factor(self, hour: int) -> float:
         """Calculate activity factor based on hour of day.

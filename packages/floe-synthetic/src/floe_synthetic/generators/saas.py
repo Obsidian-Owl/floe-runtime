@@ -420,12 +420,12 @@ class SaaSGenerator(DataGenerator):
             }
         )
 
-    def _generate_event_properties(self, event_type: str, user_id: int) -> dict[str, Any]:
+    def _generate_event_properties(self, event_type: str, _user_id: int) -> dict[str, Any]:
         """Generate realistic event properties based on event type.
 
         Args:
             event_type: Type of event
-            user_id: User generating the event
+            _user_id: User generating the event (reserved for future use)
 
         Returns:
             Dictionary of event properties

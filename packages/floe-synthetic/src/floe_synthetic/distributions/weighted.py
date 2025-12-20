@@ -37,7 +37,8 @@ class WeightedDistribution:
         """
         self.values = list(weights.keys())
         self.weights = list(weights.values())
-        self._rng = random.Random(seed)  # noqa: S311 - synthetic data, not crypto
+        # S311: Using random for synthetic data generation, not cryptographic purposes
+        self._rng = random.Random(seed)  # noqa: S311
 
     def sample(self, count: int) -> list[str]:
         """Generate weighted random values.
