@@ -186,7 +186,7 @@ def materialization_artifacts(
 class TestAssetMaterialization:
     """Integration tests for Dagster asset materialization."""
 
-    @pytest.mark.requirement("FR-011")
+    @pytest.mark.requirement("006-FR-011")
     def test_create_assets_from_manifest_with_deps(
         self,
         materialization_artifacts: dict[str, Any],
@@ -200,7 +200,7 @@ class TestAssetMaterialization:
         # Assets should be created (AssetsDefinition is truthy)
         assert assets
 
-    @pytest.mark.requirement("FR-011")
+    @pytest.mark.requirement("006-FR-011")
     def test_create_definitions_includes_resources(
         self,
         materialization_artifacts: dict[str, Any],
@@ -215,7 +215,7 @@ class TestAssetMaterialization:
         assert definitions.resources is not None
         assert "dbt" in definitions.resources
 
-    @pytest.mark.requirement("FR-011")
+    @pytest.mark.requirement("006-FR-011")
     def test_translator_extracts_metadata_from_deps(
         self,
         compiled_manifest: Path,
@@ -244,7 +244,7 @@ class TestAssetMaterialization:
             if owners:
                 assert any("team:" in owner for owner in owners)
 
-    @pytest.mark.requirement("FR-011")
+    @pytest.mark.requirement("006-FR-011")
     def test_asset_dependency_resolution(
         self,
         compiled_manifest: Path,
@@ -275,7 +275,7 @@ class TestAssetMaterialization:
 class TestAssetMaterializationExecution:
     """Tests for actual asset materialization execution."""
 
-    @pytest.mark.requirement("FR-011")
+    @pytest.mark.requirement("006-FR-011")
     @pytest.mark.integration
     def test_materialize_single_asset(
         self,
@@ -302,7 +302,7 @@ class TestAssetMaterializationExecution:
 
         assert result.success, "Asset materialization should succeed"
 
-    @pytest.mark.requirement("FR-011")
+    @pytest.mark.requirement("006-FR-011")
     @pytest.mark.integration
     def test_materialize_all_assets(
         self,
@@ -332,7 +332,7 @@ class TestAssetMaterializationExecution:
 class TestAssetMaterializationEdgeCases:
     """Edge case tests for asset materialization."""
 
-    @pytest.mark.requirement("FR-011")
+    @pytest.mark.requirement("006-FR-011")
     def test_materialize_with_missing_upstream_fails(
         self,
         dbt_project_with_deps: Path,
@@ -363,7 +363,7 @@ class TestAssetMaterializationEdgeCases:
         # dbt compile should fail with ref to nonexistent model
         assert result.returncode != 0 or "nonexistent_model" in result.stderr
 
-    @pytest.mark.requirement("FR-011")
+    @pytest.mark.requirement("006-FR-011")
     def test_asset_factory_validates_manifest_path(self) -> None:
         """Test that AssetFactory validates manifest path exists."""
         from floe_dagster.assets import FloeAssetFactory
@@ -377,7 +377,7 @@ class TestAssetMaterializationEdgeCases:
         with pytest.raises((FileNotFoundError, ValueError)):
             FloeAssetFactory.create_dbt_assets(artifacts)
 
-    @pytest.mark.requirement("FR-011")
+    @pytest.mark.requirement("006-FR-011")
     def test_asset_factory_requires_manifest_path(self) -> None:
         """Test that AssetFactory requires manifest path."""
         from floe_dagster.assets import FloeAssetFactory

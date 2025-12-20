@@ -89,9 +89,13 @@ def authenticated_headers() -> dict[str, str]:
 class TestRestApiJsonResponse:
     """T036: REST API returns JSON for valid query test.
 
-    FR-005: REST API endpoint returns JSON for valid queries
+    Covers:
+    - FR-016: REST API endpoint returns JSON for valid queries
+    - FR-023: Environment variable injection (CUBE_API_URL)
     """
 
+    @pytest.mark.requirement("006-FR-016")
+    @pytest.mark.requirement("006-FR-023")
     def test_valid_query_returns_json(
         self,
         cube_client: httpx.Client,

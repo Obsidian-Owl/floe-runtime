@@ -24,7 +24,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent.parent.parent
 class TestRealSpecFilesParsing:
     """Tests that verify parsing of actual project spec files."""
 
-    @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("006-FR-006")
     def test_parse_feature_006_spec(self) -> None:
         """Parse the actual 006-integration-testing spec file."""
         spec_path = PROJECT_ROOT / "specs" / "006-integration-testing" / "spec.md"
@@ -53,7 +53,7 @@ class TestRealSpecFilesParsing:
 class TestRealTestDirectoryScanning:
     """Tests that verify scanning of actual project test directories."""
 
-    @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("006-FR-006")
     def test_scan_floe_polaris_integration_tests(self) -> None:
         """Scan actual floe-polaris integration tests."""
         test_dir = PROJECT_ROOT / "packages" / "floe-polaris" / "tests" / "integration"
@@ -69,11 +69,11 @@ class TestRealTestDirectoryScanning:
             test_dirs=[test_dir],
         )
 
-        # Should find tests with @pytest.mark.requirement("FR-012")
+        # Should find tests with @pytest.mark.requirement("006-FR-012")
         fr012_tests = [t for t in matrix.tests if "FR-012" in t.requirement_ids]
         assert len(fr012_tests) > 0, "No FR-012 tests found in floe-polaris"
 
-    @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("006-FR-006")
     def test_scan_floe_iceberg_integration_tests(self) -> None:
         """Scan actual floe-iceberg integration tests."""
         test_dir = PROJECT_ROOT / "packages" / "floe-iceberg" / "tests" / "integration"
@@ -88,7 +88,7 @@ class TestRealTestDirectoryScanning:
             test_dirs=[test_dir],
         )
 
-        # Should find tests with @pytest.mark.requirement("FR-013") and FR-014
+        # Should find tests with @pytest.mark.requirement("006-FR-013") and FR-014
         fr013_tests = [t for t in matrix.tests if "FR-013" in t.requirement_ids]
         fr014_tests = [t for t in matrix.tests if "FR-014" in t.requirement_ids]
 
@@ -99,7 +99,7 @@ class TestRealTestDirectoryScanning:
 class TestEndToEndTraceabilityReport:
     """End-to-end integration tests for full traceability report generation."""
 
-    @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("006-FR-006")
     def test_generate_full_traceability_matrix(self) -> None:
         """Generate complete traceability matrix for feature 006."""
         spec_path = PROJECT_ROOT / "specs" / "006-integration-testing" / "spec.md"
@@ -142,7 +142,7 @@ class TestEndToEndTraceabilityReport:
         assert "FR-013" in covered_reqs, "FR-013 should be covered"
         assert "FR-014" in covered_reqs, "FR-014 should be covered"
 
-    @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("006-FR-006")
     def test_console_report_format(self) -> None:
         """Verify console report format with real data."""
         spec_path = PROJECT_ROOT / "specs" / "006-integration-testing" / "spec.md"
@@ -173,7 +173,7 @@ class TestEndToEndTraceabilityReport:
         # Should show covered requirements
         assert "[COVERED]" in report or "Covered Requirements" in report
 
-    @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("006-FR-006")
     def test_json_report_format(self) -> None:
         """Verify JSON report format with real data."""
         import json
@@ -217,7 +217,7 @@ class TestEndToEndTraceabilityReport:
 class TestCoverageThresholdValidation:
     """Tests for coverage threshold validation."""
 
-    @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("006-FR-006")
     def test_current_coverage_exceeds_minimum(self) -> None:
         """Verify current coverage meets minimum threshold."""
         spec_path = PROJECT_ROOT / "specs" / "006-integration-testing" / "spec.md"
@@ -245,7 +245,7 @@ class TestCoverageThresholdValidation:
             coverage >= minimum_threshold
         ), f"Coverage {coverage:.1f}% is below minimum threshold {minimum_threshold}%"
 
-    @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("006-FR-006")
     def test_storage_catalog_requirements_covered(self) -> None:
         """Verify storage-catalog requirements have test coverage."""
         spec_path = PROJECT_ROOT / "specs" / "006-integration-testing" / "spec.md"

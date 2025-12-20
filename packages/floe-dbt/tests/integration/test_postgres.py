@@ -121,7 +121,7 @@ class TestPostgreSQLProfileGeneration:
 
         return ProfileWriter()
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_generate_postgres_profile_structure(
         self,
         factory: Any,
@@ -160,7 +160,7 @@ class TestPostgreSQLProfileGeneration:
         assert "env_var" in profile["user"]
         assert "env_var" in profile["password"]
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_generate_postgres_profile_with_optional_schema(
         self,
         factory: Any,
@@ -190,7 +190,7 @@ class TestPostgreSQLProfileGeneration:
 
         assert outputs["dev"]["schema"] == "staging"
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_generate_postgres_profile_default_port(
         self,
         factory: Any,
@@ -218,7 +218,7 @@ class TestPostgreSQLProfileGeneration:
 
         assert outputs["dev"]["port"] == 5432
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_postgres_profile_env_var_security(
         self,
         factory: Any,
@@ -258,7 +258,7 @@ class TestPostgreSQLProfileGeneration:
 class TestPostgreSQLProfileValidation:
     """Test PostgreSQL profile validation with dbt debug."""
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_valid_profile_structure_passes_dbt_debug(
         self,
         dbt_project_dir: Path,
@@ -318,7 +318,7 @@ class TestPostgreSQLDockerIntegration:
         not HAS_POSTGRES_SERVICE,
         reason="PostgreSQL Docker service not available",
     )
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_dbt_debug_connection_succeeds(
         self,
         dbt_project_dir: Path,
@@ -375,7 +375,7 @@ class TestPostgreSQLDockerIntegration:
         not HAS_POSTGRES_SERVICE,
         reason="PostgreSQL Docker service not available",
     )
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_end_to_end_profile_generation_and_validation(
         self,
         dbt_project_dir: Path,
@@ -456,7 +456,7 @@ class TestPostgreSQLDockerIntegration:
 class TestPostgreSQLProfileEdgeCases:
     """Test edge cases in PostgreSQL profile handling."""
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_postgres_profile_with_custom_port(
         self,
         dbt_project_dir: Path,
@@ -500,7 +500,7 @@ class TestPostgreSQLProfileEdgeCases:
         # Profile YAML should be valid
         assert "profile" in result.stdout.lower() or "Configuration" in result.stdout
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_postgres_profile_missing_required_field_fails(
         self,
         dbt_project_dir: Path,

@@ -29,7 +29,7 @@ class TestCoreToDagsterBoundary:
     and consumed by floe-dagster.
     """
 
-    @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("006-FR-006")
     def test_compiled_artifacts_creation(self) -> None:
         """Verify CompiledArtifacts can be created with valid data."""
         from floe_core.compiler.models import ArtifactMetadata, CompiledArtifacts
@@ -61,7 +61,7 @@ class TestCoreToDagsterBoundary:
         assert artifacts.compute.target == ComputeTarget.duckdb
         assert len(artifacts.transforms) == 1
 
-    @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("006-FR-006")
     def test_compiled_artifacts_json_serialization(self) -> None:
         """Verify CompiledArtifacts can be serialized to JSON."""
         from floe_core.compiler.models import ArtifactMetadata, CompiledArtifacts
@@ -99,7 +99,7 @@ class TestCoreToDagsterBoundary:
         assert data["compute"]["target"] == "postgres"
         assert data["transforms"][0]["path"] == "./transforms/dbt"
 
-    @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("006-FR-006")
     def test_compiled_artifacts_json_deserialization(self) -> None:
         """Verify CompiledArtifacts can be deserialized from JSON."""
         from floe_core.compiler.models import CompiledArtifacts
@@ -134,7 +134,7 @@ class TestCoreToDagsterBoundary:
         assert artifacts.compute.target == ComputeTarget.snowflake
         assert artifacts.compute.connection_secret_ref == "snowflake-prod"
 
-    @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("006-FR-006")
     def test_compiled_artifacts_immutability(self) -> None:
         """Verify CompiledArtifacts is immutable (frozen)."""
         from pydantic import ValidationError
@@ -161,7 +161,7 @@ class TestCoreToDagsterBoundary:
         with pytest.raises(ValidationError):
             artifacts.version = "2.0.0"  # type: ignore[misc]
 
-    @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("006-FR-006")
     def test_compiled_artifacts_rejects_extra_fields(self) -> None:
         """Verify CompiledArtifacts rejects unknown fields (extra='forbid')."""
         from pydantic import ValidationError
@@ -185,7 +185,7 @@ class TestCoreToDagsterBoundary:
 
         assert "unknown_field" in str(exc_info.value)
 
-    @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("006-FR-006")
     def test_compiled_artifacts_schema_export(self) -> None:
         """Verify CompiledArtifacts can export JSON Schema."""
         from floe_core.compiler.models import CompiledArtifacts
@@ -206,7 +206,7 @@ class TestCoreToDbtBoundary:
     Verifies that compute configuration can be used for dbt profile generation.
     """
 
-    @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("006-FR-006")
     def test_compute_config_for_dbt_profiles(self) -> None:
         """Verify ComputeConfig structure supports dbt profile generation."""
         from floe_core.schemas import ComputeConfig, ComputeTarget
@@ -258,7 +258,7 @@ class TestDbtToCubeBoundary:
     Verifies that transform configurations support Cube integration.
     """
 
-    @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("006-FR-006")
     def test_transform_config_for_cube_integration(self) -> None:
         """Verify TransformConfig can be used for Cube dbt references."""
         from floe_core.schemas import TransformConfig
@@ -286,7 +286,7 @@ class TestCoreToPolarisTestBoundary:
     Verifies that CatalogConfig supports Polaris REST catalog integration.
     """
 
-    @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("006-FR-006")
     def test_catalog_config_for_polaris(self) -> None:
         """Verify CatalogConfig supports Polaris catalog configuration."""
         from floe_core.schemas import CatalogConfig
@@ -306,7 +306,7 @@ class TestCoreToPolarisTestBoundary:
         assert config.scope == "PRINCIPAL_ROLE:DATA_ENGINEER"
         assert config.token_refresh_enabled is True
 
-    @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("006-FR-006")
     def test_catalog_config_serialization(self) -> None:
         """Verify CatalogConfig can be serialized for floe-polaris consumption."""
         from floe_core.schemas import CatalogConfig
@@ -328,7 +328,7 @@ class TestCoreToPolarisTestBoundary:
         parsed = json.loads(json_str)
         assert parsed["type"] == "polaris"
 
-    @pytest.mark.requirement("FR-006")
+    @pytest.mark.requirement("006-FR-006")
     def test_catalog_config_in_compiled_artifacts(self) -> None:
         """Verify CatalogConfig integrates with CompiledArtifacts."""
         from floe_core.compiler.models import ArtifactMetadata, CompiledArtifacts

@@ -25,7 +25,7 @@ import yaml
 class TestFullCompileFlow:
     """Integration tests for the complete compile workflow."""
 
-    @pytest.mark.requirement("FR-008")
+    @pytest.mark.requirement("006-FR-008")
     def test_end_to_end_compile_minimal(self, tmp_path: Path) -> None:
         """Test end-to-end compilation with minimal configuration."""
         from floe_core.compiler import CompiledArtifacts, Compiler
@@ -64,8 +64,8 @@ class TestFullCompileFlow:
         assert artifacts.governance.classification_source == "dbt_meta"
         assert artifacts.observability.traces is True
 
-    @pytest.mark.requirement("FR-008")
-    @pytest.mark.requirement("FR-022")
+    @pytest.mark.requirement("006-FR-008")
+    @pytest.mark.requirement("006-FR-022")
     def test_end_to_end_compile_full(self, tmp_path: Path) -> None:
         """Test end-to-end compilation with full configuration.
 
@@ -135,7 +135,7 @@ class TestFullCompileFlow:
         assert artifacts.catalog.type == "polaris"
         assert artifacts.catalog.scope == "PRINCIPAL_ROLE:ALL"
 
-    @pytest.mark.requirement("FR-008")
+    @pytest.mark.requirement("006-FR-008")
     def test_end_to_end_with_dbt_classifications(self, tmp_path: Path) -> None:
         """Test end-to-end compilation with dbt classification extraction.
 
@@ -249,7 +249,7 @@ class TestFullCompileFlow:
         assert "order_id" in order_cols
         assert order_cols["order_id"].classification == "identifier"
 
-    @pytest.mark.requirement("FR-008")
+    @pytest.mark.requirement("006-FR-008")
     def test_compile_then_serialize_round_trip(self, tmp_path: Path) -> None:
         """Test compile output can be serialized and deserialized.
 
@@ -290,7 +290,7 @@ class TestFullCompileFlow:
         assert loaded.compute.target == original.compute.target
         assert loaded.metadata.source_hash == original.metadata.source_hash
 
-    @pytest.mark.requirement("FR-008")
+    @pytest.mark.requirement("006-FR-008")
     def test_compile_multiple_transforms(self, tmp_path: Path) -> None:
         """Test compilation with multiple transform configurations.
 
@@ -322,8 +322,8 @@ class TestFullCompileFlow:
         assert artifacts.transforms[1].path == "./dbt/marts"
         assert artifacts.transforms[1].target == "prod"
 
-    @pytest.mark.requirement("FR-008")
-    @pytest.mark.requirement("FR-022")
+    @pytest.mark.requirement("006-FR-008")
+    @pytest.mark.requirement("006-FR-022")
     def test_compile_all_compute_targets(self, tmp_path: Path) -> None:
         """Test compilation works for all compute targets.
 
@@ -358,7 +358,7 @@ class TestFullCompileFlow:
 class TestCompileFlowGracefulDegradation:
     """Tests for graceful degradation in compile flow."""
 
-    @pytest.mark.requirement("FR-031")
+    @pytest.mark.requirement("006-FR-031")
     def test_compile_without_dbt_manifest(self, tmp_path: Path) -> None:
         """Test compilation continues without dbt manifest.
 
@@ -390,7 +390,7 @@ class TestCompileFlowGracefulDegradation:
         assert artifacts is not None
         assert artifacts.column_classifications is None
 
-    @pytest.mark.requirement("FR-031")
+    @pytest.mark.requirement("006-FR-031")
     def test_compile_with_empty_manifest(self, tmp_path: Path) -> None:
         """Test compilation handles empty manifest.
 
@@ -426,7 +426,7 @@ class TestCompileFlowGracefulDegradation:
         assert artifacts is not None
         assert artifacts.column_classifications is None or artifacts.column_classifications == {}
 
-    @pytest.mark.requirement("FR-031")
+    @pytest.mark.requirement("006-FR-031")
     def test_compile_standalone_first(self, tmp_path: Path) -> None:
         """Test compile works completely standalone (no SaaS dependencies).
 

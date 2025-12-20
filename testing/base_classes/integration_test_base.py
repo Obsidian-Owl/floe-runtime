@@ -24,7 +24,7 @@ Usage:
             self.catalog = polaris_catalog
 
         @pytest.mark.integration
-        @pytest.mark.requirement("FR-XXX")
+        @pytest.mark.requirement("006-FR-XXX")  # Feature-scoped format
         def test_feature_works(self):
             '''Test that feature works with real services.'''
             # Service URLs resolved based on context (Docker vs host)
@@ -275,6 +275,35 @@ class IntegrationTestBase:
         for service, port in self.required_services:
             if not self.is_service_available(service, port):
                 pytest.skip(f"Required service unavailable: {service}:{port}")
+
+    def check_infrastructure(
+        self,
+        service: str,
+        port: int,
+        timeout: float | None = None,
+    ) -> None:
+        """Check that infrastructure is available, FAIL if not (never skip).
+
+        This method follows the "FAIL not skip" philosophy - if infrastructure
+        is missing, the test should fail rather than be skipped.
+
+        Args:
+            service: Service name (e.g., 'polaris', 'localstack')
+            port: Port number to check
+            timeout: Connection timeout (defaults to class attribute)
+
+        Raises:
+            pytest.fail.Exception: If service is not available
+
+        Covers: FR-005 (FAIL not skip when infrastructure missing)
+        """
+        if not self.is_service_available(service, port, timeout):
+            host = self.get_service_host(service)
+            pytest.fail(
+                f"{service} not available at {host}:{port}. "
+                "Start with: cd testing/docker && docker compose --profile storage up -d. "
+                "Tests FAIL when infrastructure is missing (never skip)."
+            )
 
     # ==========================================================================
     # Polaris Utilities

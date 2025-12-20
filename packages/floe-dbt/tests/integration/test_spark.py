@@ -72,7 +72,7 @@ class TestSparkProfileGeneration:
 
         return ProfileFactory
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_generate_spark_profile_structure(
         self,
         factory: Any,
@@ -105,7 +105,7 @@ class TestSparkProfileGeneration:
         assert profile["method"] == "thrift"
         assert profile["schema"] == "default"
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_generate_spark_profile_with_http_method(
         self,
         factory: Any,
@@ -138,7 +138,7 @@ class TestSparkProfileGeneration:
         profile = outputs["dev"]
         assert profile["method"] == "http"
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_generate_spark_profile_minimal(
         self,
         factory: Any,
@@ -176,7 +176,7 @@ class TestSparkProfileValidation:
         not HAS_DBT_SPARK,
         reason="dbt-spark adapter not installed",
     )
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_valid_profile_structure_accepted_by_dbt(
         self,
         dbt_project_dir: Path,
@@ -222,7 +222,7 @@ class TestSparkProfileValidation:
         not HAS_DBT_SPARK,
         reason="dbt-spark adapter not installed",
     )
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_spark_profile_missing_method_fails(
         self,
         dbt_project_dir: Path,
@@ -267,7 +267,7 @@ class TestSparkProfileValidation:
 class TestSparkProfileEdgeCases:
     """Test edge cases in Spark profile handling."""
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_spark_profile_session_method(
         self,
         base_metadata: dict[str, Any],
@@ -296,7 +296,7 @@ class TestSparkProfileEdgeCases:
         assert outputs["dev"]["type"] == "spark"
         assert outputs["dev"]["method"] == "session"
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_spark_multi_environment_profiles(
         self,
         base_metadata: dict[str, Any],
@@ -335,7 +335,7 @@ class TestSparkProfileEdgeCases:
         assert dev_outputs["dev"]["type"] == "spark"
         assert prod_outputs["prod"]["type"] == "spark"
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_spark_profile_with_odbc_method(
         self,
         base_metadata: dict[str, Any],

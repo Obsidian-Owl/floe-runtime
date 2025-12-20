@@ -166,7 +166,8 @@ def nested_namespace(catalog: PolarisCatalog) -> Generator[str, None, None]:
 class TestCatalogConnection:
     """Tests for catalog connection and authentication."""
 
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
+    @pytest.mark.requirement("006-FR-023")
     def test_create_catalog_with_valid_credentials(
         self,
         config: PolarisCatalogConfig,
@@ -178,7 +179,7 @@ class TestCatalogConnection:
         assert catalog.is_connected()
         assert isinstance(catalog, PolarisCatalog)
 
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_catalog_reconnect(self, catalog: PolarisCatalog) -> None:
         """Test that reconnect re-establishes connection."""
         assert catalog.is_connected()
@@ -187,7 +188,7 @@ class TestCatalogConnection:
 
         assert catalog.is_connected()
 
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_access_inner_catalog(self, catalog: PolarisCatalog) -> None:
         """Test accessing the underlying PyIceberg catalog."""
         inner = catalog.inner_catalog
@@ -196,7 +197,7 @@ class TestCatalogConnection:
         # Should be a PyIceberg RestCatalog
         assert hasattr(inner, "list_namespaces")
 
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_invalid_uri_connection_error(self) -> None:
         """Test that invalid URI raises CatalogConnectionError."""
         # Suppress expected warning for PRINCIPAL_ROLE:ALL in test environment
@@ -215,7 +216,7 @@ class TestCatalogConnection:
 
         assert "Failed to connect" in str(exc_info.value)
 
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_invalid_credentials_authentication_error(self) -> None:
         """Test that invalid credentials raise CatalogAuthenticationError."""
         # Suppress expected warning for PRINCIPAL_ROLE:ALL in test environment
@@ -250,7 +251,7 @@ class TestCatalogConnection:
 class TestNamespaceOperations:
     """Tests for namespace CRUD operations."""
 
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_create_namespace(
         self,
         catalog: PolarisCatalog,
@@ -262,7 +263,7 @@ class TestNamespaceOperations:
         assert result is not None
         assert result.name == test_namespace
 
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_create_namespace_with_properties(
         self,
         catalog: PolarisCatalog,
@@ -277,7 +278,7 @@ class TestNamespaceOperations:
         # Note: Properties may or may not be returned depending on Polaris version
         # Just verify the namespace was created
 
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_create_namespace_already_exists(
         self,
         catalog: PolarisCatalog,
@@ -291,7 +292,7 @@ class TestNamespaceOperations:
 
         assert test_namespace in str(exc_info.value)
 
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_create_namespace_if_not_exists_idempotent(
         self,
         catalog: PolarisCatalog,
@@ -306,7 +307,7 @@ class TestNamespaceOperations:
         result2 = catalog.create_namespace_if_not_exists(test_namespace)
         assert result2.name == test_namespace
 
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_create_nested_namespace_with_parents(
         self,
         catalog: PolarisCatalog,
@@ -323,7 +324,7 @@ class TestNamespaceOperations:
         parent_info = catalog.load_namespace(parent)
         assert parent_info.name == parent
 
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_list_namespaces(
         self,
         catalog: PolarisCatalog,
@@ -338,7 +339,7 @@ class TestNamespaceOperations:
         ns_names = [ns.name for ns in namespaces]
         assert test_namespace in ns_names
 
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_list_child_namespaces(
         self,
         catalog: PolarisCatalog,
@@ -354,7 +355,7 @@ class TestNamespaceOperations:
         # The child namespace name as returned might be just "child" or "parent.child"
         assert len(children) >= 1
 
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_load_namespace(
         self,
         catalog: PolarisCatalog,
@@ -368,7 +369,7 @@ class TestNamespaceOperations:
         assert result.name == test_namespace
         assert isinstance(result.properties, dict)
 
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_load_namespace_not_found(
         self,
         catalog: PolarisCatalog,
@@ -379,7 +380,7 @@ class TestNamespaceOperations:
 
         assert "nonexistent_ns_12345" in str(exc_info.value)
 
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_drop_namespace(
         self,
         catalog: PolarisCatalog,
@@ -394,7 +395,7 @@ class TestNamespaceOperations:
         with pytest.raises(NamespaceNotFoundError):
             catalog.load_namespace(test_namespace)
 
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_drop_namespace_not_found(
         self,
         catalog: PolarisCatalog,
@@ -403,7 +404,7 @@ class TestNamespaceOperations:
         with pytest.raises(NamespaceNotFoundError):
             catalog.drop_namespace("nonexistent_ns_12345")
 
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_update_namespace_properties(
         self,
         catalog: PolarisCatalog,
@@ -429,7 +430,7 @@ class TestNamespaceOperations:
 class TestTableOperations:
     """Tests for table-related catalog operations."""
 
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_list_tables_empty_namespace(
         self,
         catalog: PolarisCatalog,
@@ -442,7 +443,7 @@ class TestTableOperations:
 
         assert tables == []
 
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_list_tables_namespace_not_found(
         self,
         catalog: PolarisCatalog,
@@ -456,7 +457,7 @@ class TestTableOperations:
         except NamespaceNotFoundError:
             pass  # Also acceptable
 
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_table_exists_false(
         self,
         catalog: PolarisCatalog,
@@ -526,7 +527,7 @@ class TestRetryBehavior:
 class TestIntegrationScenarios:
     """End-to-end integration scenarios."""
 
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_full_namespace_lifecycle(
         self,
         catalog: PolarisCatalog,
@@ -566,7 +567,7 @@ class TestIntegrationScenarios:
             with contextlib.suppress(NamespaceNotFoundError, NamespaceNotEmptyError):
                 catalog.drop_namespace(ns_name)
 
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_nested_namespace_hierarchy(
         self,
         catalog: PolarisCatalog,

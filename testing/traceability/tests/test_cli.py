@@ -129,7 +129,7 @@ class TestCLIExitCodes:
             """
             import pytest
 
-            @pytest.mark.requirement("FR-001")
+            @pytest.mark.requirement("006-FR-001")
             def test_covered():
                 pass
         """

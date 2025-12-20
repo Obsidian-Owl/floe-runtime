@@ -73,7 +73,7 @@ class TestRedshiftProfileGeneration:
 
         return ProfileFactory
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_generate_redshift_profile_structure(
         self,
         factory: Any,
@@ -109,7 +109,7 @@ class TestRedshiftProfileGeneration:
         assert profile["dbname"] == "analytics"
         assert profile["schema"] == "public"
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_redshift_profile_env_var_security(
         self,
         factory: Any,
@@ -143,7 +143,7 @@ class TestRedshiftProfileGeneration:
         assert "REDSHIFT" in profile["user"]
         assert "PROD" in profile["user"]
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_generate_redshift_profile_default_port(
         self,
         factory: Any,
@@ -179,7 +179,7 @@ class TestRedshiftProfileValidation:
         not HAS_DBT_REDSHIFT,
         reason="dbt-redshift adapter not installed",
     )
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_valid_profile_structure_accepted_by_dbt(
         self,
         dbt_project_dir: Path,
@@ -227,7 +227,7 @@ class TestRedshiftProfileValidation:
         not HAS_DBT_REDSHIFT,
         reason="dbt-redshift adapter not installed",
     )
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_redshift_profile_missing_host_fails(
         self,
         dbt_project_dir: Path,
@@ -274,7 +274,7 @@ class TestRedshiftProfileValidation:
 class TestRedshiftProfileEdgeCases:
     """Test edge cases in Redshift profile handling."""
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_redshift_profile_with_iam_role(
         self,
         base_metadata: dict[str, Any],
@@ -304,7 +304,7 @@ class TestRedshiftProfileEdgeCases:
 
         assert outputs["dev"]["type"] == "redshift"
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_redshift_multi_environment_profiles(
         self,
         base_metadata: dict[str, Any],

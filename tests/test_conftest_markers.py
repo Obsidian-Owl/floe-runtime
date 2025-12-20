@@ -28,7 +28,7 @@ class TestRequirementMarker:
     def test_requirement_marker_on_function(self) -> None:
         """Verify requirement marker can be applied to a function."""
 
-        @pytest.mark.requirement("FR-001")
+        @pytest.mark.requirement("006-FR-001")
         def sample_test() -> None:
             """Sample test function - body intentionally empty to test marker attachment."""
 
@@ -73,7 +73,7 @@ class TestCombinedMarkers:
         """Verify requirement can be combined with integration marker."""
 
         @pytest.mark.integration
-        @pytest.mark.requirement("FR-012")
+        @pytest.mark.requirement("006-FR-012")
         def sample_test() -> None:
             """Sample test function - body intentionally empty to test marker attachment."""
 
@@ -86,7 +86,7 @@ class TestCombinedMarkers:
         """Verify marker order is preserved for traceability scanning."""
 
         @pytest.mark.slow
-        @pytest.mark.requirement("FR-001")
+        @pytest.mark.requirement("006-FR-001")
         @pytest.mark.integration
         def sample_test() -> None:
             """Sample test function - body intentionally empty to test marker attachment."""

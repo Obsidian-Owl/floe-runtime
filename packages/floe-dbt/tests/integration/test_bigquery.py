@@ -73,7 +73,7 @@ class TestBigQueryProfileGeneration:
 
         return ProfileFactory
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_generate_bigquery_profile_structure(
         self,
         factory: Any,
@@ -109,7 +109,7 @@ class TestBigQueryProfileGeneration:
         assert profile["location"] == "US"
         assert profile["method"] == "oauth"
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_generate_bigquery_profile_with_service_account(
         self,
         factory: Any,
@@ -142,7 +142,7 @@ class TestBigQueryProfileGeneration:
         # FR-003: Keyfile path is converted to env_var reference for security
         assert profile["keyfile"] == "{{ env_var('BIGQUERY_DEV_KEYFILE') }}"
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_generate_bigquery_profile_minimal(
         self,
         factory: Any,
@@ -181,7 +181,7 @@ class TestBigQueryProfileValidation:
         not HAS_DBT_BIGQUERY,
         reason="dbt-bigquery adapter not installed",
     )
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_valid_profile_structure_accepted_by_dbt(
         self,
         dbt_project_dir: Path,
@@ -227,7 +227,7 @@ class TestBigQueryProfileValidation:
         not HAS_DBT_BIGQUERY,
         reason="dbt-bigquery adapter not installed",
     )
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_bigquery_profile_missing_project_fails(
         self,
         dbt_project_dir: Path,
@@ -272,7 +272,7 @@ class TestBigQueryProfileValidation:
 class TestBigQueryProfileEdgeCases:
     """Test edge cases in BigQuery profile handling."""
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_bigquery_profile_with_impersonation(
         self,
         base_metadata: dict[str, Any],
@@ -302,7 +302,7 @@ class TestBigQueryProfileEdgeCases:
 
         assert outputs["dev"]["type"] == "bigquery"
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_bigquery_multi_environment_profiles(
         self,
         base_metadata: dict[str, Any],

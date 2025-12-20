@@ -82,7 +82,7 @@ def lineage_emitter(openlineage_config: dict[str, Any]):
 class TestOpenLineageEmission:
     """Tests for OpenLineage event emission to Marquez."""
 
-    @pytest.mark.requirement("FR-029")
+    @pytest.mark.requirement("006-FR-029")
     def test_emit_start_event(
         self,
         lineage_emitter,
@@ -115,7 +115,7 @@ class TestOpenLineageEmission:
             # Graceful degradation - log but don't fail if Marquez query fails
             pytest.skip("Marquez query failed - service may be initializing")
 
-    @pytest.mark.requirement("FR-029")
+    @pytest.mark.requirement("006-FR-029")
     def test_emit_complete_event(
         self,
         lineage_emitter,
@@ -146,7 +146,7 @@ class TestOpenLineageEmission:
             # Graceful degradation for slow service initialization
             pytest.skip("Marquez query failed - service may be initializing")
 
-    @pytest.mark.requirement("FR-029")
+    @pytest.mark.requirement("006-FR-029")
     def test_emit_fail_event(
         self,
         lineage_emitter,
@@ -168,7 +168,7 @@ class TestOpenLineageEmission:
         # The emitter should handle errors gracefully
         assert run_id is not None
 
-    @pytest.mark.requirement("FR-029")
+    @pytest.mark.requirement("006-FR-029")
     def test_run_context_manager_success(
         self,
         lineage_emitter,
@@ -184,7 +184,7 @@ class TestOpenLineageEmission:
 
         # Context exited cleanly - COMPLETE should have been emitted
 
-    @pytest.mark.requirement("FR-029")
+    @pytest.mark.requirement("006-FR-029")
     def test_run_context_manager_failure(
         self,
         lineage_emitter,
@@ -205,7 +205,7 @@ class TestOpenLineageEmission:
 class TestOpenLineageGracefulDegradation:
     """Tests for graceful degradation when Marquez is unavailable."""
 
-    @pytest.mark.requirement("FR-029")
+    @pytest.mark.requirement("006-FR-029")
     def test_disabled_emitter_does_not_fail(self) -> None:
         """Test that disabled emitter handles operations gracefully."""
         from floe_dagster.lineage import OpenLineageConfig, OpenLineageEmitter
@@ -227,7 +227,7 @@ class TestOpenLineageGracefulDegradation:
         emitter.emit_complete(run_id=run_id, job_name="test_job")
         emitter.emit_fail(run_id=run_id, job_name="test_job", error_message="error")
 
-    @pytest.mark.requirement("FR-029")
+    @pytest.mark.requirement("006-FR-029")
     def test_emitter_with_unavailable_endpoint(self) -> None:
         """Test emitter gracefully handles unavailable endpoint."""
         from floe_dagster.lineage import OpenLineageConfig, OpenLineageEmitter
@@ -251,7 +251,7 @@ class TestOpenLineageGracefulDegradation:
 class TestOpenLineageDatasets:
     """Tests for dataset tracking in lineage events."""
 
-    @pytest.mark.requirement("FR-029")
+    @pytest.mark.requirement("006-FR-029")
     def test_emit_with_input_datasets(
         self,
         lineage_emitter,
@@ -286,7 +286,7 @@ class TestOpenLineageDatasets:
             inputs=inputs,
         )
 
-    @pytest.mark.requirement("FR-029")
+    @pytest.mark.requirement("006-FR-029")
     def test_emit_with_output_datasets(
         self,
         lineage_emitter,
@@ -328,7 +328,7 @@ class TestOpenLineageDatasets:
 class TestMarquezClientIntegration:
     """Tests for MarquezClient functionality."""
 
-    @pytest.mark.requirement("FR-029")
+    @pytest.mark.requirement("006-FR-029")
     def test_marquez_client_availability(
         self,
         marquez_client: MarquezClient,
@@ -336,7 +336,7 @@ class TestMarquezClientIntegration:
         """Test that MarquezClient can connect."""
         assert marquez_client.is_available()
 
-    @pytest.mark.requirement("FR-029")
+    @pytest.mark.requirement("006-FR-029")
     def test_get_namespaces(
         self,
         marquez_client: MarquezClient,
@@ -346,7 +346,7 @@ class TestMarquezClientIntegration:
         # Should at least have the default namespace
         assert isinstance(namespaces, list)
 
-    @pytest.mark.requirement("FR-029")
+    @pytest.mark.requirement("006-FR-029")
     def test_get_jobs(
         self,
         marquez_client: MarquezClient,

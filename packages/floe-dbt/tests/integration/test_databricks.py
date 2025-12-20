@@ -73,7 +73,7 @@ class TestDatabricksProfileGeneration:
 
         return ProfileFactory
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_generate_databricks_profile_structure(
         self,
         factory: Any,
@@ -109,7 +109,7 @@ class TestDatabricksProfileGeneration:
         assert profile["catalog"] == "main"
         assert profile["schema"] == "default"
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_databricks_profile_env_var_security(
         self,
         factory: Any,
@@ -142,7 +142,7 @@ class TestDatabricksProfileGeneration:
         assert "DATABRICKS" in profile["token"]
         assert "PROD" in profile["token"]
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_generate_databricks_profile_minimal(
         self,
         factory: Any,
@@ -180,7 +180,7 @@ class TestDatabricksProfileValidation:
         not HAS_DBT_DATABRICKS,
         reason="dbt-databricks adapter not installed",
     )
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_valid_profile_structure_accepted_by_dbt(
         self,
         dbt_project_dir: Path,
@@ -227,7 +227,7 @@ class TestDatabricksProfileValidation:
         not HAS_DBT_DATABRICKS,
         reason="dbt-databricks adapter not installed",
     )
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_databricks_profile_missing_host_fails(
         self,
         dbt_project_dir: Path,
@@ -272,7 +272,7 @@ class TestDatabricksProfileValidation:
 class TestDatabricksProfileEdgeCases:
     """Test edge cases in Databricks profile handling."""
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_databricks_profile_with_cluster_id(
         self,
         base_metadata: dict[str, Any],
@@ -301,7 +301,7 @@ class TestDatabricksProfileEdgeCases:
 
         assert outputs["dev"]["type"] == "databricks"
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_databricks_multi_environment_profiles(
         self,
         base_metadata: dict[str, Any],
@@ -340,7 +340,7 @@ class TestDatabricksProfileEdgeCases:
         assert "DEV" in dev_outputs["dev"]["token"]
         assert "PROD" in prod_outputs["prod"]["token"]
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_databricks_profile_unity_catalog(
         self,
         base_metadata: dict[str, Any],

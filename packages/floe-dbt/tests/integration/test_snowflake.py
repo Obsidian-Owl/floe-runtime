@@ -73,7 +73,7 @@ class TestSnowflakeProfileGeneration:
 
         return ProfileFactory
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_generate_snowflake_profile_structure(
         self,
         factory: Any,
@@ -111,7 +111,7 @@ class TestSnowflakeProfileGeneration:
         assert profile["schema"] == "PUBLIC"
         assert profile["role"] == "TRANSFORMER"
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_snowflake_profile_env_var_security(
         self,
         factory: Any,
@@ -144,7 +144,7 @@ class TestSnowflakeProfileGeneration:
         assert "SNOWFLAKE" in profile["user"]
         assert "PROD" in profile["user"]
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_generate_snowflake_profile_minimal(
         self,
         factory: Any,
@@ -184,7 +184,7 @@ class TestSnowflakeProfileValidation:
         not HAS_DBT_SNOWFLAKE,
         reason="dbt-snowflake adapter not installed",
     )
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_valid_profile_structure_accepted_by_dbt(
         self,
         dbt_project_dir: Path,
@@ -233,7 +233,7 @@ class TestSnowflakeProfileValidation:
         not HAS_DBT_SNOWFLAKE,
         reason="dbt-snowflake adapter not installed",
     )
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_snowflake_profile_missing_account_fails(
         self,
         dbt_project_dir: Path,
@@ -280,7 +280,7 @@ class TestSnowflakeProfileValidation:
 class TestSnowflakeProfileEdgeCases:
     """Test edge cases in Snowflake profile handling."""
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_snowflake_profile_with_authenticator(
         self,
         base_metadata: dict[str, Any],
@@ -310,7 +310,7 @@ class TestSnowflakeProfileEdgeCases:
         # Profile should be generated successfully
         assert outputs["dev"]["type"] == "snowflake"
 
-    @pytest.mark.requirement("FR-010")
+    @pytest.mark.requirement("006-FR-010")
     def test_snowflake_multi_environment_profiles(
         self,
         base_metadata: dict[str, Any],

@@ -75,7 +75,7 @@ class TestMyFeature:
     """Tests for my feature covering FR-012."""
 
     @pytest.mark.integration
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_catalog_connection(
         self,
         polaris_catalog: PolarisCatalog,
@@ -147,7 +147,7 @@ Link tests to requirements for traceability:
 import pytest
 
 # Single requirement
-@pytest.mark.requirement("FR-012")
+@pytest.mark.requirement("006-FR-012")
 def test_polaris_connection():
     ...
 
@@ -158,7 +158,7 @@ def test_contract_boundary():
 
 # With integration marker
 @pytest.mark.integration
-@pytest.mark.requirement("FR-012")
+@pytest.mark.requirement("006-FR-012")
 def test_with_docker():
     ...
 ```
@@ -302,7 +302,7 @@ class TestIcebergTableOperations:
         catalog.drop_namespace(namespace)
 
     @pytest.mark.integration
-    @pytest.mark.requirement("FR-013")
+    @pytest.mark.requirement("006-FR-013")
     def test_create_table(
         self,
         catalog: Catalog,
@@ -329,7 +329,7 @@ class TestIcebergTableOperations:
         assert table.schema() == schema
 
     @pytest.mark.integration
-    @pytest.mark.requirement("FR-013")
+    @pytest.mark.requirement("006-FR-013")
     def test_load_nonexistent_table_fails(
         self,
         catalog: Catalog,

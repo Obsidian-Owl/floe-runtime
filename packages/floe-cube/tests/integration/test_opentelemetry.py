@@ -124,7 +124,7 @@ class TestTracesAppearInJaeger:
     FR-033: Support W3C Trace Context propagation
     """
 
-    @pytest.mark.requirement("FR-024")
+    @pytest.mark.requirement("006-FR-024")
     def test_tracer_emits_spans_to_jaeger(
         self,
         jaeger_client: httpx.Client,
@@ -167,7 +167,7 @@ class TestTracesAppearInJaeger:
             assert span.attributes["cube.dimensions_count"] == 2
             assert span.attributes["cube.filter_count"] == 3
 
-    @pytest.mark.requirement("FR-024")
+    @pytest.mark.requirement("006-FR-024")
     def test_span_hierarchy_created(
         self,
         jaeger_client: httpx.Client,
@@ -200,7 +200,7 @@ class TestTracesAppearInJaeger:
             assert execute_span.parent_span_id == parent_span.span_id
             assert execute_span.trace_id == parent_span.trace_id
 
-    @pytest.mark.requirement("FR-024")
+    @pytest.mark.requirement("006-FR-024")
     def test_w3c_trace_context_propagation(
         self,
         jaeger_client: httpx.Client,
@@ -229,7 +229,7 @@ class TestTracesAppearInJaeger:
             # Should have parent set to incoming span
             assert span.parent_span_id == incoming_parent_id
 
-    @pytest.mark.requirement("FR-024")
+    @pytest.mark.requirement("006-FR-024")
     def test_query_result_recording(
         self,
         jaeger_client: httpx.Client,
@@ -255,7 +255,7 @@ class TestTracesAppearInJaeger:
             assert updated_span.status == SpanStatus.OK
             assert updated_span.end_time is not None
 
-    @pytest.mark.requirement("FR-024")
+    @pytest.mark.requirement("006-FR-024")
     def test_error_recording(
         self,
         jaeger_client: httpx.Client,
@@ -280,7 +280,7 @@ class TestTracesAppearInJaeger:
             assert updated_span.attributes["cube.error_type"] == "ValidationError"
             assert updated_span.status == SpanStatus.ERROR
 
-    @pytest.mark.requirement("FR-024")
+    @pytest.mark.requirement("006-FR-024")
     def test_safe_attributes_only(
         self,
         jaeger_client: httpx.Client,
@@ -317,7 +317,7 @@ class TestTracesAppearInJaeger:
             assert "jwt_token" not in updated_span.attributes
             assert "password" not in updated_span.attributes
 
-    @pytest.mark.requirement("FR-024")
+    @pytest.mark.requirement("006-FR-024")
     def test_disabled_tracing_produces_no_spans(
         self,
         jaeger_client: httpx.Client,
@@ -342,7 +342,7 @@ class TestTracesAppearInJaeger:
         )
         assert child is None
 
-    @pytest.mark.requirement("FR-024")
+    @pytest.mark.requirement("006-FR-024")
     def test_jaeger_query_api_available(
         self,
         jaeger_client: httpx.Client,
@@ -360,8 +360,8 @@ class TestTracesAppearInJaeger:
         # Services list may or may not have entries depending on what's been traced
         assert isinstance(data["data"], list)
 
-    @pytest.mark.requirement("FR-024")
-    @pytest.mark.requirement("FR-025")
+    @pytest.mark.requirement("006-FR-024")
+    @pytest.mark.requirement("006-FR-025")
     def test_openlineage_run_id_linking(
         self,
         jaeger_client: httpx.Client,

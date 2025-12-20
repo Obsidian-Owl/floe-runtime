@@ -89,7 +89,7 @@ def tracing_manager(tracing_config: dict[str, Any]):
 class TestOTelSpanEmission:
     """Tests for OpenTelemetry span emission to Jaeger."""
 
-    @pytest.mark.requirement("FR-030")
+    @pytest.mark.requirement("006-FR-030")
     def test_start_span_creates_trace(
         self,
         tracing_manager,
@@ -120,7 +120,7 @@ class TestOTelSpanEmission:
         except Exception:
             pytest.skip("Jaeger query failed - service may be initializing")
 
-    @pytest.mark.requirement("FR-030")
+    @pytest.mark.requirement("006-FR-030")
     def test_span_attributes(
         self,
         tracing_manager,
@@ -158,7 +158,7 @@ class TestOTelSpanEmission:
         except Exception:
             pytest.skip("Jaeger query failed - service may be initializing")
 
-    @pytest.mark.requirement("FR-030")
+    @pytest.mark.requirement("006-FR-030")
     def test_nested_spans(
         self,
         tracing_manager,
@@ -183,7 +183,7 @@ class TestOTelSpanEmission:
                     != child_span.get_span_context().span_id
                 )
 
-    @pytest.mark.requirement("FR-030")
+    @pytest.mark.requirement("006-FR-030")
     def test_span_status_ok(
         self,
         tracing_manager,
@@ -195,7 +195,7 @@ class TestOTelSpanEmission:
             # Span should still be valid
             assert span.get_span_context().is_valid
 
-    @pytest.mark.requirement("FR-030")
+    @pytest.mark.requirement("006-FR-030")
     def test_span_status_error(
         self,
         tracing_manager,
@@ -206,7 +206,7 @@ class TestOTelSpanEmission:
             tracing_manager.set_status_error(span, "Test error description")
             assert span.get_span_context().is_valid
 
-    @pytest.mark.requirement("FR-030")
+    @pytest.mark.requirement("006-FR-030")
     def test_record_exception(
         self,
         tracing_manager,
@@ -225,7 +225,7 @@ class TestOTelSpanEmission:
 class TestTracingGracefulDegradation:
     """Tests for graceful degradation when Jaeger is unavailable."""
 
-    @pytest.mark.requirement("FR-030")
+    @pytest.mark.requirement("006-FR-030")
     def test_disabled_tracing_does_not_fail(self) -> None:
         """Test that disabled tracing handles operations gracefully."""
         from floe_dagster.observability import TracingConfig, TracingManager
@@ -250,7 +250,7 @@ class TestTracingGracefulDegradation:
         finally:
             manager.shutdown()
 
-    @pytest.mark.requirement("FR-030")
+    @pytest.mark.requirement("006-FR-030")
     def test_tracing_with_unavailable_endpoint(self) -> None:
         """Test tracing gracefully handles unavailable endpoint."""
         from floe_dagster.observability import TracingConfig, TracingManager
@@ -281,7 +281,7 @@ class TestTracingGracefulDegradation:
 class TestTracingContext:
     """Tests for trace context management."""
 
-    @pytest.mark.requirement("FR-030")
+    @pytest.mark.requirement("006-FR-030")
     def test_get_current_trace_context(
         self,
         tracing_manager,
@@ -298,7 +298,7 @@ class TestTracingContext:
             assert len(context["trace_id"]) == 32  # 128-bit trace ID
             assert len(context["span_id"]) == 16  # 64-bit span ID
 
-    @pytest.mark.requirement("FR-030")
+    @pytest.mark.requirement("006-FR-030")
     def test_trace_context_outside_span(
         self,
         tracing_manager,
@@ -316,7 +316,7 @@ class TestTracingContext:
 class TestTracingManagerLifecycle:
     """Tests for TracingManager lifecycle management."""
 
-    @pytest.mark.requirement("FR-030")
+    @pytest.mark.requirement("006-FR-030")
     def test_manager_as_context_manager(self) -> None:
         """Test TracingManager as context manager."""
         from floe_dagster.observability import TracingConfig, TracingManager
@@ -338,7 +338,7 @@ class TestTracingManagerLifecycle:
 
         # After exit, manager should be shut down
 
-    @pytest.mark.requirement("FR-030")
+    @pytest.mark.requirement("006-FR-030")
     def test_get_tracer(
         self,
         tracing_manager,
@@ -351,7 +351,7 @@ class TestTracingManagerLifecycle:
         with tracer.start_as_current_span("tracer_test") as span:
             assert span.get_span_context().is_valid
 
-    @pytest.mark.requirement("FR-030")
+    @pytest.mark.requirement("006-FR-030")
     def test_double_configure_warning(
         self,
         tracing_config: dict[str, Any],
@@ -382,7 +382,7 @@ class TestTracingManagerLifecycle:
 class TestJaegerClientIntegration:
     """Tests for JaegerClient functionality."""
 
-    @pytest.mark.requirement("FR-030")
+    @pytest.mark.requirement("006-FR-030")
     def test_jaeger_client_availability(
         self,
         jaeger_client: JaegerClient,
@@ -390,7 +390,7 @@ class TestJaegerClientIntegration:
         """Test that JaegerClient can connect."""
         assert jaeger_client.is_available()
 
-    @pytest.mark.requirement("FR-030")
+    @pytest.mark.requirement("006-FR-030")
     def test_get_services(
         self,
         jaeger_client: JaegerClient,
@@ -399,7 +399,7 @@ class TestJaegerClientIntegration:
         services = jaeger_client.get_services()
         assert isinstance(services, list)
 
-    @pytest.mark.requirement("FR-030")
+    @pytest.mark.requirement("006-FR-030")
     def test_get_traces_empty_service(
         self,
         jaeger_client: JaegerClient,
@@ -413,7 +413,7 @@ class TestJaegerClientIntegration:
         assert isinstance(traces, list)
         assert len(traces) == 0
 
-    @pytest.mark.requirement("FR-030")
+    @pytest.mark.requirement("006-FR-030")
     def test_get_operations(
         self,
         jaeger_client: JaegerClient,
