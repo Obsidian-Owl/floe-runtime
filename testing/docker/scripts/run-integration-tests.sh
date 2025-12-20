@@ -176,12 +176,14 @@ if [[ "$PROFILE" == "full" ]]; then
         "packages/floe-polaris/tests/integration/"
         "packages/floe-cube/tests/integration/"
         "packages/floe-dagster/tests/integration/"
+        "packages/floe-dbt/tests/integration/"
     )
 else
-    # Storage profile: iceberg and polaris only
+    # Storage profile: iceberg, polaris, and dbt (postgres tests need Docker)
     TEST_DIRS=(
         "packages/floe-iceberg/tests/integration/"
         "packages/floe-polaris/tests/integration/"
+        "packages/floe-dbt/tests/integration/"
     )
 fi
 
