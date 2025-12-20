@@ -139,7 +139,8 @@ class TestBigQueryProfileGeneration:
 
         profile = outputs["dev"]
         assert profile["method"] == "service-account"
-        assert profile["keyfile"] == "/path/to/keyfile.json"
+        # FR-003: Keyfile path is converted to env_var reference for security
+        assert profile["keyfile"] == "{{ env_var('BIGQUERY_DEV_KEYFILE') }}"
 
     @pytest.mark.requirement("FR-010")
     def test_generate_bigquery_profile_minimal(
