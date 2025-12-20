@@ -6,10 +6,37 @@ and contract tests.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
+import structlog
+
+
+@pytest.fixture(autouse=True)
+def configure_structlog_for_tests() -> None:
+    """Configure structlog to output to stdout for test capture.
+
+    This fixture ensures structlog outputs to stdout so that capsys
+    can capture the output in tests. Without this, structlog may use
+    different processors depending on test execution order.
+    """
+    structlog.configure(
+        processors=[
+            structlog.stdlib.add_log_level,
+            structlog.stdlib.PositionalArgumentsFormatter(),
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.processors.StackInfoRenderer(),
+            structlog.processors.format_exc_info,
+            structlog.processors.UnicodeDecoder(),
+            structlog.dev.ConsoleRenderer(),
+        ],
+        wrapper_class=structlog.stdlib.BoundLogger,
+        context_class=dict,
+        logger_factory=structlog.PrintLoggerFactory(file=sys.stdout),
+        cache_logger_on_first_use=False,  # Important for test isolation
+    )
 
 
 @pytest.fixture
