@@ -393,10 +393,7 @@ def format_multi_feature_console(report: MultiFeatureReport) -> str:
     lines.append("")
 
     # Summary table header
-    lines.append(
-        f"{'Feature':<6} {'Name':<25} {'Reqs':>5} {'Cover':>5} "
-        f"{'Pct':>6} {'Markers':>8}"
-    )
+    lines.append(f"{'Feature':<6} {'Name':<25} {'Reqs':>5} {'Cover':>5} {'Pct':>6} {'Markers':>8}")
     lines.append("-" * 70)
 
     # Per-feature rows

@@ -250,9 +250,7 @@ class TestPostgreSQLProfileGeneration:
             "transforms": [],
         }
 
-        config = ProfileGeneratorConfig(
-            profile_name="floe", target_name="prod", environment="prod"
-        )
+        config = ProfileGeneratorConfig(profile_name="floe", target_name="prod", environment="prod")
         generator = factory.create("postgres")
         outputs = generator.generate(artifacts, config)
 
@@ -377,9 +375,7 @@ class TestPostgreSQLDockerIntegration:
 
         # Should connect successfully
         assert result.returncode == 0, f"dbt debug failed: {result.stderr}"
-        assert (
-            "Connection test: OK" in result.stdout or "All checks passed" in result.stdout
-        )
+        assert "Connection test: OK" in result.stdout or "All checks passed" in result.stdout
 
     @pytest.mark.skipif(
         not HAS_POSTGRES_SERVICE,

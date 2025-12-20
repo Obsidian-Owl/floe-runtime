@@ -26,8 +26,8 @@ import yaml
 
 # Check if required dependencies are available
 try:
-    import dbt.version  # noqa: F401
     from dagster import materialize  # noqa: F401
+    import dbt.version  # noqa: F401
 
     HAS_DAGSTER = True
 except ImportError:
@@ -283,6 +283,7 @@ class TestAssetMaterializationExecution:
     ) -> None:
         """Test materializing a single dbt asset."""
         from dagster import materialize
+
         from floe_dagster.assets import FloeAssetFactory
 
         # Create assets and definitions
@@ -310,6 +311,7 @@ class TestAssetMaterializationExecution:
     ) -> None:
         """Test materializing all dbt assets in dependency order."""
         from dagster import materialize
+
         from floe_dagster.assets import FloeAssetFactory
 
         definitions = FloeAssetFactory.create_definitions(materialization_artifacts)
@@ -341,9 +343,7 @@ class TestAssetMaterializationEdgeCases:
         """Test that materialization fails gracefully with missing upstream."""
         # Create a model that references a non-existent model
         models_dir = dbt_project_with_deps / "models"
-        (models_dir / "broken_model.sql").write_text(
-            "SELECT * FROM {{ ref('nonexistent_model') }}"
-        )
+        (models_dir / "broken_model.sql").write_text("SELECT * FROM {{ ref('nonexistent_model') }}")
 
         # Compile should fail
         result = subprocess.run(

@@ -17,6 +17,7 @@ Covers:
 
 from __future__ import annotations
 
+import contextlib
 import os
 import uuid
 import warnings
@@ -121,9 +122,7 @@ class TestArtifactsToCatalogConfig:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message="scope='PRINCIPAL_ROLE:ALL'")
             return PolarisCatalogConfig(
-                uri=catalog_config.get(
-                    "uri", f"http://{_get_polaris_host()}:8181/api/catalog"
-                ),
+                uri=catalog_config.get("uri", f"http://{_get_polaris_host()}:8181/api/catalog"),
                 warehouse=catalog_config.get("warehouse", "warehouse"),
                 client_id=os.environ.get("POLARIS_CLIENT_ID", "root"),
                 client_secret=os.environ.get("POLARIS_CLIENT_SECRET", "s3cr3t"),
@@ -139,18 +138,14 @@ class TestArtifactsToCatalogConfig:
         yield catalog
 
     @pytest.fixture
-    def test_namespace(
-        self, catalog_from_artifacts: PolarisCatalog
-    ) -> Generator[str, None, None]:
+    def test_namespace(self, catalog_from_artifacts: PolarisCatalog) -> Generator[str, None, None]:
         """Provide a unique test namespace with cleanup."""
         ns_name = f"fr035_test_{uuid.uuid4().hex[:8]}"
         yield ns_name
 
         # Cleanup
-        try:
+        with contextlib.suppress(NamespaceNotFoundError):
             catalog_from_artifacts.drop_namespace(ns_name)
-        except NamespaceNotFoundError:
-            pass
 
     @pytest.mark.requirement("006-FR-035")
     @pytest.mark.requirement("004-FR-001")

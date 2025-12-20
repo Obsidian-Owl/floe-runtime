@@ -54,7 +54,7 @@ from floe_iceberg import (  # noqa: E402
 )
 
 if TYPE_CHECKING:
-    from structlog.stdlib import BoundLogger
+    pass
 
 
 # =============================================================================
@@ -145,10 +145,10 @@ def test_namespace(catalog: PolarisCatalog) -> Generator[str, None, None]:
     yield ns_name
 
     # Cleanup: Drop namespace
-    try:
+    import contextlib
+
+    with contextlib.suppress(Exception):
         catalog.drop_namespace(ns_name)
-    except Exception:
-        pass
 
 
 @pytest.fixture
@@ -638,8 +638,6 @@ class TestObservability:
         import logging
         from io import StringIO
 
-        import structlog
-
         # Capture log output
         log_output = StringIO()
         handler = logging.StreamHandler(log_output)
@@ -660,8 +658,8 @@ class TestObservability:
             table_manager.scan(table_name)
             table_manager.drop_table(table_name)
 
-            # Verify logs were emitted
-            log_contents = log_output.getvalue()
+            # Verify logs were emitted (capture for potential debugging)
+            _ = log_output.getvalue()
 
             # The observability module should log these operations
             # Note: actual log format depends on structlog configuration

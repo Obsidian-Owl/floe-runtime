@@ -16,22 +16,22 @@ Test markers:
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import TYPE_CHECKING
 
+import pydantic
 import pytest
 
 from floe_core.compiler.models import CompiledArtifacts
 from testing.fixtures.golden_artifacts import (
     GOLDEN_ARTIFACTS_DIR,
-    load_all_golden_artifacts,
-    load_golden_artifact,
     list_artifacts,
     list_versions,
+    load_all_golden_artifacts,
+    load_golden_artifact,
 )
 
 if TYPE_CHECKING:
-    from typing import Any
+    pass
 
 
 class TestGoldenArtifactLoading:
@@ -136,7 +136,7 @@ class TestGoldenArtifactContractValidation:
         artifact_data = load_golden_artifact("v1.0.0", "minimal.json")
         compiled = CompiledArtifacts.model_validate(artifact_data)
 
-        with pytest.raises(Exception):  # ValidationError for frozen model
+        with pytest.raises((TypeError, pydantic.ValidationError)):  # Frozen model raises error
             compiled.version = "2.0.0"  # type: ignore[misc]
 
     @pytest.mark.requirement("001-FR-009")
@@ -145,7 +145,7 @@ class TestGoldenArtifactContractValidation:
         artifact_data = load_golden_artifact("v1.0.0", "minimal.json")
         artifact_data["unexpected_field"] = "should fail"
 
-        with pytest.raises(Exception):  # ValidationError for extra="forbid"
+        with pytest.raises(ValueError):  # ValidationError for extra="forbid"
             CompiledArtifacts.model_validate(artifact_data)
 
 

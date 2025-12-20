@@ -21,7 +21,6 @@ import pytest
 
 from floe_cli.main import cli
 
-
 # Valid floe.yaml content for tests
 VALID_FLOE_YAML = """\
 name: test-project
@@ -319,9 +318,12 @@ class TestTargetOption:
             cli,
             [
                 "compile",
-                "--file", str(floe_yaml),
-                "--output", str(output_dir),
-                "--target", "duckdb",
+                "--file",
+                str(floe_yaml),
+                "--output",
+                str(output_dir),
+                "--target",
+                "duckdb",
             ],
         )
 

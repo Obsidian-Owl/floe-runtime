@@ -19,8 +19,8 @@ Covers:
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
+import subprocess
 from typing import Any
 
 import pytest
@@ -173,9 +173,7 @@ class TestCompiledArtifactsToDagster:
         }
 
     @pytest.fixture
-    def artifacts_json_file(
-        self, tmp_path: Path, compiled_artifacts: dict[str, Any]
-    ) -> Path:
+    def artifacts_json_file(self, tmp_path: Path, compiled_artifacts: dict[str, Any]) -> Path:
         """Write CompiledArtifacts to JSON file."""
         artifacts_path = tmp_path / ".floe" / "compiled_artifacts.json"
         artifacts_path.parent.mkdir(parents=True, exist_ok=True)

@@ -17,6 +17,7 @@ Covers:
 
 from __future__ import annotations
 
+import contextlib
 import os
 import uuid
 import warnings
@@ -84,25 +85,19 @@ class TestSecurityContextPropagation:
             )
 
     @pytest.fixture
-    def catalog(
-        self, valid_config: PolarisCatalogConfig
-    ) -> Generator[PolarisCatalog, None, None]:
+    def catalog(self, valid_config: PolarisCatalogConfig) -> Generator[PolarisCatalog, None, None]:
         """Create catalog with valid credentials."""
         catalog = create_catalog(valid_config)
         yield catalog
 
     @pytest.fixture
-    def test_namespace(
-        self, catalog: PolarisCatalog
-    ) -> Generator[str, None, None]:
+    def test_namespace(self, catalog: PolarisCatalog) -> Generator[str, None, None]:
         """Provide a unique test namespace with cleanup."""
         ns_name = f"fr028_security_{uuid.uuid4().hex[:8]}"
         yield ns_name
 
-        try:
+        with contextlib.suppress(NamespaceNotFoundError):
             catalog.drop_namespace(ns_name)
-        except NamespaceNotFoundError:
-            pass
 
     @pytest.mark.requirement("006-FR-028")
     @pytest.mark.requirement("004-FR-001")
@@ -183,9 +178,7 @@ class TestSecurityContextPropagation:
         """
         # The scope should be set in the config
         assert valid_config.scope is not None
-        assert valid_config.scope == os.environ.get(
-            "POLARIS_SCOPE", "PRINCIPAL_ROLE:ALL"
-        )
+        assert valid_config.scope == os.environ.get("POLARIS_SCOPE", "PRINCIPAL_ROLE:ALL")
 
         # Create catalog with configured scope
         catalog = create_catalog(valid_config)
@@ -272,17 +265,13 @@ class TestSecurityContextInOperations:
         yield catalog
 
     @pytest.fixture
-    def test_namespace(
-        self, catalog: PolarisCatalog
-    ) -> Generator[str, None, None]:
+    def test_namespace(self, catalog: PolarisCatalog) -> Generator[str, None, None]:
         """Provide a unique test namespace with cleanup."""
         ns_name = f"fr028_ops_{uuid.uuid4().hex[:8]}"
         yield ns_name
 
-        try:
+        with contextlib.suppress(NamespaceNotFoundError):
             catalog.drop_namespace(ns_name)
-        except NamespaceNotFoundError:
-            pass
 
     @pytest.mark.requirement("006-FR-028")
     @pytest.mark.requirement("004-FR-002")
@@ -313,9 +302,9 @@ class TestSecurityContextInOperations:
 
         # Verify operations completed successfully with authenticated context
         assert ns_properties is not None, "Namespace load should return properties"
-        assert any(
-            test_namespace in str(ns) for ns in namespaces
-        ), "Created namespace should appear in list"
+        assert any(test_namespace in str(ns) for ns in namespaces), (
+            "Created namespace should appear in list"
+        )
 
     @pytest.mark.requirement("006-FR-028")
     @pytest.mark.requirement("004-FR-002")
@@ -396,8 +385,6 @@ class TestScopeWarnings:
 
             # No PRINCIPAL_ROLE:ALL warnings
             principal_role_all_warnings = [
-                warning
-                for warning in w
-                if "PRINCIPAL_ROLE:ALL" in str(warning.message)
+                warning for warning in w if "PRINCIPAL_ROLE:ALL" in str(warning.message)
             ]
             assert len(principal_role_all_warnings) == 0

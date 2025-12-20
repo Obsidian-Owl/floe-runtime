@@ -20,8 +20,8 @@ import pytest
 from floe_core.compiler.models import CompiledArtifacts
 from floe_core.schemas import ComputeTarget
 from testing.fixtures.golden_artifacts import (
-    load_golden_artifact,
     list_artifacts,
+    load_golden_artifact,
 )
 
 
@@ -44,8 +44,15 @@ class TestDbtRequiredFields:
         assert compiled.compute.target is not None
 
         # REQUIRED: target is valid dbt adapter name
-        valid_adapters = ["duckdb", "snowflake", "bigquery", "redshift",
-                         "databricks", "postgres", "spark"]
+        valid_adapters = [
+            "duckdb",
+            "snowflake",
+            "bigquery",
+            "redshift",
+            "databricks",
+            "postgres",
+            "spark",
+        ]
         assert compiled.compute.target.value in valid_adapters
 
     @pytest.mark.requirement("001-FR-011")
@@ -132,6 +139,7 @@ class TestDbtSecretReferences:
         assert compiled.compute.connection_secret_ref is not None
         # Should be valid K8s name (alphanumeric, dashes)
         import re
+
         pattern = r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,252}$"
         assert re.match(pattern, compiled.compute.connection_secret_ref)
 

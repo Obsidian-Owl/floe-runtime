@@ -241,9 +241,9 @@ class TestCoverageThresholdValidation:
 
         # Minimum threshold: at least 5% coverage (3+ requirements covered)
         minimum_threshold = 5.0
-        assert (
-            coverage >= minimum_threshold
-        ), f"Coverage {coverage:.1f}% is below minimum threshold {minimum_threshold}%"
+        assert coverage >= minimum_threshold, (
+            f"Coverage {coverage:.1f}% is below minimum threshold {minimum_threshold}%"
+        )
 
     @pytest.mark.requirement("006-FR-006")
     def test_storage_catalog_requirements_covered(self) -> None:
@@ -273,7 +273,7 @@ class TestCoverageThresholdValidation:
                 None,
             )
             assert mapping is not None, f"Requirement {req_id} not found in mappings"
-            assert (
-                mapping.coverage_status == CoverageStatus.COVERED
-            ), f"Requirement {req_id} is not covered"
+            assert mapping.coverage_status == CoverageStatus.COVERED, (
+                f"Requirement {req_id} is not covered"
+            )
             assert len(mapping.test_ids) > 0, f"Requirement {req_id} has no linked tests"

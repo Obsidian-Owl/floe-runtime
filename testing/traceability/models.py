@@ -30,7 +30,6 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from enum import Enum
-
 import re
 
 from pydantic import BaseModel, Field

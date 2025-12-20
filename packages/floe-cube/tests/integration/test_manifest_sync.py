@@ -17,9 +17,7 @@ Covers:
 
 from __future__ import annotations
 
-import json
 import os
-from pathlib import Path
 from typing import Any
 
 import httpx
@@ -161,9 +159,7 @@ class TestManifestToCubeSync:
         # Query Cube's meta endpoint to get available cubes
         response = cube_client.get("/cubejs-api/v1/meta")
 
-        assert response.status_code == 200, (
-            f"Cube meta endpoint failed: {response.text}"
-        )
+        assert response.status_code == 200, f"Cube meta endpoint failed: {response.text}"
 
         meta = response.json()
         cube_names = [cube["name"] for cube in meta.get("cubes", [])]
@@ -249,9 +245,7 @@ class TestManifestToCubeSync:
         """
         # Extract models from manifest
         nodes = sample_dbt_manifest.get("nodes", {})
-        models = {
-            k: v for k, v in nodes.items() if v.get("resource_type") == "model"
-        }
+        models = {k: v for k, v in nodes.items() if v.get("resource_type") == "model"}
 
         assert len(models) == 2, "Should have 2 models"
 

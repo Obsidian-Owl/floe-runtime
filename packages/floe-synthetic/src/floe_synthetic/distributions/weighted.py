@@ -37,7 +37,7 @@ class WeightedDistribution:
         """
         self.values = list(weights.keys())
         self.weights = list(weights.values())
-        self._rng = random.Random(seed)
+        self._rng = random.Random(seed)  # noqa: S311 - synthetic data, not crypto
 
     def sample(self, count: int) -> list[str]:
         """Generate weighted random values.
@@ -70,23 +70,29 @@ class WeightedDistribution:
 
 
 # Common weight distributions for reuse
-ORDER_STATUS_DISTRIBUTION = WeightedDistribution({
-    "completed": 60,
-    "processing": 20,
-    "pending": 15,
-    "cancelled": 5,
-})
+ORDER_STATUS_DISTRIBUTION = WeightedDistribution(
+    {
+        "completed": 60,
+        "processing": 20,
+        "pending": 15,
+        "cancelled": 5,
+    }
+)
 
-REGION_DISTRIBUTION = WeightedDistribution({
-    "north": 25,
-    "south": 25,
-    "east": 25,
-    "west": 25,
-})
+REGION_DISTRIBUTION = WeightedDistribution(
+    {
+        "north": 25,
+        "south": 25,
+        "east": 25,
+        "west": 25,
+    }
+)
 
-PLAN_DISTRIBUTION = WeightedDistribution({
-    "free": 50,
-    "starter": 25,
-    "pro": 20,
-    "enterprise": 5,
-})
+PLAN_DISTRIBUTION = WeightedDistribution(
+    {
+        "free": 50,
+        "starter": 25,
+        "pro": 20,
+        "enterprise": 5,
+    }
+)

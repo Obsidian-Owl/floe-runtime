@@ -6,8 +6,6 @@ for the generators and loaders.
 
 from __future__ import annotations
 
-from typing import Any
-
 from dagster import ConfigurableResource
 from pydantic import Field
 
@@ -16,7 +14,7 @@ from floe_synthetic.generators.saas import SaaSGenerator
 from floe_synthetic.loaders.iceberg import IcebergLoader, IcebergLoaderConfig
 
 
-class EcommerceGeneratorResource(ConfigurableResource):
+class EcommerceGeneratorResource(ConfigurableResource):  # type: ignore[type-arg]
     """Dagster resource for EcommerceGenerator.
 
     Example:
@@ -32,7 +30,7 @@ class EcommerceGeneratorResource(ConfigurableResource):
         return EcommerceGenerator(seed=self.seed)
 
 
-class SaaSGeneratorResource(ConfigurableResource):
+class SaaSGeneratorResource(ConfigurableResource):  # type: ignore[type-arg]
     """Dagster resource for SaaSGenerator.
 
     Example:
@@ -48,7 +46,7 @@ class SaaSGeneratorResource(ConfigurableResource):
         return SaaSGenerator(seed=self.seed)
 
 
-class IcebergLoaderResource(ConfigurableResource):
+class IcebergLoaderResource(ConfigurableResource):  # type: ignore[type-arg]
     """Dagster resource for IcebergLoader.
 
     Example:

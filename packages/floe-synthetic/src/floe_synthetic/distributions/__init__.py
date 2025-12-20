@@ -7,7 +7,7 @@ This module provides utilities for creating realistic data distributions:
 
 from __future__ import annotations
 
-from floe_synthetic.distributions.weighted import WeightedDistribution
 from floe_synthetic.distributions.temporal import TemporalDistribution
+from floe_synthetic.distributions.weighted import WeightedDistribution
 
 __all__ = ["WeightedDistribution", "TemporalDistribution"]

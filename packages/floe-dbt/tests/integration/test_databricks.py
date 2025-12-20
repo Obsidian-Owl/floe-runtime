@@ -141,9 +141,7 @@ class TestDatabricksProfileGeneration:
             "transforms": [],
         }
 
-        config = ProfileGeneratorConfig(
-            profile_name="floe", target_name="prod", environment="prod"
-        )
+        config = ProfileGeneratorConfig(profile_name="floe", target_name="prod", environment="prod")
         generator = factory.create("databricks")
         outputs = generator.generate(artifacts, config)
 

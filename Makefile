@@ -9,7 +9,7 @@ help:
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  make check           - Run all CI checks (lint, type, security, test)"
-	@echo "  make lint            - Run linting (ruff, isort)"
+	@echo "  make lint            - Run linting (ruff check + format)"
 	@echo "  make typecheck       - Run mypy strict type checking"
 	@echo "  make security        - Run security scans (bandit)"
 	@echo "  make format          - Auto-format code"
@@ -34,12 +34,13 @@ help:
 check: lint typecheck security test
 	@echo "✅ All checks passed!"
 
-# Lint checks - mirrors CI lint job
+# Lint checks - mirrors CI lint job exactly
+# Note: ruff check includes I001 import sorting via [tool.ruff.lint] select = ["I"]
+# This replaces the need for a separate isort check
 lint:
 	@echo "📋 Running lint checks..."
 	uv run ruff check .
 	uv run ruff format --check .
-	uv run isort --check packages/
 
 # Type checking - mirrors CI typecheck job
 typecheck:
@@ -56,11 +57,11 @@ test:
 	@echo "🧪 Running all tests in Docker..."
 	@./testing/docker/scripts/run-all-tests.sh
 
-# Auto-format code
+# Auto-format code (ruff handles both formatting and import sorting)
 format:
 	@echo "🎨 Formatting code..."
+	uv run ruff check --fix .
 	uv run ruff format .
-	uv run isort packages/
 
 # Install dependencies
 install:

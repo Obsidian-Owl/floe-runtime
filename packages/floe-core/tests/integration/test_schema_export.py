@@ -57,7 +57,7 @@ def count_descriptions(schema: dict[str, Any]) -> tuple[int, int]:
         nonlocal with_desc, without_desc
         if isinstance(obj, dict):
             if "properties" in obj:
-                for prop_name, prop_schema in obj["properties"].items():
+                for _prop_name, prop_schema in obj["properties"].items():
                     if isinstance(prop_schema, dict):
                         if "description" in prop_schema:
                             with_desc += 1
@@ -300,7 +300,7 @@ class TestJsonSchemaDraft202012Compatibility:
 
         # If there are $defs, they must be valid schemas
         if "$defs" in schema:
-            for def_name, def_schema in schema["$defs"].items():
+            for _def_name, def_schema in schema["$defs"].items():
                 validate_json_schema_structure(def_schema)
 
     @pytest.mark.requirement("001-FR-024")
@@ -319,7 +319,7 @@ class TestJsonSchemaDraft202012Compatibility:
 
         # If there are $defs, they must be valid schemas
         if "$defs" in schema:
-            for def_name, def_schema in schema["$defs"].items():
+            for _def_name, def_schema in schema["$defs"].items():
                 validate_json_schema_structure(def_schema)
 
     @pytest.mark.requirement("001-FR-024")

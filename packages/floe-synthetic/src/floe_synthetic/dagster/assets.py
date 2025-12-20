@@ -69,9 +69,7 @@ def daily_ecommerce_orders(
 
     # Append to orders table
     result = loader.get_loader().append("demo.orders", orders)
-    context.log.info(
-        f"Appended {result.rows_loaded} orders, snapshot: {result.snapshot_id}"
-    )
+    context.log.info(f"Appended {result.rows_loaded} orders, snapshot: {result.snapshot_id}")
 
 
 @asset(
@@ -123,6 +121,4 @@ def daily_saas_events(
 
     # Append to events table
     result = loader.get_loader().append("demo.events", events)
-    context.log.info(
-        f"Appended {result.rows_loaded} events, snapshot: {result.snapshot_id}"
-    )
+    context.log.info(f"Appended {result.rows_loaded} events, snapshot: {result.snapshot_id}")

@@ -23,11 +23,10 @@ import pyarrow as pa
 from faker import Faker
 
 from floe_synthetic.generators.base import (
-    DataGenerator,
     PLAN_WEIGHTS,
     SUBSCRIPTION_STATUS_WEIGHTS,
+    DataGenerator,
 )
-
 
 # MRR by plan (monthly recurring revenue in USD)
 PLAN_MRR: dict[str, Decimal] = {
@@ -38,7 +37,7 @@ PLAN_MRR: dict[str, Decimal] = {
 }
 
 # Event type weights for realistic activity patterns
-EVENT_TYPE_WEIGHTS: dict[str, int] = {
+EVENT_TYPE_WEIGHTS: dict[str, float] = {
     "page_view": 50,
     "feature_use": 25,
     "api_call": 15,
@@ -231,9 +230,7 @@ class SaaSGenerator(DataGenerator):
                 org_id = None
             organization_ids.append(org_id)
 
-            signup_date = self.fake.date_time_between(
-                start_date=start_date, end_date=end_date
-            )
+            signup_date = self.fake.date_time_between(start_date=start_date, end_date=end_date)
             signup_dates.append(signup_date)
 
             # Last active somewhere between signup and now
@@ -315,16 +312,17 @@ class SaaSGenerator(DataGenerator):
             properties = self._generate_event_properties(event_type, user_id)
             properties_list.append(str(properties))
 
-            timestamps.append(
-                self.fake.date_time_between(start_date=start_date, end_date=end_date)
-            )
+            timestamps.append(self.fake.date_time_between(start_date=start_date, end_date=end_date))
 
             # Session management
+            session_id: str | None
             if event_type == "login":
                 session_id = f"sess_{self.fake.uuid4()[:8]}"
                 current_sessions[user_id] = session_id
             elif event_type == "logout":
-                session_id = current_sessions.pop(user_id, None)
+                session_id = current_sessions.pop(user_id, "")
+                if not session_id:
+                    session_id = None
             else:
                 session_id = current_sessions.get(user_id)
 
@@ -388,9 +386,7 @@ class SaaSGenerator(DataGenerator):
             )
             sub_statuses.append(status)
 
-            started_at = self.fake.date_time_between(
-                start_date="-2y", end_date="-30d"
-            )
+            started_at = self.fake.date_time_between(start_date="-2y", end_date="-30d")
             started_ats.append(started_at)
 
             # Set end date for churned/cancelled
@@ -424,9 +420,7 @@ class SaaSGenerator(DataGenerator):
             }
         )
 
-    def _generate_event_properties(
-        self, event_type: str, user_id: int
-    ) -> dict[str, Any]:
+    def _generate_event_properties(self, event_type: str, user_id: int) -> dict[str, Any]:
         """Generate realistic event properties based on event type.
 
         Args:

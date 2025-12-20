@@ -36,7 +36,7 @@ class TestRequirementMarker:
         markers = list(sample_test.pytestmark)  # type: ignore[attr-defined]
         assert len(markers) == 1
         assert markers[0].name == "requirement"
-        assert markers[0].args == ("FR-001",)
+        assert markers[0].args == ("006-FR-001",)
 
 
 class TestRequirementsMarker:

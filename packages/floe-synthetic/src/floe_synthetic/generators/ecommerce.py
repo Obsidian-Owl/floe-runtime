@@ -22,9 +22,9 @@ import pyarrow as pa
 from faker import Faker
 
 from floe_synthetic.generators.base import (
-    DataGenerator,
     REGION_WEIGHTS,
     STATUS_WEIGHTS,
+    DataGenerator,
 )
 
 
@@ -302,15 +302,25 @@ class EcommerceGenerator(DataGenerator):
             product_categories.append(category)
 
             if category == "electronics":
-                name = f"{self.fake.word().title()} {self.fake.random_element(['Pro', 'Ultra', 'Max', 'Plus'])} {self.fake.random_element(['Phone', 'Tablet', 'Laptop', 'Headphones', 'Speaker'])}"
+                prefix = self.fake.random_element(["Pro", "Ultra", "Max", "Plus"])
+                suffix = self.fake.random_element(
+                    ["Phone", "Tablet", "Laptop", "Headphones", "Speaker"]
+                )
+                name = f"{self.fake.word().title()} {prefix} {suffix}"
             elif category == "clothing":
-                name = f"{self.fake.color_name()} {self.fake.random_element(['T-Shirt', 'Jacket', 'Pants', 'Dress', 'Shoes'])}"
+                item = self.fake.random_element(["T-Shirt", "Jacket", "Pants", "Dress", "Shoes"])
+                name = f"{self.fake.color_name()} {item}"
             elif category == "home":
-                name = f"{self.fake.word().title()} {self.fake.random_element(['Lamp', 'Chair', 'Table', 'Rug', 'Pillow'])}"
+                item = self.fake.random_element(["Lamp", "Chair", "Table", "Rug", "Pillow"])
+                name = f"{self.fake.word().title()} {item}"
             elif category == "sports":
-                name = f"{self.fake.word().title()} {self.fake.random_element(['Ball', 'Racket', 'Weights', 'Mat', 'Gear'])}"
+                item = self.fake.random_element(["Ball", "Racket", "Weights", "Mat", "Gear"])
+                name = f"{self.fake.word().title()} {item}"
             else:  # books
-                name = f"The {self.fake.word().title()} {self.fake.random_element(['Guide', 'Story', 'Manual', 'Handbook', 'Journey'])}"
+                suffix = self.fake.random_element(
+                    ["Guide", "Story", "Manual", "Handbook", "Journey"]
+                )
+                name = f"The {self.fake.word().title()} {suffix}"
 
             names.append(name)
 

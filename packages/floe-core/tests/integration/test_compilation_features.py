@@ -16,7 +16,6 @@ Covers:
 from __future__ import annotations
 
 import hashlib
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -603,12 +602,14 @@ class TestSourceHashCalculation:
         """
         from floe_core.compiler import Compiler
 
-        floe_content = yaml.dump({
-            "name": "test-project",
-            "version": "1.0.0",
-            "compute": {"target": "duckdb"},
-            "transforms": [{"type": "dbt", "path": "./dbt"}],
-        })
+        floe_content = yaml.dump(
+            {
+                "name": "test-project",
+                "version": "1.0.0",
+                "compute": {"target": "duckdb"},
+                "transforms": [{"type": "dbt", "path": "./dbt"}],
+            }
+        )
 
         (tmp_path / "floe.yaml").write_text(floe_content)
 

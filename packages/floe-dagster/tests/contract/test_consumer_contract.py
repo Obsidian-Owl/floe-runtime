@@ -21,8 +21,8 @@ import pytest
 from floe_core.compiler.models import CompiledArtifacts
 from floe_core.schemas import ComputeTarget
 from testing.fixtures.golden_artifacts import (
-    load_golden_artifact,
     list_artifacts,
+    load_golden_artifact,
 )
 
 

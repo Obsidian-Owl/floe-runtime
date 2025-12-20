@@ -13,14 +13,15 @@ The generated Parquet file can then be loaded via Trino's INSERT.
 from __future__ import annotations
 
 import argparse
-import sys
 from datetime import datetime
 from pathlib import Path
+import sys
 
 # Add the packages to path for local development
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "packages" / "floe-synthetic" / "src"))
+_package_path = Path(__file__).parent.parent.parent.parent / "packages" / "floe-synthetic" / "src"
+sys.path.insert(0, str(_package_path))
 
-from floe_synthetic.generators.ecommerce import EcommerceGenerator
+from floe_synthetic.generators.ecommerce import EcommerceGenerator  # noqa: E402
 
 
 def main() -> int:
@@ -76,6 +77,7 @@ def main() -> int:
 
     # Save to Parquet
     import pyarrow.parquet as pq
+
     pq.write_table(orders, args.output)
     print(f"  Saved to {args.output}")
 

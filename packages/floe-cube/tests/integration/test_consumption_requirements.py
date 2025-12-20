@@ -17,9 +17,7 @@ Run with:
 from __future__ import annotations
 
 import json
-import tempfile
 import time
-import uuid
 from pathlib import Path
 from typing import Any
 
@@ -29,11 +27,9 @@ from floe_cube.config import (
     SUPPORTED_DATABASE_TYPES,
     CubeConfigGenerator,
     get_cube_driver_type,
-    validate_database_type,
 )
 from floe_cube.model_sync import DbtManifestParser, ModelSynchronizer
 from floe_cube.watcher import ManifestWatcher, WatcherError, WatcherState
-
 
 # =============================================================================
 # Test Fixtures
@@ -78,7 +74,11 @@ def sample_dbt_manifest() -> dict[str, Any]:
                 "description": "Customer dimension table",
                 "columns": {
                     "id": {"name": "id", "data_type": "integer", "description": "Primary key"},
-                    "name": {"name": "name", "data_type": "varchar", "description": "Customer name"},
+                    "name": {
+                        "name": "name",
+                        "data_type": "varchar",
+                        "description": "Customer name",
+                    },
                     "email": {"name": "email", "data_type": "text"},
                     "created_at": {"name": "created_at", "data_type": "timestamp"},
                     "organization_id": {"name": "organization_id", "data_type": "integer"},

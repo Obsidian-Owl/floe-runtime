@@ -11,14 +11,14 @@ from datetime import datetime
 
 import pytest
 
+from floe_synthetic.distributions.temporal import (
+    BUSINESS_HOURS_DISTRIBUTION,
+    TemporalDistribution,
+)
 from floe_synthetic.distributions.weighted import (
     ORDER_STATUS_DISTRIBUTION,
     REGION_DISTRIBUTION,
     WeightedDistribution,
-)
-from floe_synthetic.distributions.temporal import (
-    BUSINESS_HOURS_DISTRIBUTION,
-    TemporalDistribution,
 )
 
 pytestmark = pytest.mark.unit

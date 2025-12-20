@@ -56,9 +56,7 @@ def load_golden_artifact(version: str, artifact_name: str) -> dict[str, Any]:
         '1.0.0'
     """
     if version not in AVAILABLE_VERSIONS:
-        raise ValueError(
-            f"Unknown version '{version}'. Available: {AVAILABLE_VERSIONS}"
-        )
+        raise ValueError(f"Unknown version '{version}'. Available: {AVAILABLE_VERSIONS}")
 
     if artifact_name not in ARTIFACT_TYPES.get(version, []):
         raise ValueError(
@@ -95,9 +93,7 @@ def load_all_golden_artifacts(version: str) -> dict[str, dict[str, Any]]:
         ['minimal.json', 'full.json', 'docker_integration.json', 'production.json']
     """
     if version not in AVAILABLE_VERSIONS:
-        raise ValueError(
-            f"Unknown version '{version}'. Available: {AVAILABLE_VERSIONS}"
-        )
+        raise ValueError(f"Unknown version '{version}'. Available: {AVAILABLE_VERSIONS}")
 
     result = {}
     for artifact_name in ARTIFACT_TYPES.get(version, []):

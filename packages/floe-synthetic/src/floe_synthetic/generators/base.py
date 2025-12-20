@@ -126,10 +126,7 @@ class WeightedChoice:
         Returns:
             List of randomly selected values following the weight distribution
         """
-        return [
-            fake.random_element(elements=self._build_weighted_elements())
-            for _ in range(count)
-        ]
+        return [fake.random_element(elements=self._build_weighted_elements()) for _ in range(count)]
 
     def _build_weighted_elements(self) -> dict[str, float]:
         """Build elements dict for Faker's random_element."""

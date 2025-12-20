@@ -8,6 +8,7 @@ T076: [US4] Integrate TracingManager into FloeAssetFactory asset execution
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 import json
 import logging
 from pathlib import Path
@@ -103,7 +104,7 @@ class FloeAssetFactory:
         manifest_dict = cls._load_manifest(manifest_file)
 
         @dbt_assets(manifest=manifest_file, dagster_dbt_translator=translator)
-        def floe_dbt_assets(context, dbt: DbtCliResource):  # noqa: ANN001
+        def floe_dbt_assets(context, dbt: DbtCliResource) -> Iterator[Any]:  # type: ignore[no-untyped-def]
             """Execute dbt models as Dagster assets with lineage and tracing."""
             # Start tracing span for the dbt run
             with tracing_manager.start_span(

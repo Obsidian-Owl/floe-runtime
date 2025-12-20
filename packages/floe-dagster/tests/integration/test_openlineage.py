@@ -145,9 +145,7 @@ class TestOpenLineageEmission:
             return len(events) >= 1
 
         # Wait for events to appear
-        found = wait_for_condition(
-            events_exist, timeout=5, description="lineage events to appear"
-        )
+        found = wait_for_condition(events_exist, timeout=5, description="lineage events to appear")
         # Verify events were found (don't silently pass if Marquez slow)
         if found:
             events = marquez_client.get_lineage_events(

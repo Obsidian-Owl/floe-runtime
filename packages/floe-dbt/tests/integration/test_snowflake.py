@@ -142,9 +142,7 @@ class TestSnowflakeProfileGeneration:
             "transforms": [],
         }
 
-        config = ProfileGeneratorConfig(
-            profile_name="floe", target_name="prod", environment="prod"
-        )
+        config = ProfileGeneratorConfig(profile_name="floe", target_name="prod", environment="prod")
         generator = factory.create("snowflake")
         outputs = generator.generate(artifacts, config)
 

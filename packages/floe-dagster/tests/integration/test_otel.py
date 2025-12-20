@@ -121,9 +121,7 @@ class TestOTelSpanEmission:
             return isinstance(services, list) and len(services) > 0
 
         # Wait for at least one service to be registered
-        wait_for_condition(
-            service_registered, timeout=5, description="service to appear in Jaeger"
-        )
+        wait_for_condition(service_registered, timeout=5, description="service to appear in Jaeger")
         # Verify Jaeger is responding (infrastructure check)
         services = jaeger_client.get_services()
         assert isinstance(services, list)
@@ -205,8 +203,7 @@ class TestOTelSpanEmission:
 
                 # Child should have different span ID
                 assert (
-                    parent_span.get_span_context().span_id
-                    != child_span.get_span_context().span_id
+                    parent_span.get_span_context().span_id != child_span.get_span_context().span_id
                 )
 
     @pytest.mark.requirement("006-FR-030")
@@ -427,10 +424,7 @@ class TestTracingManagerLifecycle:
             manager.configure()  # Second configure
 
             # Should log a warning about already being configured
-            assert any(
-                "already configured" in record.message.lower()
-                for record in caplog.records
-            )
+            assert any("already configured" in record.message.lower() for record in caplog.records)
         finally:
             manager.shutdown()
 

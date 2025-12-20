@@ -27,14 +27,22 @@ class TestEcommerceGenerator:
     """Tests for EcommerceGenerator."""
 
     def test_deterministic_seeding(self) -> None:
-        """Same seed produces identical data."""
+        """Same seed produces identical data (with fixed date range for determinism)."""
+        # Use fixed date range to ensure deterministic timestamps
+        end_date = datetime(2025, 1, 1)
+        start_date = end_date - timedelta(days=365)
+
         gen1 = EcommerceGenerator(seed=42)
         gen2 = EcommerceGenerator(seed=42)
 
-        orders1 = gen1.generate_orders(100)
-        orders2 = gen2.generate_orders(100)
+        # Generate with explicit date range for determinism
+        gen1.generate_customers(1000, start_date=start_date, end_date=end_date)
+        gen2.generate_customers(1000, start_date=start_date, end_date=end_date)
 
-        # All columns should be identical
+        orders1 = gen1.generate_orders(100, start_date=start_date, end_date=end_date)
+        orders2 = gen2.generate_orders(100, start_date=start_date, end_date=end_date)
+
+        # All columns should be identical with fixed date range
         assert orders1.equals(orders2)
 
     def test_different_seeds_produce_different_data(self) -> None:
@@ -109,7 +117,6 @@ class TestEcommerceGenerator:
 
         statuses = orders.column("status").to_pylist()
         completed_count = statuses.count("completed")
-        pending_count = statuses.count("pending")
 
         # Should be approximately 80/20 (±5%)
         completed_ratio = completed_count / len(statuses)

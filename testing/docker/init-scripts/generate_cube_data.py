@@ -17,20 +17,19 @@ Environment variables:
 
 from __future__ import annotations
 
-import os
-import sys
 from datetime import datetime
+import os
 from pathlib import Path
+import sys
 
 # Add the packages to path for local development
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root / "packages" / "floe-synthetic" / "src"))
 
-import pyarrow as pa
-from pyiceberg.catalog import load_catalog
-from pyiceberg.exceptions import NoSuchTableError, NamespaceAlreadyExistsError
-from pyiceberg.schema import Schema
-from pyiceberg.types import (
+from pyiceberg.catalog import load_catalog  # noqa: E402
+from pyiceberg.exceptions import NamespaceAlreadyExistsError, NoSuchTableError  # noqa: E402
+from pyiceberg.schema import Schema  # noqa: E402
+from pyiceberg.types import (  # noqa: E402
     DoubleType,
     LongType,
     NestedField,
@@ -38,10 +37,10 @@ from pyiceberg.types import (
     TimestampType,
 )
 
-from floe_synthetic.generators.ecommerce import EcommerceGenerator
+from floe_synthetic.generators.ecommerce import EcommerceGenerator  # noqa: E402
 
 
-def get_catalog() -> "Catalog":  # noqa: F821
+def get_catalog() -> Catalog:  # noqa: F821
     """Load Polaris catalog with OAuth credentials."""
     catalog_uri = os.environ.get("POLARIS_CATALOG_URI", "http://polaris:8181/api/catalog")
     client_id = os.environ.get("POLARIS_CLIENT_ID", "")
@@ -59,7 +58,7 @@ def get_catalog() -> "Catalog":  # noqa: F821
     )
 
 
-def create_orders_table(catalog: "Catalog") -> "Table":  # noqa: F821
+def create_orders_table(catalog: Catalog) -> Table:  # noqa: F821
     """Create or get the orders table."""
     namespace = "default"
     table_name = "orders"
@@ -120,7 +119,7 @@ def create_orders_table(catalog: "Catalog") -> "Table":  # noqa: F821
     return table
 
 
-def generate_and_load_data(table: "Table", count: int = 15500) -> None:  # noqa: F821
+def generate_and_load_data(table: Table, count: int = 15500) -> None:  # noqa: F821
     """Generate synthetic data and load to Iceberg table."""
     print(f"\nGenerating {count} orders using floe-synthetic...")
 
@@ -171,7 +170,7 @@ def generate_and_load_data(table: "Table", count: int = 15500) -> None:  # noqa:
 
     # Verify final state
     final_table = table.scan().to_arrow()
-    print(f"\n=== Final Table State ===")
+    print("\n=== Final Table State ===")
     print(f"Total rows: {len(final_table)}")
 
 
@@ -190,6 +189,7 @@ def main() -> int:
     except Exception as e:
         print(f"\n✗ Error: {e}", file=sys.stderr)
         import traceback
+
         traceback.print_exc()
         return 1
 

@@ -17,8 +17,8 @@ See Also:
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
+import subprocess
 from typing import Any
 
 import pytest
@@ -193,9 +193,7 @@ def profiles_dir_duckdb(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def compiled_manifest(
-    dbt_project_with_dependencies: Path, profiles_dir_duckdb: Path
-) -> Path:
+def compiled_manifest(dbt_project_with_dependencies: Path, profiles_dir_duckdb: Path) -> Path:
     """Compile dbt project and return manifest path."""
     result = subprocess.run(
         [
@@ -232,9 +230,7 @@ def test_artifacts(
         "metadata": base_metadata,
         "compute": {
             "target": "duckdb",
-            "properties": {
-                "path": str(dbt_project_with_dependencies.parent / "warehouse.duckdb")
-            },
+            "properties": {"path": str(dbt_project_with_dependencies.parent / "warehouse.duckdb")},
         },
         "transforms": [
             {
@@ -275,7 +271,7 @@ class TestDbtDependencyPreservation:
 
         # Find fact_orders and verify its dependencies
         fact_orders = None
-        for model_id, model_node in models.items():
+        for _model_id, model_node in models.items():
             if model_node["name"] == "fact_orders":
                 fact_orders = model_node
                 break
@@ -307,7 +303,7 @@ class TestDbtDependencyPreservation:
 
         # Find dim_customers
         dim_customers = None
-        for model_id, model_node in models.items():
+        for _model_id, model_node in models.items():
             if model_node["name"] == "dim_customers":
                 dim_customers = model_node
                 break
@@ -337,7 +333,7 @@ class TestDbtDependencyPreservation:
         # Find staging models
         stg_customers = None
         stg_orders = None
-        for model_id, model_node in models.items():
+        for _model_id, model_node in models.items():
             if model_node["name"] == "stg_customers":
                 stg_customers = model_node
             if model_node["name"] == "stg_orders":
@@ -394,6 +390,7 @@ class TestDbtEventStreaming:
         - 003-FR-009: System MUST stream dbt execution events to Dagster event log
         """
         from dagster import materialize
+
         from floe_dagster.assets import FloeAssetFactory
 
         definitions = FloeAssetFactory.create_definitions(test_artifacts)
@@ -426,6 +423,7 @@ class TestDbtEventStreaming:
         - 003-FR-009: System MUST stream dbt execution events to Dagster event log
         """
         from dagster import materialize
+
         from floe_dagster.assets import FloeAssetFactory
 
         definitions = FloeAssetFactory.create_definitions(test_artifacts)
@@ -590,6 +588,7 @@ class TestNoSaaSDependencies:
         - 003-FR-023: System MUST not require any SaaS dependencies
         """
         from dagster import materialize
+
         from floe_dagster.assets import FloeAssetFactory
 
         # Artifacts have no SaaS configuration

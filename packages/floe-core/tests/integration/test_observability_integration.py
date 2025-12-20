@@ -186,11 +186,13 @@ class TestErrorLogging:
 
         # Trigger validation error
         try:
-            FloeSpec.model_validate({
-                "name": "",  # Invalid: empty name
-                "version": "1.0.0",
-                "compute": {"target": "duckdb"},
-            })
+            FloeSpec.model_validate(
+                {
+                    "name": "",  # Invalid: empty name
+                    "version": "1.0.0",
+                    "compute": {"target": "duckdb"},
+                }
+            )
         except ValidationError as e:
             # Log internal details
             logger.error(
@@ -216,11 +218,13 @@ class TestErrorLogging:
 
         # Trigger validation error
         try:
-            FloeSpec.model_validate({
-                "name": "",  # Invalid: empty name
-                "version": "1.0.0",
-                "compute": {"target": "duckdb"},
-            })
+            FloeSpec.model_validate(
+                {
+                    "name": "",  # Invalid: empty name
+                    "version": "1.0.0",
+                    "compute": {"target": "duckdb"},
+                }
+            )
             pytest.fail("Should have raised ValidationError")
         except ValidationError as e:
             # Pydantic provides structured errors that can be formatted
