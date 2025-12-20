@@ -30,16 +30,19 @@ Requirements:
 
 from __future__ import annotations
 
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
 import os
 from pathlib import Path
 import subprocess
 import time
-from typing import Any
+from typing import Any, TypeVar
 
 import pytest
 import requests
+
+# Type variable for generic polling functions
+T = TypeVar("T")
 
 # Path to docker-compose.yml relative to repository root
 DOCKER_COMPOSE_DIR = Path(__file__).parent.parent / "docker"
@@ -48,6 +51,102 @@ POLARIS_CREDENTIALS_FILE = DOCKER_COMPOSE_DIR / "config" / "polaris-credentials.
 
 # Default timeout for service health checks (seconds)
 DEFAULT_TIMEOUT = 120
+
+# Default polling configuration
+DEFAULT_POLL_INTERVAL = 0.5
+DEFAULT_POLL_TIMEOUT = 10.0
+
+
+def wait_for_condition(
+    condition: Callable[[], bool],
+    timeout: float = DEFAULT_POLL_TIMEOUT,
+    poll_interval: float = DEFAULT_POLL_INTERVAL,
+    description: str = "condition",
+) -> bool:
+    """Wait for a condition to become True using polling.
+
+    This is a generic polling helper that replaces hardcoded time.sleep() calls
+    in tests. Instead of sleeping for a fixed duration and hoping an operation
+    completed, this function polls until the condition is met or timeout occurs.
+
+    Args:
+        condition: Callable that returns True when the condition is met.
+            Should not raise exceptions for transient failures.
+        timeout: Maximum time to wait in seconds. Default: 10.0
+        poll_interval: Time between polls in seconds. Default: 0.5
+        description: Human-readable description for error messages.
+
+    Returns:
+        True if condition was met within timeout, False otherwise.
+
+    Example:
+        >>> def job_exists():
+        ...     jobs = marquez_client.get_jobs(namespace)
+        ...     return "my_job" in [j["name"] for j in jobs]
+        >>> wait_for_condition(job_exists, timeout=15, description="job to appear")
+        True
+
+        >>> # Can also be used inline with lambda
+        >>> wait_for_condition(
+        ...     lambda: len(jaeger.get_traces(service="test")) > 0,
+        ...     timeout=5,
+        ...     description="traces to be exported"
+        ... )
+    """
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        try:
+            if condition():
+                return True
+        except Exception:
+            # Ignore exceptions during polling - service may not be ready yet
+            pass
+        time.sleep(poll_interval)
+    return False
+
+
+def poll_until(
+    fetch_func: Callable[[], T],
+    check_func: Callable[[T], bool],
+    timeout: float = DEFAULT_POLL_TIMEOUT,
+    poll_interval: float = DEFAULT_POLL_INTERVAL,
+    description: str = "expected result",
+) -> T | None:
+    """Poll until a check function returns True on fetched data.
+
+    Two-phase polling: fetches data then checks it. Useful when you need
+    to verify the fetched data, not just that an operation succeeded.
+
+    Args:
+        fetch_func: Callable that fetches data (e.g., API call).
+        check_func: Callable that takes fetched data and returns True if valid.
+        timeout: Maximum time to wait in seconds. Default: 10.0
+        poll_interval: Time between polls in seconds. Default: 0.5
+        description: Human-readable description for error messages.
+
+    Returns:
+        The fetched data that passed the check, or None if timeout.
+
+    Example:
+        >>> result = poll_until(
+        ...     fetch_func=lambda: marquez_client.get_runs(job_name),
+        ...     check_func=lambda runs: len(runs) > 0 and runs[0]["state"] == "COMPLETED",
+        ...     timeout=15,
+        ...     description="run to complete"
+        ... )
+        >>> assert result is not None
+    """
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        try:
+            data = fetch_func()
+            if check_func(data):
+                return data
+        except Exception:
+            # Ignore exceptions during polling - service may not be ready yet
+            pass
+        time.sleep(poll_interval)
+    return None
 
 
 def is_running_in_docker() -> bool:
@@ -147,6 +246,54 @@ SERVICE_HEALTH_CHECKS: dict[str, dict[str, Any]] = {
         "path": "/readyz",
     },
 }
+
+
+def is_service_available(service: str, timeout: float = 5.0) -> bool:
+    """Check if a service is available and responding.
+
+    Uses the health check configuration from SERVICE_HEALTH_CHECKS to verify
+    that a service is running and ready to accept connections.
+
+    Args:
+        service: Service name (e.g., 'polaris', 'localstack', 'postgres')
+        timeout: Maximum time to wait for service response
+
+    Returns:
+        True if the service is available, False otherwise
+
+    Example:
+        >>> is_service_available("polaris")
+        True  # When Polaris is running
+        False # When Polaris is not available
+    """
+    if service not in SERVICE_HEALTH_CHECKS:
+        return False
+
+    check = SERVICE_HEALTH_CHECKS[service]
+    check_type = check["type"]
+    port = check["port"]
+    host = get_service_host(service)
+
+    if check_type == "tcp":
+        import socket
+
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
+        except (OSError, ConnectionRefusedError):
+            return False
+    elif check_type == "http":
+        path = check.get("path", "/")
+        try:
+            response = requests.get(
+                f"http://{host}:{port}{path}",
+                timeout=timeout,
+            )
+            return bool(response.status_code < 500)
+        except requests.RequestException:
+            return False
+
+    return False
 
 
 @dataclass

@@ -307,12 +307,15 @@ class TestSecurityContextInOperations:
         """
         # Multiple operations should all succeed with same context
         catalog.create_namespace(test_namespace)
-        catalog.load_namespace(test_namespace)
+        ns_properties = catalog.load_namespace(test_namespace)
         namespaces = catalog.list_namespaces()
         catalog.drop_namespace(test_namespace)
 
-        # If we got here, all operations used the same security context
-        assert True
+        # Verify operations completed successfully with authenticated context
+        assert ns_properties is not None, "Namespace load should return properties"
+        assert any(
+            test_namespace in str(ns) for ns in namespaces
+        ), "Created namespace should appear in list"
 
     @pytest.mark.requirement("006-FR-028")
     @pytest.mark.requirement("004-FR-002")

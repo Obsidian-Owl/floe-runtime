@@ -13,6 +13,10 @@ Exports:
     Docker service fixtures:
         DockerServices: Manager class for Docker Compose services
         docker_compose_file: Get path to docker-compose.yml
+        get_service_host: Get hostname for a service (Docker or localhost)
+        is_service_available: Check if a service is available
+        poll_until: Poll until a check function returns True on fetched data
+        wait_for_condition: Wait for a condition to become True using polling
         wait_for_services: Wait for multiple services to be healthy
 
     Observability fixtures:
@@ -51,6 +55,10 @@ from testing.fixtures.observability import (
 from testing.fixtures.services import (
     DockerServices,
     docker_compose_file,
+    get_service_host,
+    is_service_available,
+    poll_until,
+    wait_for_condition,
     wait_for_services,
 )
 
@@ -63,6 +71,10 @@ __all__ = [
     # Docker service fixtures
     "DockerServices",
     "docker_compose_file",
+    "get_service_host",
+    "is_service_available",
+    "poll_until",
+    "wait_for_condition",
     "wait_for_services",
     # Observability fixtures
     "JaegerClient",

@@ -22,6 +22,7 @@ from typing import Any
 import pytest
 
 from testing.fixtures.observability import JaegerClient
+from testing.fixtures.services import wait_for_condition
 
 # Check if Jaeger is available
 try:
@@ -113,13 +114,18 @@ class TestOTelSpanEmission:
             span_context = span.get_span_context()
             assert span_context.is_valid
 
-        # Allow time for span to be exported to Jaeger
-        time.sleep(2)
+        # Poll until service appears in Jaeger (replaces fixed sleep)
+        # Service registration may take a moment after span export
+        def service_registered() -> bool:
+            services = jaeger_client.get_services()
+            return isinstance(services, list) and len(services) > 0
 
-        # Query Jaeger for the service - if infrastructure fails, test fails
+        # Wait for at least one service to be registered
+        wait_for_condition(
+            service_registered, timeout=5, description="service to appear in Jaeger"
+        )
+        # Verify Jaeger is responding (infrastructure check)
         services = jaeger_client.get_services()
-        # Service should be registered (may take a moment)
-        # Note: New services may not appear immediately
         assert isinstance(services, list)
 
     @pytest.mark.requirement("006-FR-030")
@@ -152,16 +158,25 @@ class TestOTelSpanEmission:
             # Add additional attributes during execution
             span.set_attribute("dbt.rows_affected", 100)
 
-        # Allow export
-        time.sleep(2)
+        # Poll until traces appear in Jaeger (replaces fixed sleep)
+        def traces_available() -> bool:
+            traces = jaeger_client.get_traces(
+                service=service_name,
+                limit=10,
+                lookback="5m",
+            )
+            return isinstance(traces, list)
 
-        # Query Jaeger for traces - if infrastructure fails, test fails
+        # Wait for Jaeger to have traces available
+        wait_for_condition(
+            traces_available, timeout=5, description="traces to be available in Jaeger"
+        )
+        # Verify traces are accessible (infrastructure check)
         traces = jaeger_client.get_traces(
             service=service_name,
             limit=10,
             lookback="5m",
         )
-        # Should have traces (even if this specific one isn't found)
         assert isinstance(traces, list)
 
     @pytest.mark.requirement("006-FR-030")

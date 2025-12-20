@@ -16,16 +16,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from click.testing import CliRunner
 import pytest
 
 from floe_cli.main import cli
-
-if TYPE_CHECKING:
-    pass
-
 
 # Valid floe.yaml content for integration tests
 VALID_FLOE_YAML = """\

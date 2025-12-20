@@ -22,11 +22,11 @@ Note: This test validates that:
 from __future__ import annotations
 
 import os
-import time
 from typing import TYPE_CHECKING, Any
 
 import httpx
 import pytest
+from testing.fixtures.services import poll_until
 
 from floe_cube.models import SpanKind, SpanStatus
 from floe_cube.tracing import QueryTracer
@@ -103,17 +103,21 @@ def _wait_for_traces(
     if operation:
         params["operation"] = operation
 
-    start_time = time.time()
-    while time.time() - start_time < max_wait_seconds:
+    def fetch_traces() -> list[dict[str, Any]]:
         response = client.get("/api/traces", params=params)
         if response.status_code == 200:
             data = response.json()
-            traces = data.get("data", [])
-            if traces:
-                return traces
-        time.sleep(poll_interval)
+            return data.get("data", [])
+        return []
 
-    return []
+    result = poll_until(
+        fetch_func=fetch_traces,
+        check_func=lambda traces: len(traces) > 0,
+        timeout=max_wait_seconds,
+        poll_interval=poll_interval,
+        description="traces to appear in Jaeger",
+    )
+    return result if result is not None else []
 
 
 class TestTracesAppearInJaeger:
