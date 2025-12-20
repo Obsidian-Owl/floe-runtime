@@ -1,0 +1,648 @@
+{
+  "$defs": {
+    "ArtifactMetadata": {
+      "additionalProperties": false,
+      "description": "Compilation metadata for tracking artifact provenance.\n\nRecords when artifacts were compiled and from which source file.\n\nAttributes:\n    compiled_at: Timestamp when compilation occurred (UTC).\n    floe_core_version: Version of floe-core that produced artifacts.\n    source_hash: SHA-256 hash of source floe.yaml content.\n\nExample:\n    >>> metadata = ArtifactMetadata(\n    ...     compiled_at=datetime.now(timezone.utc),\n    ...     floe_core_version=\"0.1.0\",\n    ...     source_hash=\"e3b0c44...\"\n    ... )",
+      "properties": {
+        "compiled_at": {
+          "description": "Timestamp when compilation occurred (UTC)",
+          "format": "date-time",
+          "title": "Compiled At",
+          "type": "string"
+        },
+        "floe_core_version": {
+          "description": "Version of floe-core that produced artifacts",
+          "minLength": 1,
+          "title": "Floe Core Version",
+          "type": "string"
+        },
+        "source_hash": {
+          "description": "SHA-256 hash of source floe.yaml content",
+          "minLength": 1,
+          "title": "Source Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "compiled_at",
+        "floe_core_version",
+        "source_hash"
+      ],
+      "title": "ArtifactMetadata",
+      "type": "object"
+    },
+    "CatalogConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for Iceberg catalog integration.\n\nT067: [US6] Document catalog-specific properties\n\nSupports Polaris, AWS Glue, and Nessie catalogs with\nappropriate authentication and connection settings.\n\nSecurity:\n    For Polaris catalogs, the scope field MUST follow the principle of least\n    privilege. Use a narrowly-scoped role like 'PRINCIPAL_ROLE:DATA_ENGINEER'.\n    NEVER use 'PRINCIPAL_ROLE:ALL' in production - it grants unrestricted access.\n\nAttributes:\n    type: Catalog type (polaris, glue, nessie).\n    uri: Catalog endpoint URI.\n    credential_secret_ref: K8s secret name for credentials.\n    warehouse: Default warehouse name.\n    scope: OAuth2 scope (Polaris: e.g., \"PRINCIPAL_ROLE:DATA_ENGINEER\").\n    token_refresh_enabled: Enable OAuth2 token refresh.\n    access_delegation: Iceberg access delegation header.\n    properties: Catalog-specific properties. Common properties per type:\n\n        Polaris:\n            Uses top-level fields: scope, token_refresh_enabled, access_delegation\n            - scope: OAuth2 scope (e.g., \"PRINCIPAL_ROLE:DATA_ENGINEER\")\n            - token_refresh_enabled: Enable token refresh for long sessions\n            - access_delegation: \"vended-credentials\" for delegated access\n\n        AWS Glue:\n            - region: AWS region (e.g., \"us-east-1\")\n            - catalog_id: AWS account ID for cross-account access\n            - database: Default Glue database name\n\n        Nessie:\n            - branch: Git-like branch reference (default: \"main\")\n            - hash: Specific commit hash for time-travel\n            - ref: Reference name (branch or tag)\n\nExample:\n    >>> # Polaris with OAuth2\n    >>> config = CatalogConfig(\n    ...     type=\"polaris\",\n    ...     uri=\"http://polaris:8181/api/catalog\",\n    ...     scope=\"PRINCIPAL_ROLE:DATA_ENGINEER\",\n    ...     token_refresh_enabled=True,\n    ...     access_delegation=\"vended-credentials\"\n    ... )\n\n    >>> # AWS Glue with region\n    >>> config = CatalogConfig(\n    ...     type=\"glue\",\n    ...     uri=\"arn:aws:glue:us-east-1:123456789:catalog\",\n    ...     properties={\"region\": \"us-east-1\", \"catalog_id\": \"123456789\"}\n    ... )\n\n    >>> # Nessie with branch\n    >>> config = CatalogConfig(\n    ...     type=\"nessie\",\n    ...     uri=\"http://nessie:19120/api/v2\",\n    ...     properties={\"branch\": \"main\"}\n    ... )",
+      "properties": {
+        "type": {
+          "description": "Catalog type (polaris, glue, nessie)",
+          "enum": [
+            "polaris",
+            "glue",
+            "nessie"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "uri": {
+          "description": "Catalog endpoint URI",
+          "title": "Uri",
+          "type": "string"
+        },
+        "credential_secret_ref": {
+          "anyOf": [
+            {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,252}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "K8s secret name for credentials",
+          "title": "Credential Secret Ref"
+        },
+        "warehouse": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Default warehouse name",
+          "title": "Warehouse"
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "pattern": "^PRINCIPAL_ROLE:[A-Za-z0-9_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "OAuth2 scope for Polaris catalogs. Required for Polaris type. Format: 'PRINCIPAL_ROLE:<role_name>'. Use least-privilege roles (e.g., 'PRINCIPAL_ROLE:DATA_ENGINEER').",
+          "title": "Scope"
+        },
+        "token_refresh_enabled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Enable OAuth2 token refresh",
+          "title": "Token Refresh Enabled"
+        },
+        "access_delegation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Iceberg access delegation header",
+          "title": "Access Delegation"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Catalog-specific properties",
+          "title": "Properties"
+        }
+      },
+      "required": [
+        "type",
+        "uri"
+      ],
+      "title": "CatalogConfig",
+      "type": "object"
+    },
+    "ColumnClassification": {
+      "additionalProperties": false,
+      "description": "Classification metadata for a single column.\n\nUsed to track PII and sensitivity levels extracted from\ndbt model meta tags.\n\nAttributes:\n    classification: Classification type (e.g., \"pii\", \"confidential\").\n    pii_type: Specific PII type (e.g., \"email\", \"phone\").\n    sensitivity: Sensitivity level (low, medium, high).\n\nExample:\n    >>> classification = ColumnClassification(\n    ...     classification=\"pii\",\n    ...     pii_type=\"email\",\n    ...     sensitivity=\"high\"\n    ... )",
+      "properties": {
+        "classification": {
+          "title": "Classification",
+          "type": "string"
+        },
+        "pii_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pii Type"
+        },
+        "sensitivity": {
+          "default": "medium",
+          "description": "Sensitivity level",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "title": "Sensitivity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "classification"
+      ],
+      "title": "ColumnClassification",
+      "type": "object"
+    },
+    "ComputeConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for compute target.\n\nT062: [US5] Document target-specific properties\n\nDefines which compute target to use and optional connection\ncredentials via K8s secret reference.\n\nAttributes:\n    target: Compute target enum value (duckdb, snowflake, etc.)\n    connection_secret_ref: Optional K8s secret name for credentials.\n        Must match K8s naming convention.\n    properties: Target-specific properties. Common properties per target:\n\n        DuckDB:\n            - path: Database file path or \":memory:\" (default: \":memory:\")\n            - threads: Number of threads (default: 4)\n\n        Snowflake:\n            - account: Snowflake account identifier (required)\n            - warehouse: Virtual warehouse name\n            - database: Default database\n            - schema: Default schema\n            - role: User role\n\n        BigQuery:\n            - project: GCP project ID (required)\n            - dataset: Default dataset\n            - location: Dataset location (US, EU, etc.)\n            - method: Auth method (oauth, service-account)\n\n        Redshift:\n            - host: Cluster endpoint (required)\n            - port: Connection port (default: 5439)\n            - database: Database name\n\n        Databricks:\n            - host: Workspace URL (required)\n            - http_path: SQL warehouse HTTP path\n            - catalog: Unity Catalog name\n            - schema: Default schema\n\n        PostgreSQL:\n            - host: Database host (required)\n            - port: Connection port (default: 5432)\n            - database: Database name\n            - schema: Default schema\n\n        Spark:\n            - host: Spark master URL\n            - method: Connection method (thrift, http)\n            - cluster: Cluster identifier\n\nExample:\n    >>> config = ComputeConfig(\n    ...     target=ComputeTarget.snowflake,\n    ...     connection_secret_ref=\"snowflake-prod-creds\",\n    ...     properties={\"account\": \"xy12345.us-east-1\", \"warehouse\": \"COMPUTE_WH\"}\n    ... )",
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/ComputeTarget"
+        },
+        "connection_secret_ref": {
+          "anyOf": [
+            {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,252}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "K8s secret name for connection credentials",
+          "title": "Connection Secret Ref"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Target-specific properties",
+          "title": "Properties"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "title": "ComputeConfig",
+      "type": "object"
+    },
+    "ComputeTarget": {
+      "description": "Supported compute targets matching dbt adapter names.\n\nThese values correspond to dbt adapter names for SQL compilation\nand execution targeting.",
+      "enum": [
+        "duckdb",
+        "snowflake",
+        "bigquery",
+        "redshift",
+        "databricks",
+        "postgres",
+        "spark"
+      ],
+      "title": "ComputeTarget",
+      "type": "string"
+    },
+    "ConsumptionConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for Cube semantic layer.\n\nAttributes:\n    enabled: Enable Cube semantic layer.\n    port: Cube API port.\n    api_secret_ref: K8s secret name for Cube API key.\n    database_type: Database driver type for Cube (postgres, snowflake, etc.)\n    dev_mode: Enable Cube Playground in development.\n    pre_aggregations: Pre-aggregation configuration.\n    security: Row-level security configuration.\n\nExample:\n    >>> config = ConsumptionConfig(\n    ...     enabled=True,\n    ...     port=8080,\n    ...     database_type=\"snowflake\"\n    ... )",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "Enable Cube semantic layer",
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "port": {
+          "default": 4000,
+          "description": "Cube API port",
+          "title": "Port",
+          "type": "integer"
+        },
+        "api_secret_ref": {
+          "anyOf": [
+            {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,252}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "K8s secret name for Cube API key",
+          "title": "Api Secret Ref"
+        },
+        "database_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Database driver type (postgres, snowflake, bigquery, etc.)",
+          "title": "Database Type"
+        },
+        "dev_mode": {
+          "default": false,
+          "description": "Enable Cube Playground in development",
+          "title": "Dev Mode",
+          "type": "boolean"
+        },
+        "pre_aggregations": {
+          "$ref": "#/$defs/PreAggregationConfig",
+          "description": "Pre-aggregation configuration"
+        },
+        "security": {
+          "$ref": "#/$defs/CubeSecurityConfig",
+          "description": "Row-level security configuration"
+        }
+      },
+      "title": "ConsumptionConfig",
+      "type": "object"
+    },
+    "CubeSecurityConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for Cube row-level security.\n\nRow-level security filters query results based on JWT claims.\nThe filter_column specifies which database column to filter on,\nand the corresponding claim value is extracted from the JWT token.\n\nNote:\n    This is USER-MANAGED row-level security, NOT SaaS tenant isolation.\n    Users define their own filter columns and claims for their use cases\n    (e.g., organization_id, department, region).\n\nAttributes:\n    row_level: Enable row-level security filtering.\n    filter_column: Column name used for row-level filtering.\n\nExample:\n    >>> config = CubeSecurityConfig(\n    ...     row_level=True,\n    ...     filter_column=\"organization_id\"\n    ... )",
+      "properties": {
+        "row_level": {
+          "default": true,
+          "description": "Enable row-level security",
+          "title": "Row Level",
+          "type": "boolean"
+        },
+        "filter_column": {
+          "default": "organization_id",
+          "description": "Column for row-level filtering (matches JWT claim name)",
+          "title": "Filter Column",
+          "type": "string"
+        }
+      },
+      "title": "CubeSecurityConfig",
+      "type": "object"
+    },
+    "EnvironmentContext": {
+      "additionalProperties": false,
+      "description": "Optional runtime context from Control Plane (SaaS enrichment).\n\nThis model is only populated when running with the Floe Control Plane.\nStandalone deployments should set this to None (standalone-first principle).\n\nAttributes:\n    tenant_id: Tenant identifier (UUID).\n    tenant_slug: Human-readable tenant slug.\n    project_id: Project identifier (UUID).\n    project_slug: Human-readable project slug.\n    environment_id: Environment identifier (UUID).\n    environment_type: Type of environment (development, preview, staging, production).\n    governance_category: Governance category for the environment.\n\nExample:\n    >>> context = EnvironmentContext(\n    ...     tenant_id=uuid4(),\n    ...     tenant_slug=\"acme-corp\",\n    ...     project_id=uuid4(),\n    ...     project_slug=\"data-warehouse\",\n    ...     environment_id=uuid4(),\n    ...     environment_type=\"production\",\n    ...     governance_category=\"production\"\n    ... )",
+      "properties": {
+        "tenant_id": {
+          "description": "Tenant identifier",
+          "format": "uuid",
+          "title": "Tenant Id",
+          "type": "string"
+        },
+        "tenant_slug": {
+          "description": "Human-readable tenant slug",
+          "minLength": 1,
+          "title": "Tenant Slug",
+          "type": "string"
+        },
+        "project_id": {
+          "description": "Project identifier",
+          "format": "uuid",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "project_slug": {
+          "description": "Human-readable project slug",
+          "minLength": 1,
+          "title": "Project Slug",
+          "type": "string"
+        },
+        "environment_id": {
+          "description": "Environment identifier",
+          "format": "uuid",
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "environment_type": {
+          "description": "Type of environment",
+          "enum": [
+            "development",
+            "preview",
+            "staging",
+            "production"
+          ],
+          "title": "Environment Type",
+          "type": "string"
+        },
+        "governance_category": {
+          "description": "Governance category for the environment",
+          "enum": [
+            "production",
+            "non_production"
+          ],
+          "title": "Governance Category",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "tenant_slug",
+        "project_id",
+        "project_slug",
+        "environment_id",
+        "environment_type",
+        "governance_category"
+      ],
+      "title": "EnvironmentContext",
+      "type": "object"
+    },
+    "GovernanceConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for data governance.\n\nAttributes:\n    classification_source: Source for column classifications.\n        'dbt_meta' extracts from dbt model meta tags.\n        'external' uses external classification service.\n    policies: Policy definitions (masking rules, etc.)\n    emit_lineage: Emit OpenLineage events for governance tracking.\n\nExample:\n    >>> config = GovernanceConfig(\n    ...     classification_source=\"dbt_meta\",\n    ...     emit_lineage=True\n    ... )",
+      "properties": {
+        "classification_source": {
+          "default": "dbt_meta",
+          "description": "Source for column classifications",
+          "enum": [
+            "dbt_meta",
+            "external"
+          ],
+          "title": "Classification Source",
+          "type": "string"
+        },
+        "policies": {
+          "additionalProperties": true,
+          "description": "Policy definitions",
+          "title": "Policies",
+          "type": "object"
+        },
+        "emit_lineage": {
+          "default": true,
+          "description": "Emit OpenLineage events",
+          "title": "Emit Lineage",
+          "type": "boolean"
+        }
+      },
+      "title": "GovernanceConfig",
+      "type": "object"
+    },
+    "ObservabilityConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for observability.\n\nEnables OpenTelemetry traces and metrics, plus OpenLineage\nfor data lineage tracking.\n\nAttributes:\n    traces: Enable OpenTelemetry traces.\n    metrics: Enable metrics collection.\n    lineage: Enable OpenLineage emission.\n    otlp_endpoint: OTLP exporter endpoint.\n    lineage_endpoint: OpenLineage API endpoint.\n    attributes: Custom trace attributes (service.name, etc.)\n\nExample:\n    >>> config = ObservabilityConfig(\n    ...     traces=True,\n    ...     otlp_endpoint=\"http://otel-collector:4317\",\n    ...     attributes={\"service.name\": \"my-pipeline\"}\n    ... )",
+      "properties": {
+        "traces": {
+          "default": true,
+          "description": "Enable OpenTelemetry traces",
+          "title": "Traces",
+          "type": "boolean"
+        },
+        "metrics": {
+          "default": true,
+          "description": "Enable metrics collection",
+          "title": "Metrics",
+          "type": "boolean"
+        },
+        "lineage": {
+          "default": true,
+          "description": "Enable OpenLineage emission",
+          "title": "Lineage",
+          "type": "boolean"
+        },
+        "otlp_endpoint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "OTLP exporter endpoint",
+          "title": "Otlp Endpoint"
+        },
+        "lineage_endpoint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "OpenLineage API endpoint",
+          "title": "Lineage Endpoint"
+        },
+        "attributes": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Custom trace attributes",
+          "title": "Attributes",
+          "type": "object"
+        }
+      },
+      "title": "ObservabilityConfig",
+      "type": "object"
+    },
+    "PreAggregationConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for Cube pre-aggregations.\n\nAttributes:\n    refresh_schedule: Cron expression for refresh schedule.\n    timezone: Timezone for the schedule.\n\nExample:\n    >>> config = PreAggregationConfig(\n    ...     refresh_schedule=\"0 * * * *\",\n    ...     timezone=\"America/New_York\"\n    ... )",
+      "properties": {
+        "refresh_schedule": {
+          "default": "*/30 * * * *",
+          "description": "Cron expression for pre-aggregation refresh",
+          "title": "Refresh Schedule",
+          "type": "string"
+        },
+        "timezone": {
+          "default": "UTC",
+          "description": "Timezone for schedule evaluation",
+          "title": "Timezone",
+          "type": "string"
+        }
+      },
+      "title": "PreAggregationConfig",
+      "type": "object"
+    },
+    "TransformConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for a transformation step.\n\nCurrently supports 'dbt' type. Future versions will add\n'python' and 'flink' via discriminated unions.\n\nAttributes:\n    type: Transform type discriminator. Currently only 'dbt' supported.\n    path: Path to transform source (relative to floe.yaml).\n    target: Optional target override for dbt.\n\nExample:\n    >>> config = TransformConfig(type=\"dbt\", path=\"./dbt\", target=\"prod\")",
+      "properties": {
+        "type": {
+          "const": "dbt",
+          "description": "Transform type (currently only 'dbt' supported)",
+          "title": "Type",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path to transform source relative to floe.yaml",
+          "title": "Path",
+          "type": "string"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional target override",
+          "title": "Target"
+        }
+      },
+      "required": [
+        "type",
+        "path"
+      ],
+      "title": "TransformConfig",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Immutable output contract from compilation.\n\nThis is the sole integration point between floe-core (compiler) and\ndownstream packages (floe-dagster, floe-dbt, floe-cube, floe-polaris).\n\nContract Rules:\n- Model is immutable (frozen=True)\n- Unknown fields are rejected (extra=\"forbid\")\n- 3-version backward compatibility maintained\n- JSON Schema exported for cross-language validation\n\nAttributes:\n    version: Contract version (semver). Default \"1.0.0\".\n    metadata: Compilation metadata.\n    compute: Compute target configuration.\n    transforms: List of transform configurations.\n    consumption: Cube semantic layer configuration.\n    governance: Data governance configuration.\n    observability: Observability configuration.\n    catalog: Optional Iceberg catalog configuration.\n    dbt_manifest_path: Path to dbt manifest.json (if available).\n    dbt_project_path: Path to dbt project directory (if detected).\n    dbt_profiles_path: Path to profiles directory. Default \".floe/profiles\".\n    lineage_namespace: OpenLineage namespace (SaaS enrichment).\n    environment_context: Optional SaaS environment context.\n    column_classifications: Extracted column classifications from dbt.\n\nExample:\n    >>> artifacts = CompiledArtifacts(\n    ...     metadata=metadata,\n    ...     compute=compute_config,\n    ...     transforms=[transform_config]\n    ... )",
+  "properties": {
+    "version": {
+      "default": "1.0.0",
+      "description": "Contract version (semver)",
+      "title": "Version",
+      "type": "string"
+    },
+    "metadata": {
+      "$ref": "#/$defs/ArtifactMetadata",
+      "description": "Compilation metadata"
+    },
+    "compute": {
+      "$ref": "#/$defs/ComputeConfig",
+      "description": "Compute target configuration"
+    },
+    "transforms": {
+      "description": "List of transform configurations",
+      "items": {
+        "$ref": "#/$defs/TransformConfig"
+      },
+      "title": "Transforms",
+      "type": "array"
+    },
+    "consumption": {
+      "$ref": "#/$defs/ConsumptionConfig",
+      "description": "Cube semantic layer configuration"
+    },
+    "governance": {
+      "$ref": "#/$defs/GovernanceConfig",
+      "description": "Data governance configuration"
+    },
+    "observability": {
+      "$ref": "#/$defs/ObservabilityConfig",
+      "description": "Observability configuration"
+    },
+    "catalog": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CatalogConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Iceberg catalog configuration"
+    },
+    "dbt_manifest_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Path to dbt manifest.json",
+      "title": "Dbt Manifest Path"
+    },
+    "dbt_project_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Path to dbt project directory",
+      "title": "Dbt Project Path"
+    },
+    "dbt_profiles_path": {
+      "default": ".floe/profiles",
+      "description": "Path to profiles directory (required by dagster-dbt)",
+      "title": "Dbt Profiles Path",
+      "type": "string"
+    },
+    "lineage_namespace": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "OpenLineage namespace (SaaS enrichment)",
+      "title": "Lineage Namespace"
+    },
+    "environment_context": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EnvironmentContext"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional SaaS environment context"
+    },
+    "column_classifications": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "additionalProperties": {
+              "$ref": "#/$defs/ColumnClassification"
+            },
+            "type": "object"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Extracted column classifications from dbt manifest",
+      "title": "Column Classifications"
+    }
+  },
+  "required": [
+    "metadata",
+    "compute",
+    "transforms"
+  ],
+  "title": "CompiledArtifacts",
+  "type": "object"
+}

@@ -1,0 +1,113 @@
+{
+  "$schema": "../../../schemas/compiled_artifacts.v1.0.0.schema.json",
+  "$comment": "Full v1.0.0 CompiledArtifacts - all fields populated for comprehensive testing",
+  "version": "1.0.0",
+  "metadata": {
+    "compiled_at": "2024-01-15T10:30:00Z",
+    "floe_core_version": "0.1.0",
+    "source_hash": "a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd"
+  },
+  "compute": {
+    "target": "snowflake",
+    "connection_secret_ref": "snowflake-prod-creds",
+    "properties": {
+      "account": "xy12345.us-east-1",
+      "warehouse": "COMPUTE_WH",
+      "database": "ANALYTICS",
+      "schema": "PUBLIC",
+      "role": "TRANSFORMER"
+    }
+  },
+  "transforms": [
+    {
+      "type": "dbt",
+      "path": "./dbt",
+      "target": "prod"
+    }
+  ],
+  "consumption": {
+    "enabled": true,
+    "port": 4000,
+    "api_secret_ref": "cube-api-secret",
+    "database_type": "snowflake",
+    "dev_mode": false,
+    "pre_aggregations": {
+      "refresh_schedule": "0 */2 * * *",
+      "timezone": "America/New_York"
+    },
+    "security": {
+      "row_level": true,
+      "filter_column": "organization_id"
+    }
+  },
+  "governance": {
+    "classification_source": "dbt_meta",
+    "policies": {
+      "pii_masking": {
+        "enabled": true,
+        "mask_type": "hash"
+      }
+    },
+    "emit_lineage": true
+  },
+  "observability": {
+    "traces": true,
+    "metrics": true,
+    "lineage": true,
+    "otlp_endpoint": "http://otel-collector:4317",
+    "lineage_endpoint": "http://marquez:5001",
+    "attributes": {
+      "service.name": "floe-analytics",
+      "deployment.environment": "production"
+    }
+  },
+  "catalog": {
+    "type": "polaris",
+    "uri": "https://polaris.prod.internal/api/catalog",
+    "credential_secret_ref": "polaris-prod-creds",
+    "warehouse": "analytics_warehouse",
+    "scope": "PRINCIPAL_ROLE:DATA_ENGINEER",
+    "token_refresh_enabled": true,
+    "access_delegation": "vended-credentials",
+    "properties": {}
+  },
+  "dbt_manifest_path": "target/manifest.json",
+  "dbt_project_path": "./dbt",
+  "dbt_profiles_path": ".floe/profiles",
+  "lineage_namespace": "floe-production",
+  "environment_context": {
+    "tenant_id": "12345678-1234-1234-1234-123456789abc",
+    "tenant_slug": "acme-corp",
+    "project_id": "abcdef12-3456-7890-abcd-ef1234567890",
+    "project_slug": "data-warehouse",
+    "environment_id": "fedcba98-7654-3210-fedc-ba9876543210",
+    "environment_type": "production",
+    "governance_category": "production"
+  },
+  "column_classifications": {
+    "customers": {
+      "email": {
+        "classification": "pii",
+        "pii_type": "email",
+        "sensitivity": "high"
+      },
+      "phone": {
+        "classification": "pii",
+        "pii_type": "phone",
+        "sensitivity": "high"
+      },
+      "ssn": {
+        "classification": "pii",
+        "pii_type": "ssn",
+        "sensitivity": "high"
+      }
+    },
+    "orders": {
+      "customer_email": {
+        "classification": "pii",
+        "pii_type": "email",
+        "sensitivity": "high"
+      }
+    }
+  }
+}

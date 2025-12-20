@@ -1,7 +1,7 @@
 # floe-runtime Makefile
 # Provides consistent commands that mirror CI exactly
 
-.PHONY: check lint typecheck security test test-unit test-integration format install hooks docker-up docker-down docker-logs help
+.PHONY: check lint typecheck security test test-unit test-contract test-integration format install hooks docker-up docker-down docker-logs help
 
 # Default target
 help:
@@ -15,9 +15,10 @@ help:
 	@echo "  make format          - Auto-format code"
 	@echo ""
 	@echo "Testing:"
-	@echo "  make test            - Run all tests (unit only, fast)"
-	@echo "  make test-unit       - Run unit tests (no Docker)"
-	@echo "  make test-integration - Run integration tests in Docker (zero-config)"
+	@echo "  make test            - Run all tests in Docker (unit + contract + integration)"
+	@echo "  make test-unit       - Run unit tests only (no Docker required)"
+	@echo "  make test-contract   - Run contract tests only (no Docker required)"
+	@echo "  make test-integration - Run integration tests only in Docker"
 	@echo ""
 	@echo "Docker Services:"
 	@echo "  make docker-up       - Start test infrastructure"
@@ -50,10 +51,10 @@ security:
 	@echo "🔒 Running security scan..."
 	uv run bandit -r packages/*/src/ -ll -q
 
-# Tests - mirrors CI test job
+# Tests - ALL tests run in Docker for consistent hostname resolution
 test:
-	@echo "🧪 Running tests..."
-	uv run pytest packages/*/tests/ -q --tb=short
+	@echo "🧪 Running all tests in Docker..."
+	@./testing/docker/scripts/run-all-tests.sh
 
 # Auto-format code
 format:
@@ -78,6 +79,11 @@ hooks:
 test-unit:
 	@echo "🧪 Running unit tests..."
 	uv run pytest packages/*/tests/unit/ -v --tb=short
+
+# Run contract tests (no Docker required)
+test-contract:
+	@echo "🧪 Running contract tests..."
+	uv run pytest tests/contract/ packages/*/tests/contract/ -v --tb=short
 
 # Run integration tests inside Docker network (zero-config)
 test-integration:

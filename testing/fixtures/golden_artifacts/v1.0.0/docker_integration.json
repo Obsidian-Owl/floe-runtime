@@ -1,0 +1,74 @@
+{
+  "$schema": "../../../schemas/compiled_artifacts.v1.0.0.schema.json",
+  "$comment": "Docker integration test artifact - uses internal Docker network hostnames",
+  "version": "1.0.0",
+  "metadata": {
+    "compiled_at": "2024-01-15T10:30:00Z",
+    "floe_core_version": "0.1.0",
+    "source_hash": "docker0123456789abcdef0123456789abcdef0123456789abcdef01234567"
+  },
+  "compute": {
+    "target": "postgres",
+    "connection_secret_ref": null,
+    "properties": {
+      "host": "postgres",
+      "port": 5432,
+      "database": "floe_test",
+      "schema": "public"
+    }
+  },
+  "transforms": [
+    {
+      "type": "dbt",
+      "path": "./dbt",
+      "target": null
+    }
+  ],
+  "consumption": {
+    "enabled": true,
+    "port": 4000,
+    "api_secret_ref": null,
+    "database_type": "postgres",
+    "dev_mode": true,
+    "pre_aggregations": {
+      "refresh_schedule": "*/5 * * * *",
+      "timezone": "UTC"
+    },
+    "security": {
+      "row_level": true,
+      "filter_column": "organization_id"
+    }
+  },
+  "governance": {
+    "classification_source": "dbt_meta",
+    "policies": {},
+    "emit_lineage": true
+  },
+  "observability": {
+    "traces": true,
+    "metrics": true,
+    "lineage": true,
+    "otlp_endpoint": "http://jaeger:4317",
+    "lineage_endpoint": "http://marquez:5001",
+    "attributes": {
+      "service.name": "floe-test",
+      "deployment.environment": "docker"
+    }
+  },
+  "catalog": {
+    "type": "polaris",
+    "uri": "http://polaris:8181/api/catalog",
+    "credential_secret_ref": null,
+    "warehouse": "test_warehouse",
+    "scope": "PRINCIPAL_ROLE:DATA_ENGINEER",
+    "token_refresh_enabled": true,
+    "access_delegation": "vended-credentials",
+    "properties": {}
+  },
+  "dbt_manifest_path": "target/manifest.json",
+  "dbt_project_path": "./dbt",
+  "dbt_profiles_path": ".floe/profiles",
+  "lineage_namespace": "floe-docker-test",
+  "environment_context": null,
+  "column_classifications": null
+}
