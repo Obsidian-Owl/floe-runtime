@@ -60,6 +60,8 @@ class EcommerceGenerator(DataGenerator):
         self._customer_ids: list[int] = []
         self._customer_regions: dict[int, str] = {}
         self._product_ids: list[int] = []
+        self._order_ids: list[int] = []
+        self._order_item_ids: list[int] = []
 
     def generate_batch(self, count: int, **kwargs: Any) -> pa.Table:
         """Generate a batch of orders (default entity).
@@ -208,6 +210,9 @@ class EcommerceGenerator(DataGenerator):
         start_date = start_date or datetime.now() - timedelta(days=365)
         end_date = end_date or datetime.now()
 
+        # Track order IDs for foreign key relationships
+        self._order_ids = list(range(start_id, start_id + count))
+
         order_ids: list[int] = []
         customer_ids: list[int] = []
         order_statuses: list[str] = []
@@ -349,13 +354,146 @@ class EcommerceGenerator(DataGenerator):
             }
         )
 
+    def generate_order_items(
+        self,
+        count: int,
+        *,
+        start_id: int = 1,
+        order_id_start: int | None = None,
+        order_id_end: int | None = None,
+        min_quantity: int = 1,
+        max_quantity: int = 5,
+        min_discount: Decimal = Decimal("0.00"),
+        max_discount: Decimal = Decimal("50.00"),
+    ) -> pa.Table:
+        """Generate order line item records for product-level analysis.
+
+        Creates individual line items that link orders to products, enabling
+        joins like: orders → order_items → products for detailed analytics.
+
+        Auto-generates prerequisite data (orders, products) if not present,
+        ensuring referential integrity for SQL joins.
+
+        Args:
+            count: Number of order items to generate
+            start_id: Starting order_item_id (default: 1)
+            order_id_start: Minimum order_id to use (for custom ranges)
+            order_id_end: Maximum order_id to use (for custom ranges)
+            min_quantity: Minimum quantity per item (default: 1)
+            max_quantity: Maximum quantity per item (default: 5)
+            min_discount: Minimum discount amount (default: 0.00)
+            max_discount: Maximum discount amount (default: 50.00)
+
+        Returns:
+            PyArrow Table with order item data including:
+            - order_item_id: Unique identifier
+            - order_id: Foreign key to orders
+            - product_id: Foreign key to products
+            - quantity: Number of items
+            - unit_price: Price per unit (from product)
+            - discount: Discount applied to this line
+            - subtotal: Calculated as (quantity * unit_price) - discount
+
+        Example:
+            >>> gen = EcommerceGenerator(seed=42)
+            >>> gen.generate_customers(100)
+            >>> gen.generate_products(50)
+            >>> order_items = gen.generate_order_items(500)
+
+            >>> # Use custom order ID range
+            >>> order_items = gen.generate_order_items(
+            ...     100, order_id_start=1000, order_id_end=1010
+            ... )
+        """
+        # Auto-generate products if none exist (for referential integrity)
+        if not self._product_ids:
+            self.generate_products(100)
+
+        # Auto-generate orders if none exist (for referential integrity)
+        if not self._order_ids:
+            self.generate_orders(500)
+
+        # Determine which order IDs to use
+        if order_id_start is not None and order_id_end is not None:
+            # Use custom range
+            valid_order_ids = list(range(order_id_start, order_id_end + 1))
+        else:
+            # Use existing orders (referential integrity with generated orders)
+            valid_order_ids = self._order_ids
+
+        # Track order item IDs
+        self._order_item_ids = list(range(start_id, start_id + count))
+
+        order_item_ids: list[int] = []
+        order_ids: list[int] = []
+        product_ids: list[int] = []
+        quantities: list[int] = []
+        unit_prices: list[float] = []
+        discounts: list[float] = []
+        subtotals: list[float] = []
+
+        for i in range(count):
+            order_item_id = start_id + i
+            order_item_ids.append(order_item_id)
+
+            # Select from valid orders and products (referential integrity)
+            order_id = self.fake.random_element(valid_order_ids)
+            order_ids.append(order_id)
+
+            product_id = self.fake.random_element(self._product_ids)
+            product_ids.append(product_id)
+
+            # Generate quantity
+            quantity = self.fake.random_int(min=min_quantity, max=max_quantity)
+            quantities.append(quantity)
+
+            # Generate unit price (realistic product price range)
+            unit_price = float(
+                self.fake.pydecimal(
+                    min_value=Decimal("5.00"),
+                    max_value=Decimal("500.00"),
+                    right_digits=2,
+                )
+            )
+            unit_prices.append(unit_price)
+
+            # Generate discount
+            discount = float(
+                self.fake.pydecimal(
+                    min_value=min_discount,
+                    max_value=max_discount,
+                    right_digits=2,
+                )
+            )
+            discounts.append(discount)
+
+            # Calculate subtotal
+            subtotal = (quantity * unit_price) - discount
+            subtotals.append(round(subtotal, 2))
+
+        self._log_generation("order_items", count)
+
+        return pa.table(
+            {
+                "order_item_id": pa.array(order_item_ids, type=pa.int64()),
+                "order_id": pa.array(order_ids, type=pa.int64()),
+                "product_id": pa.array(product_ids, type=pa.int64()),
+                "quantity": pa.array(quantities, type=pa.int64()),
+                "unit_price": pa.array(unit_prices, type=pa.float64()),
+                "discount": pa.array(discounts, type=pa.float64()),
+                "subtotal": pa.array(subtotals, type=pa.float64()),
+            }
+        )
+
     def reset(self) -> None:
         """Reset the generator state.
 
-        Clears tracked customer and product IDs. Useful between test runs
+        Clears tracked customer, product, and order IDs. Useful between test runs
         when you want fresh data without changing the seed.
         """
         self._customer_ids = []
         self._customer_regions = {}
         self._product_ids = []
+        self._order_ids = []
+        self._order_item_ids = []
         self.fake.seed_instance(self.seed)
