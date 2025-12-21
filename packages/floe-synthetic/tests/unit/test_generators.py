@@ -216,12 +216,16 @@ class TestSaaSGenerator:
     """Tests for SaaSGenerator."""
 
     def test_deterministic_seeding(self) -> None:
-        """Same seed produces identical data."""
+        """Same seed produces identical data (with fixed date range for determinism)."""
+        # Use fixed date range to ensure deterministic timestamps
+        end_date = datetime(2025, 1, 1)
+        start_date = end_date - timedelta(days=365)
+
         gen1 = SaaSGenerator(seed=42)
         gen2 = SaaSGenerator(seed=42)
 
-        users1 = gen1.generate_users(100)
-        users2 = gen2.generate_users(100)
+        users1 = gen1.generate_users(100, start_date=start_date, end_date=end_date)
+        users2 = gen2.generate_users(100, start_date=start_date, end_date=end_date)
 
         assert users1.equals(users2)
 
