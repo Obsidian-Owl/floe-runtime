@@ -15,6 +15,11 @@ from floe_core.preflight.models import (
     PreflightReport,
     PreflightResult,
 )
+from floe_core.preflight.output import (
+    format_result_json,
+    format_result_table,
+    print_result,
+)
 
 __all__ = [
     "CheckResult",
@@ -22,4 +27,7 @@ __all__ = [
     "PreflightConfig",
     "PreflightReport",
     "PreflightResult",
+    "format_result_json",
+    "format_result_table",
+    "print_result",
 ]
