@@ -1,0 +1,65 @@
+# Floe Dagster Helm Chart Values
+#
+# Default configuration values for floe-dagster chart.
+# Override in values-dev.yaml or values-prod.yaml for environment-specific settings.
+#
+# Covers: 007-FR-001 (Helm chart for Kubernetes deployment)
+
+# Enable/disable the dagster subchart
+dagster:
+  enabled: true
+
+# Floe-specific configuration
+floe:
+  # CompiledArtifacts configuration
+  compiledArtifacts:
+    # ConfigMap name containing compiled_artifacts.json
+    configMapName: "floe-compiled-artifacts"
+    # Mount path inside containers
+    mountPath: "/app/.floe/compiled_artifacts.json"
+
+  # External secrets configuration
+  externalSecrets:
+    enabled: false
+    # Provider: aws, gcp, azure, vault
+    provider: ""
+    # Secret store reference name
+    secretStoreRef: ""
+
+# Image configuration (for custom Dagster image with floe packages)
+image:
+  repository: ghcr.io/obsidian-owl/floe-dagster
+  tag: ""  # Defaults to chart appVersion
+  pullPolicy: IfNotPresent
+
+# Image pull secrets for private registries
+imagePullSecrets: []
+
+# Resource defaults (override in values-prod.yaml)
+resources:
+  webserver:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  daemon:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Ingress configuration
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: dagster.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
