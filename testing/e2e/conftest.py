@@ -76,7 +76,9 @@ DEFAULT_CUBE_SQL_PORT = 15432
 DEFAULT_TRINO_HOST = "localhost"
 DEFAULT_TRINO_PORT = 8080
 DEFAULT_POLARIS_URL = "http://localhost:8181"
-DEFAULT_MARQUEZ_URL = "http://localhost:5000"
+DEFAULT_MARQUEZ_URL = (
+    "http://localhost:5002"  # Port 5002 external (5000 conflicts with macOS AirPlay)
+)
 DEFAULT_JAEGER_URL = "http://localhost:16686"
 DEFAULT_DAGSTER_URL = "http://localhost:3000"
 DEFAULT_DEMO_TIMEOUT = 300  # 5 minutes max wait for data
