@@ -133,6 +133,10 @@ markers = [
 branch = true
 source = ["packages"]
 omit = ["*/tests/*", "*/__init__.py"]
+# CRITICAL: Required for SonarCloud to correctly parse coverage in GitHub Actions
+# GitHub Actions uses /home/runner/work/repo/repo paths that SonarCloud can't access
+# relative_files converts absolute paths to relative paths in coverage.xml
+relative_files = true
 
 [tool.coverage.report]
 exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError"]

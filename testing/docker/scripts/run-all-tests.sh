@@ -153,9 +153,15 @@ TEST_DIRS=(
     "packages/floe-synthetic/tests/"
 )
 
-echo "==> Running ALL tests (unit + integration)..."
+echo "==> Running ALL tests (unit + integration) with coverage..."
 echo "   Test directories: ${TEST_DIRS[*]}"
 docker compose --profile full --profile test run --rm test-runner \
-    uv run pytest "${TEST_DIRS[@]}" -v --tb=short -p no:cacheprovider "$@"
+    uv run pytest "${TEST_DIRS[@]}" -v --tb=short -p no:cacheprovider \
+    --cov=packages --cov-report=xml --cov-branch "$@"
 
 echo "==> All tests completed"
+
+# Copy coverage.xml from Docker volume if it exists (for CI artifact upload)
+if [[ -f "$DOCKER_DIR/../../coverage.xml" ]]; then
+    echo "==> Coverage report generated: coverage.xml"
+fi
