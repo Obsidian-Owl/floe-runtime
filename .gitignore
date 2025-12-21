@@ -104,3 +104,7 @@ compiled_artifacts.json
 
 # Pre-commit
 .pre-commit-cache/
+
+# Helm
+charts/*/charts/
+*.tgz

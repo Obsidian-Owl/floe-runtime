@@ -13,10 +13,16 @@ dagster:
 floe:
   # CompiledArtifacts configuration
   compiledArtifacts:
-    # ConfigMap name containing compiled_artifacts.json
-    configMapName: "floe-compiled-artifacts"
+    # Enable CompiledArtifacts ConfigMap creation
+    enabled: true
+    # ConfigMap name (leave empty to use generated name)
+    configMapName: ""
     # Mount path inside containers
     mountPath: "/app/.floe/compiled_artifacts.json"
+    # Content of compiled_artifacts.json (set via --set-file or values override)
+    content: ""
+    # Additional annotations for the ConfigMap
+    annotations: {}
 
   # External secrets configuration
   externalSecrets:
