@@ -7,7 +7,7 @@ Covers: 007-FR-005 (pre-deployment validation)
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -59,7 +59,9 @@ class CheckResult(BaseModel):
     message: str = Field(default="", description="Result message")
     details: dict[str, Any] = Field(default_factory=dict, description="Additional details")
     duration_ms: int = Field(default=0, ge=0, description="Duration in milliseconds")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Check timestamp")
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(UTC), description="Check timestamp"
+    )
 
     @property
     def passed(self) -> bool:
@@ -96,7 +98,9 @@ class PreflightResult(BaseModel):
 
     checks: list[CheckResult] = Field(default_factory=list, description="Check results")
     overall_status: CheckStatus = Field(default=CheckStatus.PASSED, description="Overall status")
-    started_at: datetime = Field(default_factory=datetime.utcnow, description="Start time")
+    started_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC), description="Start time"
+    )
     finished_at: datetime | None = Field(default=None, description="End time")
     total_duration_ms: int = Field(default=0, ge=0, description="Total duration")
 
