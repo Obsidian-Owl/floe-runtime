@@ -65,7 +65,7 @@ class IcebergLoaderResource(ConfigurableResource):  # type: ignore[type-arg]
     s3_endpoint: str | None = Field(default=None, description="S3 endpoint override")
     s3_region: str = Field(default="us-east-1", description="S3 region")
 
-    def get_loader(self) -> IcebergLoader:
+    def get_loader(self) -> IcebergLoader:  # pragma: no cover - integration tested
         """Create a configured IcebergLoader instance."""
         config = IcebergLoaderConfig(
             catalog_name=self.catalog_name,

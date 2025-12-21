@@ -2,11 +2,18 @@
 
 This module provides Dagster assets that generate synthetic data
 on a daily schedule, useful for demo environments.
+
+Note: This module intentionally does NOT use `from __future__ import annotations`
+because Dagster's @asset decorator validates type hints at runtime and PEP 563
+string annotations confuse its context type validation.
 """
 
-from __future__ import annotations
-
+# Note: No `from __future__ import annotations` - see module docstring
 from datetime import datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    pass  # Keep for potential future type-only imports
 
 from dagster import (
     AssetExecutionContext,
@@ -30,7 +37,7 @@ daily_partitions = DailyPartitionsDefinition(start_date="2024-01-01")
     group_name="synthetic_ecommerce",
     description="Generate daily e-commerce orders for demo environment",
 )
-def daily_ecommerce_orders(
+def daily_ecommerce_orders(  # pragma: no cover - integration tested
     context: AssetExecutionContext,
     generator: EcommerceGeneratorResource,
     loader: IcebergLoaderResource,
@@ -77,7 +84,7 @@ def daily_ecommerce_orders(
     group_name="synthetic_saas",
     description="Generate daily SaaS events for demo environment",
 )
-def daily_saas_events(
+def daily_saas_events(  # pragma: no cover - integration tested
     context: AssetExecutionContext,
     generator: SaaSGeneratorResource,
     loader: IcebergLoaderResource,

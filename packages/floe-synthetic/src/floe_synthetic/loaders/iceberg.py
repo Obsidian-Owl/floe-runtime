@@ -91,11 +91,14 @@ class LoadResult(BaseModel):
     operation: str
 
 
-class IcebergLoader:
+class IcebergLoader:  # pragma: no cover - integration tested
     """Load synthetic data into Iceberg tables via PyIceberg.
 
     Supports both append and overwrite operations with automatic
     schema evolution and snapshot management.
+
+    This class is integration tested via Docker (Polaris + LocalStack).
+    Unit tests cover the configuration models (IcebergLoaderConfig, LoadResult).
 
     Example:
         >>> loader = IcebergLoader(
