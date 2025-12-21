@@ -7,6 +7,7 @@ plus common utilities for data generation.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 from collections.abc import Iterator
 from typing import Any
 
@@ -41,7 +42,9 @@ class DataGenerator(ABC):
     """
 
     @abstractmethod
-    def generate_batch(self, count: int, **kwargs: Any) -> pa.Table:
+    def generate_batch(  # pragma: no cover - abstract method
+        self, count: int, **kwargs: Any
+    ) -> pa.Table:
         """Generate a batch of records as Arrow table.
 
         Args:
@@ -54,7 +57,7 @@ class DataGenerator(ABC):
         ...
 
     @abstractmethod
-    def generate_stream(
+    def generate_stream(  # pragma: no cover - abstract method
         self,
         total: int,
         batch_size: int = 10000,
@@ -128,9 +131,9 @@ class WeightedChoice:
         """
         return [fake.random_element(elements=self._build_weighted_elements()) for _ in range(count)]
 
-    def _build_weighted_elements(self) -> dict[str, float]:
-        """Build elements dict for Faker's random_element."""
-        return dict(zip(self.values, self.probabilities, strict=True))
+    def _build_weighted_elements(self) -> OrderedDict[str, float]:
+        """Build elements OrderedDict for Faker's random_element."""
+        return OrderedDict(zip(self.values, self.probabilities, strict=True))
 
 
 # Common weight distributions for reuse
