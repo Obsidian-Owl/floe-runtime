@@ -640,7 +640,7 @@ class TestNormalizeNamespace:
 
         result = IcebergTableManager._normalize_namespace(ns)
 
-        assert result is ns
+        assert result == ns
 
 
 class TestToArrow:

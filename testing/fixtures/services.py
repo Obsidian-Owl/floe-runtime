@@ -280,7 +280,7 @@ def is_service_available(service: str, timeout: float = 5.0) -> bool:
         try:
             with socket.create_connection((host, port), timeout=timeout):
                 return True
-        except (OSError, ConnectionRefusedError):
+        except OSError:
             return False
     elif check_type == "http":
         path = check.get("path", "/")
@@ -470,7 +470,7 @@ class DockerServices:
         try:
             with socket.create_connection((host, port), timeout=5):
                 return True
-        except (OSError, ConnectionRefusedError):
+        except OSError:
             return False
 
     def _check_http(self, port: int, path: str, service: str = "localhost") -> bool:

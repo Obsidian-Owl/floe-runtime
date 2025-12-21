@@ -99,7 +99,7 @@ def is_polaris_available() -> bool:
     try:
         with socket.create_connection((host, 8181), timeout=2):
             return True
-    except (OSError, ConnectionRefusedError):
+    except OSError:
         return False
 
 
