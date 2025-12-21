@@ -81,6 +81,29 @@ jobs:
       - name: Run pip-audit
         run: uv run pip-audit
 
+  helm-lint:
+    name: Helm Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@fe7b79cd5ee1e45176fcad797de68ecaf3ca4814  # v4
+        with:
+          version: v3.14.0
+
+      - name: Lint floe-dagster chart
+        run: helm lint charts/floe-dagster/
+
+      - name: Lint floe-cube chart
+        run: helm lint charts/floe-cube/
+
+      - name: Template validation (floe-dagster)
+        run: helm template test-release charts/floe-dagster/ > /dev/null
+
+      - name: Template validation (floe-cube)
+        run: helm template test-release charts/floe-cube/ > /dev/null
+
   test:
     name: Test (All tests in Docker)
     runs-on: ubuntu-latest
