@@ -1,0 +1,5 @@
+# Data quality tests
+# Validates synthetic data quality scenarios:
+# - Null handling
+# - Duplicate detection
+# - Late-arriving data

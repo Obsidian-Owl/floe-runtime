@@ -20,6 +20,8 @@ from floe_core.schemas.compute import ComputeConfig, ComputeTarget
 from floe_core.schemas.consumption import (
     ConsumptionConfig,
     CubeSecurityConfig,
+    CubeStoreConfig,
+    ExportBucketConfig,
     PreAggregationConfig,
 )
 from floe_core.schemas.floe_spec import FloeSpec
@@ -36,6 +38,8 @@ __all__: list[str] = [
     # Transforms
     "TransformConfig",
     # Consumption
+    "CubeStoreConfig",
+    "ExportBucketConfig",
     "PreAggregationConfig",
     "CubeSecurityConfig",
     "ConsumptionConfig",

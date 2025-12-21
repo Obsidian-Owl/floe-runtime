@@ -6,12 +6,14 @@
 #   docker compose --profile storage up -d  # Include Polaris + LocalStack
 #   docker compose --profile compute up -d  # Include Spark + Trino
 #   docker compose --profile full up -d     # All services including Cube
+#   docker compose --profile demo up -d     # Demo e-commerce pipeline (full + Dagster)
 #
 # Services:
 #   Base:     PostgreSQL, Jaeger
 #   Storage:  LocalStack (S3 + STS), Polaris (Iceberg catalog)
 #   Compute:  Trino, Spark
 #   Full:     Cube (semantic layer), Marquez (lineage)
+#   Demo:     Dagster (orchestration), synthetic data generation
 #
 # Security Note:
 #   LocalStack provides AWS S3 + STS emulation, enabling production-aligned
@@ -387,15 +389,16 @@ services:
       # API configuration
       CUBEJS_API_SECRET: ${CUBEJS_API_SECRET:-floe-cube-secret}
       CUBEJS_DEV_MODE: "true"
-      CUBEJS_EXTERNAL_DEFAULT: "true"
+      # Pre-aggregations: Use source database storage (external: false) for testing
+      # This matches cube-schema/*.js files which set external: false
+      # Production should use CUBEJS_EXTERNAL_DEFAULT: "true" with Cube Store
+      CUBEJS_EXTERNAL_DEFAULT: "false"
       # Telemetry
       CUBEJS_TELEMETRY: "false"
       # SQL API (Postgres wire protocol) configuration
       CUBEJS_PG_SQL_PORT: "15432"
       CUBEJS_SQL_USER: ${CUBEJS_SQL_USER:-cube}
       CUBEJS_SQL_PASSWORD: ${CUBEJS_SQL_PASSWORD:-cube_password}
-      # Note: Pre-aggregations disabled - Trino driver doesn't support S3 export bucket
-      # Pre-aggregation refresh would require GCS which isn't available in test environment
     volumes:
       # Note: Cube v0.36+ uses 'model' directory by default (changed from 'schema')
       - ./cube-schema:/cube/conf/model:ro
@@ -489,3 +492,94 @@ services:
       - floe-network
     profiles:
       - test
+
+  # ==============================================================================
+  # DEMO PROFILE (--profile demo)
+  # Complete demo environment with Dagster orchestration for the e-commerce
+  # pipeline. Includes all 'full' profile services plus Dagster webserver.
+  #
+  # Covers: 007-FR-029 (E2E validation tests)
+  # Covers: 007-FR-031 (Medallion architecture demo)
+  # ==============================================================================
+
+  dagster-webserver:
+    image: dagster/dagster-dev:latest
+    container_name: floe-dagster-webserver
+    ports:
+      - "3000:3000"
+    environment:
+      DAGSTER_HOME: /opt/dagster
+      DAGSTER_POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      DAGSTER_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DAGSTER_POSTGRES_HOST: postgres
+      DAGSTER_POSTGRES_DB: dagster
+      # Demo configuration
+      FLOE_DEMO_CATALOG: floe_demo
+      FLOE_DEMO_SCHEMA: raw
+      # Polaris catalog
+      POLARIS_URL: http://polaris:8181
+      # Cube API
+      CUBE_API_URL: http://cube:4000
+      # OpenTelemetry
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+    volumes:
+      - ../..:/workspace:ro
+      - ./config/polaris-credentials.env:/opt/dagster/.env:ro
+    working_dir: /workspace
+    command:
+      - dagster
+      - dev
+      - -h
+      - "0.0.0.0"
+      - -p
+      - "3000"
+      - -m
+      - demo.orchestration
+    depends_on:
+      postgres:
+        condition: service_healthy
+      cube:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - floe-network
+    restart: unless-stopped
+    profiles:
+      - demo
+
+  dagster-daemon:
+    image: dagster/dagster-dev:latest
+    container_name: floe-dagster-daemon
+    environment:
+      DAGSTER_HOME: /opt/dagster
+      DAGSTER_POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      DAGSTER_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DAGSTER_POSTGRES_HOST: postgres
+      DAGSTER_POSTGRES_DB: dagster
+      # Demo configuration
+      FLOE_DEMO_CATALOG: floe_demo
+      FLOE_DEMO_SCHEMA: raw
+      # Polaris catalog
+      POLARIS_URL: http://polaris:8181
+      # Cube API
+      CUBE_API_URL: http://cube:4000
+    volumes:
+      - ../..:/workspace:ro
+      - ./config/polaris-credentials.env:/opt/dagster/.env:ro
+    working_dir: /workspace
+    command:
+      - dagster-daemon
+      - run
+    depends_on:
+      dagster-webserver:
+        condition: service_healthy
+    networks:
+      - floe-network
+    restart: unless-stopped
+    profiles:
+      - demo

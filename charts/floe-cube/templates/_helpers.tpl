@@ -137,4 +137,73 @@ Common environment variables for Cube components.
 - name: FLOE_COMPILED_ARTIFACTS_PATH
   value: {{ .Values.floe.compiledArtifacts.mountPath | quote }}
 {{- end }}
+{{/*
+Pre-aggregation configuration
+*/}}
+- name: CUBEJS_EXTERNAL_DEFAULT
+  value: {{ .Values.preAggregations.external | default true | quote }}
+{{- if .Values.preAggregations.scheduledRefresh.enabled }}
+- name: CUBEJS_SCHEDULED_REFRESH_DEFAULT
+  value: "true"
+- name: CUBEJS_SCHEDULED_REFRESH_TIMEZONE
+  value: {{ .Values.preAggregations.scheduledRefresh.timezone | default "UTC" | quote }}
+{{- end }}
+{{/*
+Export bucket configuration (for large pre-aggregation builds)
+*/}}
+{{- if .Values.preAggregations.exportBucket.enabled }}
+- name: CUBEJS_DB_EXPORT_BUCKET_TYPE
+  value: {{ .Values.preAggregations.exportBucket.type | quote }}
+- name: CUBEJS_DB_EXPORT_BUCKET
+  value: {{ .Values.preAggregations.exportBucket.name | quote }}
+{{- if .Values.preAggregations.exportBucket.region }}
+- name: CUBEJS_DB_EXPORT_BUCKET_AWS_REGION
+  value: {{ .Values.preAggregations.exportBucket.region | quote }}
+{{- end }}
+{{- if .Values.preAggregations.exportBucket.secretName }}
+- name: CUBEJS_DB_EXPORT_BUCKET_AWS_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.preAggregations.exportBucket.secretName | quote }}
+      key: {{ .Values.preAggregations.exportBucket.accessKeyKey | quote }}
+- name: CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.preAggregations.exportBucket.secretName | quote }}
+      key: {{ .Values.preAggregations.exportBucket.secretKeyKey | quote }}
+{{- end }}
+{{- if .Values.preAggregations.exportBucket.integration }}
+- name: CUBEJS_DB_EXPORT_INTEGRATION
+  value: {{ .Values.preAggregations.exportBucket.integration | quote }}
+{{- end }}
+{{- end }}
+{{/*
+Cube Store S3 configuration
+*/}}
+{{- if and .Values.cubeStore.enabled .Values.cubeStore.s3.bucket }}
+- name: CUBEJS_EXT_DB_TYPE
+  value: "cubestore"
+- name: CUBEJS_CUBESTORE_S3_BUCKET
+  value: {{ .Values.cubeStore.s3.bucket | quote }}
+{{- if .Values.cubeStore.s3.region }}
+- name: CUBEJS_CUBESTORE_S3_REGION
+  value: {{ .Values.cubeStore.s3.region | quote }}
+{{- end }}
+{{- if .Values.cubeStore.s3.endpoint }}
+- name: CUBEJS_CUBESTORE_S3_ENDPOINT
+  value: {{ .Values.cubeStore.s3.endpoint | quote }}
+{{- end }}
+{{- if .Values.cubeStore.s3.secretName }}
+- name: CUBEJS_CUBESTORE_AWS_ACCESS_KEY_ID
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.cubeStore.s3.secretName | quote }}
+      key: {{ .Values.cubeStore.s3.accessKeyKey | quote }}
+- name: CUBEJS_CUBESTORE_AWS_SECRET_ACCESS_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.cubeStore.s3.secretName | quote }}
+      key: {{ .Values.cubeStore.s3.secretKeyKey | quote }}
+{{- end }}
+{{- end }}
 {{- end }}

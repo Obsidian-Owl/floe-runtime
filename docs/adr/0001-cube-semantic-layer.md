@@ -152,6 +152,67 @@ consumption:
 | Cube Store Router | Route queries | Single replica |
 | Cube Store Workers | Execute cached queries | Horizontal (2+ replicas) |
 
+## Pre-Aggregation Strategy
+
+Pre-aggregations are materialized rollups that improve query performance. Cube supports two storage modes:
+
+### Storage Options
+
+| Environment | `external` | Storage Location | Use Case |
+|-------------|-----------|------------------|----------|
+| Testing | `false` | Source database (Trino/DuckDB) | No additional infrastructure |
+| Production | `true` | Cube Store + S3/GCS | High concurrency, sub-second queries |
+
+### Build Strategies by Database
+
+| Database | Default Strategy | Export Bucket Support | Notes |
+|----------|-----------------|----------------------|-------|
+| DuckDB | Batching | Not supported | Memory-bound, set `DUCKDB_MEMORY_LIMIT` |
+| Trino | Simple | S3 + GCS | For datasets >100k rows |
+| Snowflake | Batching | S3 + GCS + Azure | Uses storage integration |
+| BigQuery | Stream | GCS | Native export |
+
+### Configuration
+
+**Testing (source database storage):**
+```yaml
+# floe.yaml
+consumption:
+  pre_aggregations:
+    external: false  # Store in source database
+```
+
+**Production (Cube Store + S3):**
+```yaml
+# floe.yaml
+consumption:
+  pre_aggregations:
+    external: true  # Store in Cube Store
+    cube_store:
+      enabled: true
+      s3_bucket: "my-cube-preaggs"
+      s3_region: "us-east-1"
+    # Optional: Export bucket for large builds (Trino/Snowflake only)
+    export_bucket:
+      enabled: true
+      bucket_type: "s3"
+      name: "my-cube-export"
+      region: "us-east-1"
+```
+
+### Architecture
+
+```
+Build Phase:
+Refresh Worker → SQL Query → Source Database (DuckDB/Trino/Snowflake)
+                     │
+                     ▼ (external: true)
+               Cube Store → S3 Parquet Files
+
+Query Phase:
+API Request → Cube Store → S3 Parquet → Sub-second Response
+```
+
 ## References
 
 - [Cube Documentation](https://cube.dev/docs/product/introduction)

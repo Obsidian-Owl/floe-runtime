@@ -94,6 +94,34 @@ refreshWorker:
   # Extra volumes
   extraVolumes: []
 
+# Pre-aggregation configuration
+# Pre-aggregations are materialized rollups that improve query performance
+preAggregations:
+  # Use external storage (Cube Store) for pre-aggregations
+  # Set to false for testing (uses source database storage)
+  # Set to true for production (uses Cube Store with S3/GCS)
+  external: true
+
+  # Scheduled refresh settings
+  scheduledRefresh:
+    enabled: true
+    timezone: "UTC"
+
+  # Export bucket for large pre-aggregation builds (Trino/Snowflake only)
+  # Required for datasets > 100k rows
+  # Note: DuckDB does NOT support export buckets - uses batching only
+  exportBucket:
+    enabled: false
+    type: ""  # s3 or gcs
+    name: ""
+    region: ""
+    # Credentials via secrets
+    secretName: ""
+    accessKeyKey: "access-key"
+    secretKeyKey: "secret-key"
+    # Snowflake storage integration name
+    integration: ""
+
 # Cube store configuration (for pre-aggregations)
 cubeStore:
   enabled: false
@@ -106,6 +134,16 @@ cubeStore:
     repository: cubejs/cubestore
     tag: "v0.36"
     pullPolicy: IfNotPresent
+
+  # S3 configuration for pre-aggregation storage
+  s3:
+    bucket: ""
+    region: ""
+    endpoint: ""  # For MinIO/LocalStack
+    # Credentials via secrets
+    secretName: ""
+    accessKeyKey: "access-key"
+    secretKeyKey: "secret-key"
 
   resources:
     requests:
