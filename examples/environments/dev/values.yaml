@@ -1,0 +1,78 @@
+# Development Environment Values
+#
+# Low resource limits, single replicas, local development focus.
+#
+# Usage:
+#   helm upgrade --install floe-runtime ./charts/floe-runtime \
+#     -f examples/environments/dev/values.yaml \
+#     -n floe-dev
+#
+# Covers: 007-FR-003 (environment promotion pipeline)
+
+# floe-dagster subchart overrides
+floe-dagster:
+  enabled: true
+
+  # Development: minimal replicas
+  dagster:
+    dagsterWebserver:
+      replicaCount: 1
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+    dagsterDaemon:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+    # Use local PostgreSQL for dev
+    postgresql:
+      enabled: true
+      postgresqlPassword: "dev-password-change-me"
+
+  # CompiledArtifacts for development
+  floe:
+    compiledArtifacts:
+      enabled: true
+      configMapName: "floe-dev-artifacts"
+
+# floe-cube subchart overrides
+floe-cube:
+  enabled: true
+
+  api:
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  refreshWorker:
+    enabled: true
+    replicaCount: 1
+
+  # Disable Cube Store for dev (use memory)
+  cubeStore:
+    enabled: false
+
+# Global dev settings
+global:
+  imagePullSecrets: []
+
+  annotations:
+    environment: "development"
+
+  labels:
+    app.kubernetes.io/environment: "dev"
