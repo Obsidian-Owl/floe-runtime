@@ -1,0 +1,92 @@
+# Floe Cube Helm Chart Values
+#
+# Default configuration values for floe-cube chart.
+# Override in values-dev.yaml or values-prod.yaml for environment-specific settings.
+#
+# Covers: 007-FR-001 (Helm chart for Kubernetes deployment)
+# Covers: 007-FR-010 (Cube semantic layer deployment)
+
+# Cube API server configuration
+api:
+  # Number of API server replicas
+  replicaCount: 1
+
+  # Image configuration
+  image:
+    repository: cubejs/cube
+    tag: "v0.36"
+    pullPolicy: IfNotPresent
+
+  # Resource limits
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 4000
+
+# Cube refresh worker configuration
+refreshWorker:
+  enabled: true
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Cube store configuration (for pre-aggregations)
+cubeStore:
+  enabled: false
+  # Use external storage (S3/GCS) for pre-aggregations by default
+  # Enable this for self-hosted Cube Store
+
+# Floe-specific configuration
+floe:
+  # Cube schema directory (generated from floe compile)
+  schemaPath: "/app/schema"
+
+  # dbt manifest path for model references
+  dbtManifestPath: "/app/.floe/manifest.json"
+
+  # CompiledArtifacts ConfigMap mount
+  compiledArtifacts:
+    enabled: true
+    configMapName: ""
+    mountPath: "/app/.floe/compiled_artifacts.json"
+
+# Database connection (set via secrets)
+database:
+  # Database type: trino, snowflake, bigquery, postgres
+  type: trino
+  # Connection configured via environment variables from secrets
+
+# External secrets configuration
+externalSecrets:
+  enabled: false
+  provider: ""
+  secretStoreRef: ""
+
+# Image pull secrets for private registries
+imagePullSecrets: []
+
+# Ingress configuration
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: cube.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []

@@ -1,0 +1,9 @@
+dependencies:
+- name: floe-dagster
+  repository: file://../floe-dagster
+  version: 0.1.0
+- name: floe-cube
+  repository: file://../floe-cube
+  version: 0.1.0
+digest: sha256:2209424054a0687fe8a1e183ae077ab7efb269ddc149b0b1451475315c678904
+generated: "2025-12-21T17:36:48.347896+11:00"

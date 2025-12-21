@@ -1,0 +1,43 @@
+# Floe Runtime Umbrella Chart Values
+#
+# This file configures the complete floe-runtime stack.
+# Individual component values can be overridden under their respective keys.
+#
+# Covers: 007-FR-001 (Helm chart for Kubernetes deployment)
+# Covers: 007-FR-011 (Umbrella chart for full stack deployment)
+
+# Enable/disable floe-dagster subchart
+floe-dagster:
+  enabled: true
+
+  # Override floe-dagster values here
+  # See charts/floe-dagster/values.yaml for all options
+
+  # Example: custom resource limits
+  # resources:
+  #   webserver:
+  #     requests:
+  #       cpu: 200m
+  #       memory: 512Mi
+
+# Enable/disable floe-cube subchart
+floe-cube:
+  enabled: true
+
+  # Override floe-cube values here
+  # See charts/floe-cube/values.yaml for all options
+
+  # Example: disable Cube Store (use external storage)
+  # cubeStore:
+  #   enabled: false
+
+# Global settings applied to all subcharts
+global:
+  # Image pull secrets shared across all components
+  imagePullSecrets: []
+
+  # Common annotations for all resources
+  annotations: {}
+
+  # Common labels for all resources
+  labels: {}
