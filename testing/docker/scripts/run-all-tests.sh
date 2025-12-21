@@ -155,13 +155,23 @@ TEST_DIRS=(
 
 echo "==> Running ALL tests (unit + integration) with coverage..."
 echo "   Test directories: ${TEST_DIRS[*]}"
-docker compose --profile full --profile test run --rm test-runner \
+# Write coverage.xml to /tmp inside container (writable), then copy out
+# Run without --rm so we can extract the coverage report
+docker compose --profile full --profile test run --name floe-test-runner test-runner \
     uv run pytest "${TEST_DIRS[@]}" -v --tb=short -p no:cacheprovider \
-    --cov=packages --cov-report=xml --cov-branch "$@"
+    --cov=packages --cov-report=xml:/tmp/coverage.xml --cov-branch "$@"
+TEST_EXIT_CODE=$?
 
 echo "==> All tests completed"
 
-# Copy coverage.xml from Docker volume if it exists (for CI artifact upload)
-if [[ -f "$DOCKER_DIR/../../coverage.xml" ]]; then
-    echo "==> Coverage report generated: coverage.xml"
-fi
+# Copy coverage.xml from the test-runner container
+echo "==> Extracting coverage report..."
+docker cp floe-test-runner:/tmp/coverage.xml "$DOCKER_DIR/../../coverage.xml" 2>/dev/null && \
+    echo "==> Coverage report generated: coverage.xml" || \
+    echo "==> Warning: Could not extract coverage.xml from container"
+
+# Clean up the test container
+docker rm floe-test-runner >/dev/null 2>&1 || true
+
+# Exit with the test exit code
+exit $TEST_EXIT_CODE
