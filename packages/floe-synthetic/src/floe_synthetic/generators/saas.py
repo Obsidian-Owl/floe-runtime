@@ -234,9 +234,7 @@ class SaaSGenerator(DataGenerator):
             signup_dates.append(signup_date)
 
             # Last active somewhere between signup and end_date (use end_date for determinism)
-            last_active = self.fake.date_time_between(
-                start_date=signup_date, end_date=end_date
-            )
+            last_active = self.fake.date_time_between(start_date=signup_date, end_date=end_date)
             last_active_ats.append(last_active)
 
         self._log_generation("users", count)
