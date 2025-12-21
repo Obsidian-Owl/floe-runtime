@@ -31,6 +31,7 @@ dev-dependencies = [
     "jsonschema>=4.0",       # Schema validation tests
     # Type stubs
     "types-PyYAML>=6.0",     # Type hints for PyYAML
+    "types-requests>=2.31",  # Type hints for requests (E2E tests)
 ]
 
 [tool.black]
