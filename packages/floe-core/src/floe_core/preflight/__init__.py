@@ -20,6 +20,7 @@ from floe_core.preflight.output import (
     format_result_table,
     print_result,
 )
+from floe_core.preflight.runner import PreflightRunner, run_preflight
 
 __all__ = [
     "CheckResult",
@@ -27,7 +28,9 @@ __all__ = [
     "PreflightConfig",
     "PreflightReport",
     "PreflightResult",
+    "PreflightRunner",
     "format_result_json",
     "format_result_table",
     "print_result",
+    "run_preflight",
 ]

@@ -97,6 +97,7 @@ LAZY_COMMANDS = {
     "run": "floe_cli.commands.run.run",
     "dev": "floe_cli.commands.dev.dev",
     "schema": "floe_cli.commands.schema.schema",
+    "preflight": "floe_cli.commands.preflight.preflight",
 }
 
 

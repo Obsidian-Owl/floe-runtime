@@ -1314,6 +1314,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pyyaml" },
+    { name = "rich" },
     { name = "structlog" },
 ]
 
@@ -1347,6 +1348,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
     { name = "pyyaml", specifier = ">=6.0" },
+    { name = "rich", specifier = ">=13.9" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1" },
     { name = "structlog", specifier = ">=24.4" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0" },
