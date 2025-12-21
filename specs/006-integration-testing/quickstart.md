@@ -13,17 +13,17 @@
 ## TL;DR
 
 ```bash
-# 1. Start test infrastructure
-./testing/docker/scripts/run-integration-tests.sh --profile storage --up-only
+# 1. Start test infrastructure (from repo root)
+cd testing/docker && docker compose --profile storage up -d --wait && cd -
 
 # 2. Write your test with requirement marker
 # packages/floe-{package}/tests/integration/test_my_feature.py
 
-# 3. Run tests in Docker
+# 3. Run tests in Docker (handles infrastructure automatically)
 ./testing/docker/scripts/run-integration-tests.sh -k test_my_feature
 
 # 4. Stop infrastructure
-docker compose -f testing/docker/docker-compose.yml --profile storage down
+cd testing/docker && docker compose --profile storage down && cd -
 ```
 
 ## Step 1: Understand Test Categories
@@ -47,11 +47,11 @@ docker compose -f testing/docker/docker-compose.yml --profile storage down
 | full | + Cube, Marquez | Semantic layer tests |
 
 ```bash
-# Start storage profile
-./testing/docker/scripts/run-integration-tests.sh --profile storage --up-only
+# Start storage profile (from repo root)
+cd testing/docker && docker compose --profile storage up -d --wait
 
 # Verify services are healthy
-docker compose -f testing/docker/docker-compose.yml ps
+docker compose ps
 ```
 
 ## Step 3: Write Your Test
@@ -75,7 +75,7 @@ class TestMyFeature:
     """Tests for my feature covering FR-012."""
 
     @pytest.mark.integration
-    @pytest.mark.requirement("FR-012")
+    @pytest.mark.requirement("006-FR-012")
     def test_catalog_connection(
         self,
         polaris_catalog: PolarisCatalog,
@@ -116,13 +116,14 @@ def load_credentials() -> None:
 @pytest.fixture
 def polaris_catalog() -> PolarisCatalog:
     """Create a Polaris catalog client for testing."""
-    from floe_polaris import PolarisCatalog, PolarisConfig
+    from floe_polaris import PolarisCatalog, PolarisCatalogConfig
 
-    config = PolarisConfig(
+    config = PolarisCatalogConfig(
         uri=os.environ.get("POLARIS_URI", "http://polaris:8181/api/catalog"),
-        warehouse=os.environ.get("POLARIS_WAREHOUSE", "warehouse"),
-        credential=os.environ.get("POLARIS_CLIENT_ID", ""),
-        secret=os.environ.get("POLARIS_CLIENT_SECRET", ""),
+        warehouse=os.environ.get("POLARIS_WAREHOUSE", "test_warehouse"),
+        client_id=os.environ.get("POLARIS_CLIENT_ID", ""),
+        client_secret=os.environ.get("POLARIS_CLIENT_SECRET", ""),
+        scope=os.environ.get("POLARIS_SCOPE", "PRINCIPAL_ROLE:ALL"),
     )
     return PolarisCatalog(config)
 ```
@@ -146,7 +147,7 @@ Link tests to requirements for traceability:
 import pytest
 
 # Single requirement
-@pytest.mark.requirement("FR-012")
+@pytest.mark.requirement("006-FR-012")
 def test_polaris_connection():
     ...
 
@@ -157,7 +158,7 @@ def test_contract_boundary():
 
 # With integration marker
 @pytest.mark.integration
-@pytest.mark.requirement("FR-012")
+@pytest.mark.requirement("006-FR-012")
 def test_with_docker():
     ...
 ```
@@ -204,21 +205,22 @@ docker compose --profile storage down
 ### Check Service Logs
 
 ```bash
-# View all logs
-docker compose -f testing/docker/docker-compose.yml logs
+# View all logs (from testing/docker directory)
+cd testing/docker
+docker compose logs
 
 # View specific service
-docker compose -f testing/docker/docker-compose.yml logs polaris
+docker compose logs polaris
 
 # Follow logs
-docker compose -f testing/docker/docker-compose.yml logs -f jaeger
+docker compose logs -f jaeger
 ```
 
 ### Check Service Health
 
 ```bash
-# List services with health status
-docker compose -f testing/docker/docker-compose.yml ps
+# List services with health status (from testing/docker directory)
+docker compose ps
 
 # Verify Polaris is healthy
 curl http://localhost:8181/api/catalog/v1/config
@@ -300,7 +302,7 @@ class TestIcebergTableOperations:
         catalog.drop_namespace(namespace)
 
     @pytest.mark.integration
-    @pytest.mark.requirement("FR-013")
+    @pytest.mark.requirement("006-FR-013")
     def test_create_table(
         self,
         catalog: Catalog,
@@ -327,7 +329,7 @@ class TestIcebergTableOperations:
         assert table.schema() == schema
 
     @pytest.mark.integration
-    @pytest.mark.requirement("FR-013")
+    @pytest.mark.requirement("006-FR-013")
     def test_load_nonexistent_table_fails(
         self,
         catalog: Catalog,

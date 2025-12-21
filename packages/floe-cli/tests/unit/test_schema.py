@@ -132,3 +132,33 @@ class TestSchemaContent:
         # Should be formatted (has newlines and indentation)
         assert "\n" in content
         assert "  " in content
+
+
+class TestSchemaErrors:
+    """Tests for schema command error handling."""
+
+    def test_export_permission_error(self, cli_runner: CliRunner, tmp_path: Path) -> None:
+        """Test export handles permission errors gracefully."""
+        from unittest.mock import patch
+
+        output_file = tmp_path / "schema.json"
+
+        # Mock the write_text to raise PermissionError
+        with patch.object(Path, "write_text", side_effect=PermissionError("Access denied")):
+            result = cli_runner.invoke(export_schema, ["--output", str(output_file)])
+            assert result.exit_code == 2
+            assert "Cannot write to" in result.output
+
+    def test_export_general_error(self, cli_runner: CliRunner, tmp_path: Path) -> None:
+        """Test export handles general errors gracefully."""
+        from unittest.mock import patch
+
+        output_file = tmp_path / "schema.json"
+
+        # Mock model_json_schema to raise an exception
+        with patch(
+            "floe_core.FloeSpec.model_json_schema", side_effect=RuntimeError("Schema failed")
+        ):
+            result = cli_runner.invoke(export_schema, ["--output", str(output_file)])
+            assert result.exit_code == 1
+            assert "Schema export failed" in result.output

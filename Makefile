@@ -1,7 +1,7 @@
 # floe-runtime Makefile
 # Provides consistent commands that mirror CI exactly
 
-.PHONY: check lint typecheck security test test-unit test-integration format install hooks docker-up docker-down docker-logs help
+.PHONY: check lint typecheck security test test-unit test-contract test-integration format install hooks docker-up docker-down docker-logs help
 
 # Default target
 help:
@@ -9,15 +9,16 @@ help:
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  make check           - Run all CI checks (lint, type, security, test)"
-	@echo "  make lint            - Run linting (ruff, isort)"
+	@echo "  make lint            - Run linting (ruff check + format)"
 	@echo "  make typecheck       - Run mypy strict type checking"
 	@echo "  make security        - Run security scans (bandit)"
 	@echo "  make format          - Auto-format code"
 	@echo ""
 	@echo "Testing:"
-	@echo "  make test            - Run all tests (unit only, fast)"
-	@echo "  make test-unit       - Run unit tests (no Docker)"
-	@echo "  make test-integration - Run integration tests in Docker (zero-config)"
+	@echo "  make test            - Run all tests in Docker (unit + contract + integration)"
+	@echo "  make test-unit       - Run unit tests only (no Docker required)"
+	@echo "  make test-contract   - Run contract tests only (no Docker required)"
+	@echo "  make test-integration - Run integration tests only in Docker"
 	@echo ""
 	@echo "Docker Services:"
 	@echo "  make docker-up       - Start test infrastructure"
@@ -33,12 +34,13 @@ help:
 check: lint typecheck security test
 	@echo "✅ All checks passed!"
 
-# Lint checks - mirrors CI lint job
+# Lint checks - mirrors CI lint job exactly
+# Note: ruff check includes I001 import sorting via [tool.ruff.lint] select = ["I"]
+# This replaces the need for a separate isort check
 lint:
 	@echo "📋 Running lint checks..."
 	uv run ruff check .
 	uv run ruff format --check .
-	uv run isort --check packages/
 
 # Type checking - mirrors CI typecheck job
 typecheck:
@@ -50,16 +52,16 @@ security:
 	@echo "🔒 Running security scan..."
 	uv run bandit -r packages/*/src/ -ll -q
 
-# Tests - mirrors CI test job
+# Tests - ALL tests run in Docker for consistent hostname resolution
 test:
-	@echo "🧪 Running tests..."
-	uv run pytest packages/*/tests/ -q --tb=short
+	@echo "🧪 Running all tests in Docker..."
+	@./testing/docker/scripts/run-all-tests.sh
 
-# Auto-format code
+# Auto-format code (ruff handles both formatting and import sorting)
 format:
 	@echo "🎨 Formatting code..."
+	uv run ruff check --fix .
 	uv run ruff format .
-	uv run isort packages/
 
 # Install dependencies
 install:
@@ -78,6 +80,11 @@ hooks:
 test-unit:
 	@echo "🧪 Running unit tests..."
 	uv run pytest packages/*/tests/unit/ -v --tb=short
+
+# Run contract tests (no Docker required)
+test-contract:
+	@echo "🧪 Running contract tests..."
+	uv run pytest tests/contract/ packages/*/tests/contract/ -v --tb=short
 
 # Run integration tests inside Docker network (zero-config)
 test-integration:

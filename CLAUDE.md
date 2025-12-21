@@ -43,42 +43,28 @@ testing/
 
 ### Test Execution Model (CRITICAL)
 
-| Test Type | Location | Execution | Command |
-|-----------|----------|-----------|---------|
-| Unit tests | `packages/*/tests/unit/` | Host | `uv run pytest packages/<pkg>/tests/unit/` |
-| Contract tests | `packages/*/tests/contract/` | Host | `uv run pytest packages/<pkg>/tests/contract/` |
-| **Integration tests** | `packages/*/tests/integration/` | **Docker** | `./testing/docker/scripts/run-integration-tests.sh` |
-| **E2E tests** | `packages/*/tests/e2e/` | **Docker** | Docker test-runner container |
+**ALL tests run in Docker** for consistent hostname resolution and reliable execution.
 
-**IMPORTANT**: Integration tests MUST run inside Docker. Running from host will fail
-with `Could not resolve host: localstack` errors due to Docker network hostname resolution.
-
-### Unit Tests (run on host)
+| Command | Description |
+|---------|-------------|
+| `make test` | Run ALL tests (unit + integration) in Docker |
+| `make test-unit` | Run unit tests only (no Docker required, fast) |
+| `make test-integration` | Run integration tests only in Docker |
 
 ```bash
-# Run unit tests for a specific package
-uv run pytest packages/<package>/tests/unit/ -v
+# Run ALL tests (recommended)
+make test
 
-# Run all unit tests
-uv run pytest packages/*/tests/unit/ -v
+# Or directly via script
+./testing/docker/scripts/run-all-tests.sh
+
+# Run specific tests
+./testing/docker/scripts/run-all-tests.sh -k "test_append"
+./testing/docker/scripts/run-all-tests.sh -v --tb=short
 ```
 
-### Integration Tests (MUST run in Docker)
-
-```bash
-# Recommended: Zero-config test runner
-./testing/docker/scripts/run-integration-tests.sh
-
-# Run specific integration tests
-./testing/docker/scripts/run-integration-tests.sh -k "test_append"
-./testing/docker/scripts/run-integration-tests.sh -v --tb=short
-
-# Or manually with Docker Compose:
-cd testing/docker
-docker compose --profile full up -d
-docker compose --profile test run --rm test-runner \
-    uv run pytest packages/*/tests/integration/ -v
-```
+**Why Docker?** Integration tests require Docker network for hostname resolution
+(localstack, polaris, etc.). Running ALL tests in Docker ensures consistency.
 
 ### Code Quality
 

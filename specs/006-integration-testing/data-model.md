@@ -232,7 +232,7 @@ Tests should use markers to declare requirement coverage:
 import pytest
 
 # Single requirement
-@pytest.mark.requirement("FR-001")
+@pytest.mark.requirement("006-FR-001")
 def test_traceability_matrix_generation():
     ...
 
@@ -243,7 +243,7 @@ def test_compiled_artifacts_boundary():
 
 # Integration test with requirement
 @pytest.mark.integration
-@pytest.mark.requirement("FR-012")
+@pytest.mark.requirement("006-FR-012")
 def test_polaris_catalog_connection():
     ...
 ```

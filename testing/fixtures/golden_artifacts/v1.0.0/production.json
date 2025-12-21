@@ -1,0 +1,142 @@
+{
+  "$schema": "../../../schemas/compiled_artifacts.v1.0.0.schema.json",
+  "$comment": "Production-like artifact - realistic production configuration for testing deployment patterns",
+  "version": "1.0.0",
+  "metadata": {
+    "compiled_at": "2024-01-15T10:30:00Z",
+    "floe_core_version": "0.1.0",
+    "source_hash": "prod56789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  },
+  "compute": {
+    "target": "snowflake",
+    "connection_secret_ref": "snowflake-prod-creds",
+    "properties": {
+      "account": "xy12345.us-east-1.aws",
+      "warehouse": "ANALYTICS_WH",
+      "database": "PRODUCTION",
+      "schema": "TRANSFORMED",
+      "role": "DATA_ENGINEER"
+    }
+  },
+  "transforms": [
+    {
+      "type": "dbt",
+      "path": "./dbt",
+      "target": "prod"
+    }
+  ],
+  "consumption": {
+    "enabled": true,
+    "port": 4000,
+    "api_secret_ref": "cube-prod-api-key",
+    "database_type": "snowflake",
+    "dev_mode": false,
+    "pre_aggregations": {
+      "refresh_schedule": "0 */4 * * *",
+      "timezone": "UTC"
+    },
+    "security": {
+      "row_level": true,
+      "filter_column": "organization_id"
+    }
+  },
+  "governance": {
+    "classification_source": "dbt_meta",
+    "policies": {
+      "pii_masking": {
+        "enabled": true,
+        "mask_type": "hash"
+      },
+      "data_retention": {
+        "enabled": true,
+        "retention_days": 90
+      }
+    },
+    "emit_lineage": true
+  },
+  "observability": {
+    "traces": true,
+    "metrics": true,
+    "lineage": true,
+    "otlp_endpoint": "https://otel.prod.internal:4317",
+    "lineage_endpoint": "https://marquez.prod.internal:5001",
+    "attributes": {
+      "service.name": "floe-production",
+      "service.version": "1.0.0",
+      "deployment.environment": "production",
+      "cloud.provider": "aws",
+      "cloud.region": "us-east-1"
+    }
+  },
+  "catalog": {
+    "type": "polaris",
+    "uri": "https://polaris.prod.internal/api/catalog",
+    "credential_secret_ref": "polaris-prod-creds",
+    "warehouse": "production_warehouse",
+    "scope": "PRINCIPAL_ROLE:DATA_ENGINEER",
+    "token_refresh_enabled": true,
+    "access_delegation": "vended-credentials",
+    "properties": {}
+  },
+  "dbt_manifest_path": "target/manifest.json",
+  "dbt_project_path": "./dbt",
+  "dbt_profiles_path": ".floe/profiles",
+  "lineage_namespace": "floe-production",
+  "environment_context": {
+    "tenant_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    "tenant_slug": "enterprise-corp",
+    "project_id": "11111111-2222-3333-4444-555555555555",
+    "project_slug": "data-platform",
+    "environment_id": "99999999-8888-7777-6666-555555555555",
+    "environment_type": "production",
+    "governance_category": "production"
+  },
+  "column_classifications": {
+    "customers": {
+      "email": {
+        "classification": "pii",
+        "pii_type": "email",
+        "sensitivity": "high"
+      },
+      "phone": {
+        "classification": "pii",
+        "pii_type": "phone",
+        "sensitivity": "high"
+      },
+      "ssn": {
+        "classification": "pii",
+        "pii_type": "ssn",
+        "sensitivity": "high"
+      },
+      "address": {
+        "classification": "pii",
+        "pii_type": "address",
+        "sensitivity": "medium"
+      }
+    },
+    "orders": {
+      "customer_email": {
+        "classification": "pii",
+        "pii_type": "email",
+        "sensitivity": "high"
+      },
+      "credit_card_last_four": {
+        "classification": "pci",
+        "pii_type": null,
+        "sensitivity": "high"
+      }
+    },
+    "employees": {
+      "salary": {
+        "classification": "confidential",
+        "pii_type": null,
+        "sensitivity": "high"
+      },
+      "personal_email": {
+        "classification": "pii",
+        "pii_type": "email",
+        "sensitivity": "high"
+      }
+    }
+  }
+}

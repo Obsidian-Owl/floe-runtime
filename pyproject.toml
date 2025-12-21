@@ -40,7 +40,7 @@ target-version = ['py310', 'py311', 'py312']
 [tool.isort]
 profile = "black"
 line_length = 100
-known_first_party = ["floe_core", "floe_cli", "floe_dagster", "floe_dbt", "floe_iceberg", "floe_polaris", "floe_cube", "testing"]
+known_first_party = ["floe_core", "floe_cli", "floe_dagster", "floe_dbt", "floe_iceberg", "floe_polaris", "floe_cube", "floe_synthetic", "testing"]
 
 [tool.mypy]
 strict = true
@@ -62,7 +62,7 @@ target-version = "py310"
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["floe_core", "floe_cli", "floe_dagster", "floe_dbt", "floe_iceberg", "floe_polaris", "floe_cube"]
+known-first-party = ["floe_core", "floe_cli", "floe_dagster", "floe_dbt", "floe_iceberg", "floe_polaris", "floe_cube", "floe_synthetic"]
 # Align with isort's black profile for consistent sorting
 force-sort-within-sections = true
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
@@ -77,6 +77,7 @@ testpaths = [
     "packages/floe-iceberg/tests",
     "packages/floe-polaris/tests",
     "packages/floe-cube/tests",
+    "packages/floe-synthetic/tests",
 ]
 addopts = "--import-mode=importlib"
 filterwarnings = [
@@ -98,9 +99,21 @@ filterwarnings = [
     "ignore:Property `InputContext.metadata` is deprecated:DeprecationWarning",
     "ignore:Parameter `metadata` of function `build_input_context` is deprecated:DeprecationWarning",
     "ignore:Parameter `metadata` of function `build_output_context` is deprecated:DeprecationWarning",
+    # Dagster-dbt uses deprecated context.op property - in dagster-dbt library code, not ours
+    # We cannot fix this; suppressing until dagster-dbt updates their code
+    "ignore:AssetExecutionContext.op is deprecated:DeprecationWarning:dagster_dbt",
+    # Click parser deprecation in dbt-core library code - not ours
+    # Click 9.0 will remove these; dbt-core needs to update before then
+    "ignore:'parser.OptionParser' is deprecated:DeprecationWarning:dbt",
+    "ignore:'parser.ParsingState' is deprecated:DeprecationWarning:dbt",
     # Hypothesis database location warning in Docker containers with read-only mounts
     # The in-memory fallback works fine for CI
     "ignore:The database setting is not configured:hypothesis.errors.HypothesisWarning",
+    # ResourceWarning for unclosed sockets in httpx/requests clients during tests
+    # These are cleaned up by garbage collection; not a real leak
+    "ignore:unclosed.*socket:ResourceWarning",
+    # PytestUnraisableExceptionWarning wrapping ResourceWarning - same underlying issue
+    "ignore:Exception ignored in.*socket:pytest.PytestUnraisableExceptionWarning",
 ]
 pythonpath = ["."]
 markers = [
@@ -113,12 +126,19 @@ markers = [
     "requires_container: marks tests that require Docker containers",
     "requirement: marks test with a single functional requirement ID (FR-XXX) for traceability",
     "requirements: marks test with multiple functional requirement IDs for traceability",
+    "unit: marks tests as unit tests (fast, no external dependencies)",
 ]
 
 [tool.coverage.run]
 branch = true
 source = ["packages"]
 omit = ["*/tests/*", "*/__init__.py"]
+# CRITICAL: Required for SonarCloud to correctly parse coverage in GitHub Actions
+# GitHub Actions uses /home/runner/work/repo/repo paths that SonarCloud can't access
+# relative_files converts absolute paths to relative paths in coverage.xml
+relative_files = true
+# Data file in /tmp to avoid permission issues in Docker containers
+data_file = "/tmp/.coverage"
 
 [tool.coverage.report]
 exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError"]

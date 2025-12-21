@@ -1,0 +1,60 @@
+{
+  "$schema": "../../../schemas/compiled_artifacts.v1.0.0.schema.json",
+  "$comment": "Minimal v1.0.0 CompiledArtifacts - required fields only with defaults",
+  "version": "1.0.0",
+  "metadata": {
+    "compiled_at": "2024-01-15T10:30:00Z",
+    "floe_core_version": "0.1.0",
+    "source_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "compute": {
+    "target": "duckdb",
+    "connection_secret_ref": null,
+    "properties": {
+      "path": ":memory:",
+      "threads": 4
+    }
+  },
+  "transforms": [
+    {
+      "type": "dbt",
+      "path": "./dbt",
+      "target": null
+    }
+  ],
+  "consumption": {
+    "enabled": false,
+    "port": 4000,
+    "api_secret_ref": null,
+    "database_type": null,
+    "dev_mode": false,
+    "pre_aggregations": {
+      "refresh_schedule": "*/30 * * * *",
+      "timezone": "UTC"
+    },
+    "security": {
+      "row_level": true,
+      "filter_column": "organization_id"
+    }
+  },
+  "governance": {
+    "classification_source": "dbt_meta",
+    "policies": {},
+    "emit_lineage": true
+  },
+  "observability": {
+    "traces": true,
+    "metrics": true,
+    "lineage": true,
+    "otlp_endpoint": null,
+    "lineage_endpoint": null,
+    "attributes": {}
+  },
+  "catalog": null,
+  "dbt_manifest_path": null,
+  "dbt_project_path": null,
+  "dbt_profiles_path": ".floe/profiles",
+  "lineage_namespace": null,
+  "environment_context": null,
+  "column_classifications": null
+}

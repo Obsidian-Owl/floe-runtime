@@ -6,12 +6,17 @@ These tests verify test discovery and requirement marker extraction:
 - @pytest.mark.requirements(["FR-XXX", "FR-YYY"]) extraction
 - Package inference from file path
 - Class context preservation
+
+Covers:
+- FR-001: Traceability matrix mapping (scanner finds requirement markers)
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 from textwrap import dedent
+
+import pytest
 
 # Import models with underscore prefix to avoid pytest collection conflicts
 from testing.traceability.models import Test as _Test
@@ -65,15 +70,19 @@ class TestScanTests:
 
         assert tests == []
 
+    @pytest.mark.requirement("006-FR-001")
     def test_scan_single_requirement_marker(self, tmp_path: Path) -> None:
-        """Test with @pytest.mark.requirement is discovered."""
+        """Test with @pytest.mark.requirement is discovered.
+
+        Covers: FR-001 (traceability matrix requirement marker detection)
+        """
         from testing.traceability.scanner import scan_tests
 
         test_content = dedent(
             """
             import pytest
 
-            @pytest.mark.requirement("FR-001")
+            @pytest.mark.requirement("006-FR-001")
             def test_traceability():
                 assert True
         """
@@ -116,7 +125,7 @@ class TestScanTests:
             import pytest
 
             class TestPolarisCatalog:
-                @pytest.mark.requirement("FR-012")
+                @pytest.mark.requirement("006-FR-012")
                 def test_create_namespace(self):
                     assert True
         """
@@ -146,7 +155,7 @@ class TestPackageInference:
             """
             import pytest
 
-            @pytest.mark.requirement("FR-012")
+            @pytest.mark.requirement("006-FR-012")
             def test_catalog():
                 assert True
         """
@@ -166,7 +175,7 @@ class TestPackageInference:
             """
             import pytest
 
-            @pytest.mark.requirement("FR-001")
+            @pytest.mark.requirement("006-FR-001")
             def test_something():
                 assert True
         """
@@ -191,7 +200,7 @@ class TestMarkerExtraction:
             import pytest
 
             @pytest.mark.integration
-            @pytest.mark.requirement("FR-012")
+            @pytest.mark.requirement("006-FR-012")
             def test_polaris_connection():
                 assert True
         """
@@ -213,7 +222,7 @@ class TestMarkerExtraction:
 
             @pytest.mark.integration
             @pytest.mark.slow
-            @pytest.mark.requirement("FR-005")
+            @pytest.mark.requirement("006-FR-005")
             def test_slow_integration():
                 assert True
         """
@@ -238,7 +247,7 @@ class TestMultipleFiles:
             """
             import pytest
 
-            @pytest.mark.requirement("FR-001")
+            @pytest.mark.requirement("006-FR-001")
             def test_first():
                 pass
         """
@@ -247,7 +256,7 @@ class TestMultipleFiles:
             """
             import pytest
 
-            @pytest.mark.requirement("FR-002")
+            @pytest.mark.requirement("006-FR-002")
             def test_second():
                 pass
         """
@@ -274,7 +283,7 @@ class TestMultipleFiles:
             """
             import pytest
 
-            @pytest.mark.requirement("FR-001")
+            @pytest.mark.requirement("006-FR-001")
             def test_from_dir1():
                 pass
         """
@@ -283,7 +292,7 @@ class TestMultipleFiles:
             """
             import pytest
 
-            @pytest.mark.requirement("FR-002")
+            @pytest.mark.requirement("006-FR-002")
             def test_from_dir2():
                 pass
         """
@@ -306,7 +315,7 @@ class TestMultipleFiles:
             """
             import pytest
 
-            @pytest.mark.requirement("FR-010")
+            @pytest.mark.requirement("006-FR-010")
             def test_nested():
                 pass
         """
@@ -330,7 +339,7 @@ class TestFilePath:
             """
             import pytest
 
-            @pytest.mark.requirement("FR-001")
+            @pytest.mark.requirement("006-FR-001")
             def test_example():
                 pass
         """
@@ -369,7 +378,7 @@ class TestEdgeCases:
             def test_missing_arg():
                 pass
 
-            @pytest.mark.requirement("FR-001")
+            @pytest.mark.requirement("006-FR-001")
             def test_valid():
                 pass
         """
@@ -394,7 +403,7 @@ class TestEdgeCases:
             """
             import pytest
 
-            @pytest.mark.requirement("FR-001")
+            @pytest.mark.requirement("006-FR-001")
             def test_valid():
                 pass
         """
@@ -415,7 +424,7 @@ class TestEdgeCases:
             """
             import pytest
 
-            @pytest.mark.requirement("FR-001")
+            @pytest.mark.requirement("006-FR-001")
             def test_example():
                 pass
         """

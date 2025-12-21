@@ -8,6 +8,129 @@ Note: T004 creates the stub classes. T009/T010 implement full functionality.
 
 from __future__ import annotations
 
+import pytest
+
+
+class TestInputValidation:
+    """Tests for input validation security measures."""
+
+    def test_validate_name_accepts_valid_service_names(self) -> None:
+        """Verify valid service names pass validation."""
+        from testing.fixtures.observability import _validate_name
+
+        # Valid names should not raise
+        assert _validate_name("floe-dagster", "service") == "floe-dagster"
+        assert _validate_name("my_service", "service") == "my_service"
+        assert _validate_name("service.name", "service") == "service.name"
+        assert _validate_name("MyService123", "service") == "MyService123"
+
+    def test_validate_name_rejects_empty_name(self) -> None:
+        """Verify empty names are rejected."""
+        from testing.fixtures.observability import _validate_name
+
+        with pytest.raises(ValueError, match="cannot be empty"):
+            _validate_name("", "service")
+
+    def test_validate_name_rejects_path_traversal(self) -> None:
+        """Verify path traversal attempts are blocked."""
+        from testing.fixtures.observability import _validate_name
+
+        # Path traversal attempts
+        with pytest.raises(ValueError, match="Invalid service"):
+            _validate_name("../etc/passwd", "service")
+
+        with pytest.raises(ValueError, match="Invalid service"):
+            _validate_name("foo/../bar", "service")
+
+        with pytest.raises(ValueError, match="Invalid service"):
+            _validate_name("/etc/passwd", "service")
+
+    def test_validate_name_rejects_special_characters(self) -> None:
+        """Verify special characters that could be exploited are blocked."""
+        from testing.fixtures.observability import _validate_name
+
+        invalid_names = [
+            "service;rm -rf",  # Command injection
+            "service`whoami`",  # Backtick injection
+            "service$(id)",  # Command substitution
+            "service%00null",  # Null byte
+            "service\nheader",  # CRLF injection
+            "service with spaces",  # Spaces
+        ]
+
+        for name in invalid_names:
+            with pytest.raises(ValueError, match="Invalid"):
+                _validate_name(name, "service")
+
+
+class TestJaegerClientVerifySpanAttributes:
+    """Tests for JaegerClient.verify_span_attributes method."""
+
+    def test_verify_span_attributes_finds_matching_span(self) -> None:
+        """Verify method returns True when span has expected attributes."""
+        from testing.fixtures.observability import JaegerClient
+
+        client = JaegerClient()
+        trace = {
+            "traceID": "abc123",
+            "spans": [
+                {
+                    "operationName": "test_op",
+                    "tags": [
+                        {"key": "http.method", "value": "POST"},
+                        {"key": "http.status_code", "value": 200},
+                    ],
+                }
+            ],
+        }
+
+        assert client.verify_span_attributes(trace, {"http.method": "POST"})
+        assert client.verify_span_attributes(trace, {"http.status_code": "200"})
+
+    def test_verify_span_attributes_returns_false_when_not_found(self) -> None:
+        """Verify method returns False when expected attributes missing."""
+        from testing.fixtures.observability import JaegerClient
+
+        client = JaegerClient()
+        trace = {
+            "traceID": "abc123",
+            "spans": [
+                {
+                    "operationName": "test_op",
+                    "tags": [{"key": "http.method", "value": "GET"}],
+                }
+            ],
+        }
+
+        assert not client.verify_span_attributes(trace, {"http.method": "POST"})
+        assert not client.verify_span_attributes(trace, {"nonexistent": "value"})
+
+    def test_verify_span_attributes_handles_empty_trace(self) -> None:
+        """Verify method handles traces with no spans."""
+        from typing import Any
+
+        from testing.fixtures.observability import JaegerClient
+
+        client = JaegerClient()
+        trace: dict[str, Any] = {"traceID": "abc123", "spans": []}
+
+        assert not client.verify_span_attributes(trace, {"any": "attr"})
+
+    def test_verify_span_attributes_searches_all_spans(self) -> None:
+        """Verify method searches through all spans in trace."""
+        from testing.fixtures.observability import JaegerClient
+
+        client = JaegerClient()
+        trace = {
+            "traceID": "abc123",
+            "spans": [
+                {"operationName": "op1", "tags": [{"key": "attr", "value": "wrong"}]},
+                {"operationName": "op2", "tags": [{"key": "attr", "value": "correct"}]},
+            ],
+        }
+
+        assert client.verify_span_attributes(trace, {"attr": "correct"})
+
 
 class TestJaegerClientImport:
     """Tests for JaegerClient class structure."""
@@ -52,6 +175,126 @@ class TestJaegerClientImport:
         assert callable(client.verify_span_attributes)
 
 
+class TestMarquezClientVerifyEventFacets:
+    """Tests for MarquezClient.verify_event_facets method."""
+
+    def test_verify_event_facets_matches_top_level_fields(self) -> None:
+        """Verify method matches top-level event fields."""
+        from testing.fixtures.observability import MarquezClient
+
+        client = MarquezClient()
+        event = {
+            "id": "run-123",
+            "state": "COMPLETED",
+            "startedAt": "2024-01-01T00:00:00Z",
+        }
+
+        assert client.verify_event_facets(event, {"state": "COMPLETED"})
+        assert client.verify_event_facets(event, {"id": "run-123"})
+        assert not client.verify_event_facets(event, {"state": "FAILED"})
+
+    def test_verify_event_facets_matches_facets(self) -> None:
+        """Verify method matches facet key-value pairs."""
+        from testing.fixtures.observability import MarquezClient
+
+        client = MarquezClient()
+        event = {
+            "id": "run-123",
+            "facets": {
+                "errorMessage": "Something went wrong",
+                "duration": "1000",
+            },
+        }
+
+        assert client.verify_event_facets(event, {"errorMessage": "Something went wrong"})
+        assert client.verify_event_facets(event, {"duration": "1000"})
+        assert not client.verify_event_facets(event, {"errorMessage": "Different error"})
+
+    def test_verify_event_facets_matches_nested_facets(self) -> None:
+        """Verify method searches nested facet structures."""
+        from testing.fixtures.observability import MarquezClient
+
+        client = MarquezClient()
+        event = {
+            "id": "run-123",
+            "facets": {
+                "run": {"nominalStartTime": "2024-01-01T00:00:00Z"},
+                "job": {"type": "BATCH"},
+            },
+        }
+
+        assert client.verify_event_facets(event, {"nominalStartTime": "2024-01-01T00:00:00Z"})
+        assert client.verify_event_facets(event, {"type": "BATCH"})
+
+    def test_verify_event_facets_returns_false_when_not_found(self) -> None:
+        """Verify method returns False when expected fields are missing."""
+        from testing.fixtures.observability import MarquezClient
+
+        client = MarquezClient()
+        event = {"id": "run-123", "state": "COMPLETED", "facets": {}}
+
+        assert not client.verify_event_facets(event, {"nonexistent": "value"})
+        assert not client.verify_event_facets(event, {"nested_key": "value"})
+
+    def test_verify_event_facets_handles_empty_event(self) -> None:
+        """Verify method handles empty events."""
+        from testing.fixtures.observability import MarquezClient
+
+        client = MarquezClient()
+        event: dict[str, str] = {}
+
+        assert not client.verify_event_facets(event, {"any": "attr"})
+
+    def test_verify_event_facets_handles_multiple_expected(self) -> None:
+        """Verify method checks all expected fields."""
+        from testing.fixtures.observability import MarquezClient
+
+        client = MarquezClient()
+        event = {
+            "id": "run-123",
+            "state": "COMPLETED",
+            "facets": {"duration": "1000"},
+        }
+
+        # All must match
+        assert client.verify_event_facets(event, {"state": "COMPLETED", "duration": "1000"})
+        # One mismatch fails
+        assert not client.verify_event_facets(event, {"state": "COMPLETED", "duration": "999"})
+
+
+class TestMarquezClientInputValidation:
+    """Tests for MarquezClient input validation."""
+
+    def test_get_lineage_events_validates_job_name(self) -> None:
+        """Verify get_lineage_events validates job_name parameter."""
+        from testing.fixtures.observability import MarquezClient
+
+        client = MarquezClient()
+
+        # Path traversal should be blocked
+        with pytest.raises(ValueError, match="Invalid job_name"):
+            client.get_lineage_events("../etc/passwd")
+
+    def test_get_lineage_events_validates_namespace(self) -> None:
+        """Verify get_lineage_events validates namespace parameter."""
+        from testing.fixtures.observability import MarquezClient
+
+        client = MarquezClient()
+
+        # Path traversal should be blocked
+        with pytest.raises(ValueError, match="Invalid namespace"):
+            client.get_lineage_events("my_job", namespace="../etc/passwd")
+
+    def test_get_jobs_validates_namespace(self) -> None:
+        """Verify get_jobs validates namespace parameter."""
+        from testing.fixtures.observability import MarquezClient
+
+        client = MarquezClient()
+
+        with pytest.raises(ValueError, match="Invalid namespace"):
+            client.get_jobs(namespace="/etc/passwd")
+
+
 class TestMarquezClientImport:
     """Tests for MarquezClient class structure."""
 
@@ -93,6 +336,30 @@ class TestMarquezClientImport:
         client = MarquezClient()
         assert hasattr(client, "verify_event_facets")
         assert callable(client.verify_event_facets)
+
+    def test_marquez_client_has_get_namespaces_method(self) -> None:
+        """Verify MarquezClient has get_namespaces method."""
+        from testing.fixtures.observability import MarquezClient
+
+        client = MarquezClient()
+        assert hasattr(client, "get_namespaces")
+        assert callable(client.get_namespaces)
+
+    def test_marquez_client_has_get_jobs_method(self) -> None:
+        """Verify MarquezClient has get_jobs method."""
+        from testing.fixtures.observability import MarquezClient
+
+        client = MarquezClient()
+        assert hasattr(client, "get_jobs")
+        assert callable(client.get_jobs)
+
+    def test_marquez_client_has_is_available_method(self) -> None:
+        """Verify MarquezClient has is_available method."""
+        from testing.fixtures.observability import MarquezClient
+
+        client = MarquezClient()
+        assert hasattr(client, "is_available")
+        assert callable(client.is_available)
 
 
 class TestModuleExports:

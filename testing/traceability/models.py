@@ -1,10 +1,16 @@
 """Pydantic models for the traceability system.
 
 This module defines the data models for mapping functional requirements
-(FR-XXX) from specification files to integration tests.
+from specification files to integration tests using feature-scoped IDs.
+
+The traceability system supports N-dimensional multi-marker patterns where:
+- A single test can satisfy N requirements from any number of features
+- Requirements use feature-scoped format: {feature}-FR-{id} (e.g., "006-FR-012")
+- Many-to-many relationships: one test → many requirements, one requirement → many tests
 
 Models:
     RequirementCategory: Enum of requirement categories
+    RequirementMarker: A feature-scoped requirement marker (e.g., "006-FR-012")
     Requirement: A functional requirement from a specification
     TestMarker: Enum of pytest markers for integration tests
     Test: An integration test that covers requirements
@@ -24,8 +30,78 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from enum import Enum
+import re
 
 from pydantic import BaseModel, Field
+
+# Pattern for feature-scoped requirement IDs: "006-FR-012"
+FEATURE_SCOPED_PATTERN = re.compile(r"^(\d{3})-FR-(\d{3})$")
+# Legacy pattern for backward compatibility during migration: "FR-012"
+LEGACY_PATTERN = re.compile(r"^FR-(\d{3})$")
+
+
+class RequirementMarker(BaseModel):
+    """A feature-scoped requirement marker.
+
+    Supports the N-dimensional multi-marker pattern where a single test can
+    satisfy N requirements from any number of features (001-006+).
+
+    Attributes:
+        feature_id: The feature number (e.g., "006" for integration testing)
+        requirement_id: The requirement ID (e.g., "FR-012")
+
+    Properties:
+        full_id: The complete feature-scoped ID (e.g., "006-FR-012")
+
+    Example:
+        >>> marker = RequirementMarker(feature_id="006", requirement_id="FR-012")
+        >>> marker.full_id
+        '006-FR-012'
+
+        >>> # Parse from string
+        >>> marker = RequirementMarker.from_string("004-FR-001")
+        >>> marker.feature_id
+        '004'
+    """
+
+    feature_id: str = Field(..., pattern=r"^\d{3}$")
+    requirement_id: str = Field(..., pattern=r"^FR-\d{3}$")
+
+    @property
+    def full_id(self) -> str:
+        """Get the complete feature-scoped requirement ID."""
+        return f"{self.feature_id}-{self.requirement_id}"
+
+    @classmethod
+    def from_string(cls, value: str) -> RequirementMarker | None:
+        """Parse a requirement marker from a string.
+
+        Supports both feature-scoped ("006-FR-012") and legacy ("FR-012") formats.
+        Legacy format defaults to feature "006" (integration testing meta-feature).
+
+        Args:
+            value: The marker string to parse.
+
+        Returns:
+            RequirementMarker if valid, None otherwise.
+        """
+        # Try feature-scoped format first: "006-FR-012"
+        match = FEATURE_SCOPED_PATTERN.match(value)
+        if match:
+            return cls(
+                feature_id=match.group(1),
+                requirement_id=f"FR-{match.group(2)}",
+            )
+
+        # Try legacy format: "FR-012" (defaults to feature 006)
+        legacy_match = LEGACY_PATTERN.match(value)
+        if legacy_match:
+            return cls(
+                feature_id="006",  # Default to integration testing meta-feature
+                requirement_id=value,
+            )
+
+        return None
 
 
 class RequirementCategory(str, Enum):
@@ -51,10 +127,12 @@ class Requirement(BaseModel):
     """A functional requirement from a specification.
 
     Requirements are extracted from spec.md files and identified by
-    their FR-XXX identifier pattern.
+    feature-scoped identifiers ({feature}-FR-{id}).
 
     Attributes:
-        id: Unique identifier (e.g., "FR-001")
+        id: Full feature-scoped identifier (e.g., "006-FR-001")
+        feature_id: Feature number (e.g., "006")
+        requirement_id: Requirement ID within feature (e.g., "FR-001")
         spec_file: Path to the specification file
         line_number: Line number in spec file where requirement is defined
         text: Full text of the requirement
@@ -63,7 +141,9 @@ class Requirement(BaseModel):
 
     Example:
         >>> req = Requirement(
-        ...     id="FR-001",
+        ...     id="006-FR-001",
+        ...     feature_id="006",
+        ...     requirement_id="FR-001",
         ...     spec_file="specs/006-integration-testing/spec.md",
         ...     line_number=42,
         ...     text="The system SHALL generate traceability matrices",
@@ -71,7 +151,9 @@ class Requirement(BaseModel):
         ... )
     """
 
-    id: str = Field(..., pattern=r"^FR-\d{3}$")
+    id: str = Field(..., pattern=r"^\d{3}-FR-\d{3}$")
+    feature_id: str = Field(..., pattern=r"^\d{3}$")
+    requirement_id: str = Field(..., pattern=r"^FR-\d{3}$")
     spec_file: str
     line_number: int
     text: str
@@ -97,12 +179,16 @@ class Test(BaseModel):
     Tests are discovered by scanning test files for functions decorated
     with @pytest.mark.requirement or @pytest.mark.requirements markers.
 
+    Supports N-dimensional multi-marker pattern: a single test can satisfy
+    N requirements from any number of features (001-006+).
+
     Attributes:
         file_path: Path to the test file
         function_name: Test function name
         class_name: Test class name (if any)
         markers: List of pytest markers
-        requirement_ids: List of FR-XXX IDs this test covers
+        requirement_ids: List of feature-scoped IDs (e.g., ["006-FR-012", "004-FR-001"])
+        requirement_markers: Parsed RequirementMarker objects
         package: Package name (e.g., "floe-core")
 
     Example:
@@ -111,9 +197,12 @@ class Test(BaseModel):
         ...     function_name="test_create_namespace",
         ...     class_name="TestPolarisCatalog",
         ...     markers=[TestMarker.INTEGRATION],
-        ...     requirement_ids=["FR-012"],
+        ...     requirement_ids=["006-FR-012", "004-FR-001"],
         ...     package="floe-polaris",
         ... )
+        >>> # Test covers requirements from multiple features
+        >>> test.get_features_covered()
+        {'006', '004'}
     """
 
     file_path: str
@@ -122,6 +211,27 @@ class Test(BaseModel):
     markers: list[TestMarker] = Field(default_factory=list)
     requirement_ids: list[str] = Field(default_factory=list)
     package: str
+
+    def get_requirement_markers(self) -> list[RequirementMarker]:
+        """Parse requirement IDs into RequirementMarker objects.
+
+        Returns:
+            List of parsed RequirementMarker objects.
+        """
+        markers: list[RequirementMarker] = []
+        for req_id in self.requirement_ids:
+            marker = RequirementMarker.from_string(req_id)
+            if marker:
+                markers.append(marker)
+        return markers
+
+    def get_features_covered(self) -> set[str]:
+        """Get the set of feature IDs covered by this test.
+
+        Returns:
+            Set of feature IDs (e.g., {"006", "004"}).
+        """
+        return {m.feature_id for m in self.get_requirement_markers()}
 
 
 class CoverageStatus(str, Enum):
@@ -143,21 +253,26 @@ class CoverageStatus(str, Enum):
 class TraceabilityMapping(BaseModel):
     """Mapping between a requirement and its tests.
 
+    Supports feature-scoped requirement IDs for cross-feature traceability.
+
     Attributes:
-        requirement_id: The requirement ID (FR-XXX)
+        requirement_id: The full feature-scoped ID (e.g., "006-FR-001")
+        feature_id: Feature number (e.g., "006")
         test_ids: List of test identifiers (file::class::function)
         coverage_status: Current coverage status
         notes: Optional notes about coverage
 
     Example:
         >>> mapping = TraceabilityMapping(
-        ...     requirement_id="FR-001",
+        ...     requirement_id="006-FR-001",
+        ...     feature_id="006",
         ...     test_ids=["test_report.py::TestMatrix::test_generation"],
         ...     coverage_status=CoverageStatus.COVERED,
         ... )
     """
 
     requirement_id: str
+    feature_id: str = Field(default="006")
     test_ids: list[str] = Field(default_factory=list)
     coverage_status: CoverageStatus = CoverageStatus.UNCOVERED
     notes: str | None = None
@@ -303,3 +418,51 @@ class TraceabilityReport(BaseModel):
     packages: list[PackageCoverage]
     test_results: list[TestResult]
     gaps: list[str]
+
+
+class FeatureCoverage(BaseModel):
+    """Coverage summary for a single feature.
+
+    Provides breakdown of requirement coverage for one feature (e.g., 006).
+
+    Attributes:
+        feature_id: Feature identifier (e.g., "006")
+        feature_name: Human-readable name (e.g., "Integration Testing")
+        total_requirements: Total FRs in spec
+        covered: Covered count
+        uncovered: Uncovered count
+        coverage_percentage: Feature coverage percentage
+        total_markers: Total @pytest.mark.requirement markers for this feature
+    """
+
+    feature_id: str
+    feature_name: str
+    total_requirements: int
+    covered: int
+    uncovered: int
+    coverage_percentage: float
+    total_markers: int = 0
+
+
+class MultiFeatureReport(BaseModel):
+    """Multi-feature traceability report.
+
+    Provides comprehensive coverage matrix across all features (001-006+).
+
+    Attributes:
+        generated_at: ISO 8601 timestamp
+        features: Per-feature coverage breakdown
+        total_requirements: Total FRs across all specs
+        total_covered: Total covered count
+        total_coverage_percentage: Overall coverage percentage
+        total_markers: Total requirement markers in tests
+        gaps_by_feature: Uncovered requirements grouped by feature
+    """
+
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    features: list[FeatureCoverage] = Field(default_factory=list)
+    total_requirements: int = 0
+    total_covered: int = 0
+    total_coverage_percentage: float = 0.0
+    total_markers: int = 0
+    gaps_by_feature: dict[str, list[str]] = Field(default_factory=dict)

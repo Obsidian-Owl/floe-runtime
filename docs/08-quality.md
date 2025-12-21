@@ -821,3 +821,102 @@ Each package must have a README with:
 3. **Quick Start**: Minimal example
 4. **API Reference**: Link to docs
 5. **Contributing**: Link to guidelines
+
+---
+
+## 9. Requirement Traceability
+
+### 9.1 Coverage Requirement
+
+**100% requirement coverage is MANDATORY.** Every functional requirement (FR-XXX)
+in specification files MUST have at least one test with an explicit marker.
+
+This ensures that:
+- Every spec requirement has evidence of implementation
+- Coverage gaps are immediately visible
+- Requirements can be traced to tests and back
+
+### 9.2 Marker Format
+
+Tests use feature-scoped requirement markers:
+
+```python
+@pytest.mark.requirement("006-FR-012")  # Feature 006, Requirement FR-012
+@pytest.mark.requirement("004-FR-001")  # Feature 004, Requirement FR-001
+def test_polaris_catalog_connection():
+    """Tests that cover multiple requirements from multiple features.
+
+    Covers:
+    - 006-FR-012: floe-polaris MUST have integration tests
+    - 004-FR-001: System MUST connect to Polaris REST catalogs
+    """
+    pass
+```
+
+**Requirement ID Format**: `{feature}-FR-{id}`
+
+| Example | Meaning |
+|---------|---------|
+| `006-FR-012` | Feature 006 (Integration Testing), Requirement FR-012 |
+| `004-FR-001` | Feature 004 (Storage Catalog), Requirement FR-001 |
+| `001-FR-005` | Feature 001 (Core Foundation), Requirement FR-005 |
+
+### 9.3 Running Traceability Report
+
+```bash
+# Multi-feature report (all features 001-006)
+python -m testing.traceability --all
+
+# Single feature with threshold enforcement
+python -m testing.traceability --feature-id 006 --threshold 100
+
+# JSON output for CI integration
+python -m testing.traceability --all --format json --threshold 100
+```
+
+### 9.4 Coverage Matrix
+
+The traceability report shows per-feature breakdown:
+
+| Feature | Name | Requirements | Covered | Coverage | Markers |
+|---------|------|--------------|---------|----------|---------|
+| 001 | Core Foundation | 28 | 28 | 100% | 45 |
+| 002 | CLI Interface | 15 | 15 | 100% | 22 |
+| 003 | Orchestration Layer | 24 | 24 | 100% | 38 |
+| 004 | Storage Catalog | 38 | 38 | 100% | 62 |
+| 005 | Consumption Layer | 36 | 36 | 100% | 48 |
+| 006 | Integration Testing | 35 | 35 | 100% | 55 |
+
+### 9.5 Multi-Feature Coverage
+
+A single test can satisfy requirements from multiple features (N-dimensional):
+
+```python
+@pytest.mark.requirement("006-FR-012")  # Meta: tests exist
+@pytest.mark.requirement("004-FR-001")  # Functional: REST connection
+@pytest.mark.requirement("004-FR-002")  # Functional: OAuth2 auth
+def test_polaris_connection():
+    """Test that covers multiple requirements from multiple features."""
+    ...
+```
+
+### 9.6 Gap Resolution
+
+If the traceability report shows gaps:
+
+1. Review the uncovered requirements in the spec file
+2. Identify which tests should cover the requirement
+3. Add `@pytest.mark.requirement()` markers to existing tests, OR
+4. Write new tests if no existing test covers the requirement
+5. Re-run the report until 100% coverage achieved
+
+### 9.7 CI Integration
+
+The traceability gate is enforced in CI:
+
+```yaml
+- name: Verify Requirement Traceability
+  run: python -m testing.traceability --all --threshold 100
+```
+
+This ensures no PR can merge with uncovered requirements.

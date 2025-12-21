@@ -256,11 +256,13 @@ class BoundLogger:
         kwargs["exc_info"] = True
         self._log(logging.ERROR, msg, *args, **kwargs)
 
-    # Delegate handler management
-    def addHandler(self, handler: logging.Handler) -> None:
+    # Delegate handler management - method names match logging.Logger API for drop-in compatibility
+    # S100: Intentionally camelCase to match logging.Logger interface
+    def addHandler(self, handler: logging.Handler) -> None:  # NOSONAR
         """Add handler to underlying logger."""
         self._logger.addHandler(handler)
 
-    def setLevel(self, level: int) -> None:
+    # S100: Intentionally camelCase to match logging.Logger interface
+    def setLevel(self, level: int) -> None:  # NOSONAR
         """Set level on underlying logger."""
         self._logger.setLevel(level)

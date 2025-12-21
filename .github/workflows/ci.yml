@@ -82,106 +82,24 @@ jobs:
         run: uv run pip-audit
 
   test:
-    name: Test (Python ${{ matrix.python-version }})
+    name: Test (All tests in Docker)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+    # ALL tests run inside Docker for consistent hostname resolution
+    # This ensures unit, contract, and integration tests all work reliably
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a  # v4
+      - name: Run all tests via Docker test runner
+        run: ./testing/docker/scripts/run-all-tests.sh
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v4
+        if: always()
         with:
-          enable-cache: true
-
-      - name: Set up Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
-
-      - name: Install dependencies
-        run: uv sync --all-packages
-
-      - name: Run unit and contract tests
-        # Run only unit and contract tests (integration tests run in separate job)
-        run: uv run pytest packages/*/tests/unit/ packages/*/tests/contract/ --cov=packages --cov-report=xml
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238  # v4
-        if: matrix.python-version == '3.12'
-        with:
-          files: coverage.xml
-          fail_ci_if_error: false
-
-  integration-test:
-    name: Integration Tests
-    runs-on: ubuntu-latest
-    # Integration tests run inside Docker for reliable hostname resolution
-    # (localstack, polaris, etc. only resolve inside Docker network)
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
-
-      - name: Start Docker infrastructure
-        working-directory: testing/docker
-        run: docker compose --profile full up -d
-
-      - name: Wait for polaris-init to complete
-        working-directory: testing/docker
-        run: |
-          echo "Waiting for polaris-init to complete..."
-          timeout 60 bash -c 'until docker inspect -f "{{.State.Status}}" floe-polaris-init 2>/dev/null | grep -q "exited"; do sleep 2; done' || {
-            echo "Error: polaris-init did not complete in time"
-            docker compose logs polaris-init
-            exit 1
-          }
-          EXIT_CODE=$(docker inspect -f "{{.State.ExitCode}}" floe-polaris-init 2>/dev/null || echo "1")
-          if [[ "$EXIT_CODE" != "0" ]]; then
-            echo "Error: polaris-init failed with exit code $EXIT_CODE"
-            docker compose logs polaris-init
-            exit 1
-          fi
-          echo "polaris-init completed successfully"
-
-      - name: Wait for all services
-        run: |
-          echo "Waiting for Polaris health endpoint..."
-          timeout 120 bash -c 'until curl -sf http://localhost:8182/q/health; do sleep 2; done'
-          echo "Waiting for Cube..."
-          timeout 120 bash -c 'until curl -sf http://localhost:4000/readyz; do sleep 2; done'
-          echo "Waiting for Marquez..."
-          timeout 60 bash -c 'until curl -sf http://localhost:5002/api/v1/namespaces; do sleep 2; done'
-          echo "All services ready"
-
-      - name: Wait for cube-init to complete
-        working-directory: testing/docker
-        run: |
-          echo "Waiting for cube-init to load test data..."
-          timeout 120 bash -c 'until docker inspect -f "{{.State.Status}}" floe-cube-init 2>/dev/null | grep -q "exited"; do sleep 2; done' || {
-            echo "Error: cube-init did not complete in time"
-            docker compose logs cube-init
-            exit 1
-          }
-          EXIT_CODE=$(docker inspect -f "{{.State.ExitCode}}" floe-cube-init 2>/dev/null || echo "1")
-          if [[ "$EXIT_CODE" != "0" ]]; then
-            echo "Error: cube-init failed with exit code $EXIT_CODE"
-            docker compose logs cube-init
-            exit 1
-          fi
-          echo "cube-init completed successfully (15,500 test rows loaded)"
-
-      - name: Build test-runner container
-        working-directory: testing/docker
-        run: docker compose --profile full --profile test build test-runner
-
-      - name: Run ALL integration tests inside Docker
-        working-directory: testing/docker
-        run: |
-          docker compose --profile full --profile test run --rm test-runner \
-            uv run pytest \
-              packages/floe-iceberg/tests/integration/ \
-              packages/floe-polaris/tests/integration/ \
-              packages/floe-cube/tests/integration/ \
-              -v --tb=short -p no:cacheprovider
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 1
+          if-no-files-found: warn
 
       - name: Show Docker logs on failure
         if: failure()
@@ -192,3 +110,57 @@ jobs:
         if: always()
         working-directory: testing/docker
         run: docker compose --profile full down -v
+
+  sonarcloud:
+    name: SonarCloud Analysis
+    runs-on: ubuntu-latest
+    needs: [test]  # Wait for tests to complete so coverage.xml is available
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          fetch-depth: 0  # Full history for accurate blame information
+
+      - name: Download coverage report
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16  # v4
+        with:
+          name: coverage-report
+          path: .
+        continue-on-error: true  # Don't fail if coverage wasn't generated
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@2500896589ef8f7247069a56136f8dc177c27ccf  # v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
+
+  traceability:
+    name: Traceability Report
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a  # v4
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --all-packages
+
+      - name: Generate traceability report with 80% threshold
+        run: ./testing/docker/scripts/run-traceability.sh --threshold 80 --format console
+
+      - name: Generate JSON report for artifacts
+        run: ./testing/docker/scripts/run-traceability.sh --format json > traceability-report.json
+        continue-on-error: true
+
+      - name: Upload traceability report
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v4
+        if: always()
+        with:
+          name: traceability-report
+          path: traceability-report.json
+          retention-days: 30

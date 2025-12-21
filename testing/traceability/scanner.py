@@ -177,7 +177,7 @@ def _process_decorator(decorator: ast.expr) -> tuple[list[str], TestMarker | Non
 
 
 def _process_call_decorator(decorator: ast.Call) -> tuple[list[str], TestMarker | None]:
-    """Process a decorator call (e.g., @pytest.mark.requirement("FR-001"))."""
+    """Process a decorator call (e.g., @pytest.mark.requirement("006-FR-001"))."""
     requirement_ids: list[str] = []
     marker: TestMarker | None = None
 
@@ -251,7 +251,10 @@ def _marker_name_to_enum(name: str) -> TestMarker | None:
 def _infer_package(file_path: Path) -> str:
     """Infer package name from file path.
 
-    Looks for patterns like packages/<package-name>/tests/.
+    Looks for patterns like:
+    - packages/<package-name>/tests/ -> package name
+    - testing/tests/ -> "testing"
+    - testing/traceability/tests/ -> "testing-traceability"
 
     Args:
         file_path: Path to the test file.
@@ -266,6 +269,14 @@ def _infer_package(file_path: Path) -> str:
     match = re.search(r"packages/([^/]+)/tests/", path_str)  # nosonar: S4784
     if match:
         return match.group(1)
+
+    # Match testing/traceability/tests/ pattern
+    if "testing/traceability/tests/" in path_str:
+        return "testing-traceability"
+
+    # Match testing/tests/ pattern
+    if "testing/tests/" in path_str:
+        return "testing"
 
     return "unknown"
 

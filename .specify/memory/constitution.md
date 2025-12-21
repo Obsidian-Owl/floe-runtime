@@ -133,7 +133,10 @@ Defense in depth: validate at boundaries, never trust external input, fail safel
 All code MUST meet strict quality standards for testing, formatting, and documentation.
 
 **Non-Negotiable Rules:**
-- MUST achieve greater than 80% test coverage
+- MUST achieve 100% requirement traceability coverage
+- Every functional requirement (FR-XXX) in specs MUST have at least one test
+- Tests MUST use `@pytest.mark.requirement("{feature}-FR-{id}")` markers
+- Run `python -m testing.traceability --all --threshold 100` to verify
 - MUST pass Black formatting (100 character line length)
 - MUST pass isort import sorting (Black profile)
 - MUST pass ruff linting (E, F, W, I, UP, B, SIM, C4 rules)
@@ -194,7 +197,9 @@ DuckDB (development), Snowflake, BigQuery, Redshift, Databricks, PostgreSQL, Spa
 - [ ] No `eval()`, `exec()`, or dangerous constructs
 - [ ] Error messages do not expose internals
 - [ ] Logs do not contain secrets or PII
-- [ ] Tests pass with > 80% coverage
+- [ ] Tests pass with > 80% code coverage
+- [ ] Traceability report shows 100% requirement coverage
+- [ ] All new requirements have tests with `@pytest.mark.requirement()` markers
 - [ ] No security vulnerabilities (`bandit`, `pip-audit`, `safety`)
 - [ ] Standalone verification (no SaaS dependencies)
 - [ ] Google-style docstrings on public APIs
@@ -204,9 +209,10 @@ DuckDB (development), Snowflake, BigQuery, Redshift, Databricks, PostgreSQL, Spa
 1. **Lint Gate**: `black --check`, `isort --check`, `ruff check` must pass
 2. **Type Gate**: `mypy --strict` must pass
 3. **Security Gate**: `bandit -r packages/`, `pip-audit`, `safety check` must pass
-4. **Test Gate**: `pytest --cov` with > 80% coverage must pass
+4. **Test Gate**: `pytest --cov` with > 80% code coverage must pass
 5. **Contract Gate**: JSON Schema validation, backward compatibility check
 6. **SonarQube Gate**: Quality Gate must pass (A rating, 100% hotspots reviewed)
+7. **Traceability Gate**: `python -m testing.traceability --all --threshold 100` must pass
 
 **SonarQube Quality Standards:**
 
@@ -252,4 +258,4 @@ Constitution, the Constitution wins.
 - `docs/` - Architecture documentation (arc42 format)
 - `docs/adr/` - Architecture Decision Records
 
-**Version**: 1.1.0 | **Ratified**: 2025-12-15 | **Last Amended**: 2025-12-19
+**Version**: 1.2.0 | **Ratified**: 2025-12-15 | **Last Amended**: 2025-12-20

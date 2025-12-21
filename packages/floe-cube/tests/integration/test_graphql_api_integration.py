@@ -130,12 +130,18 @@ class TestGraphQLSchemaIntrospection:
     4. Dimensions and measures are exposed as fields
     """
 
+    @pytest.mark.requirement("006-FR-016")
+    @pytest.mark.requirement("005-FR-012")
     def test_graphql_endpoint_accessible(
         self,
         cube_client: httpx.Client,
         authenticated_headers: dict[str, str],
     ) -> None:
-        """GraphQL endpoint should be accessible and return valid response."""
+        """GraphQL endpoint should be accessible and return valid response.
+
+        Covers:
+        - 005-FR-012: System MUST expose GraphQL API with schema introspection
+        """
         # Simple query to verify endpoint works
         response = execute_graphql(
             cube_client,
@@ -151,12 +157,18 @@ class TestGraphQLSchemaIntrospection:
         # GraphQL should return either data or errors, not both empty
         assert "data" in data or "errors" in data, f"Invalid GraphQL response format: {data}"
 
+    @pytest.mark.requirement("006-FR-016")
+    @pytest.mark.requirement("005-FR-012")
     def test_schema_introspection_returns_types(
         self,
         cube_client: httpx.Client,
         authenticated_headers: dict[str, str],
     ) -> None:
-        """Schema introspection should return available types including cubes."""
+        """Schema introspection should return available types including cubes.
+
+        Covers:
+        - 005-FR-012: System MUST expose GraphQL API with schema introspection
+        """
         introspection_query = """
         {
             __schema {
@@ -188,12 +200,18 @@ class TestGraphQLSchemaIntrospection:
         # Should have standard GraphQL types
         assert "Query" in type_names, f"Missing Query type. Types: {type_names[:20]}"
 
+    @pytest.mark.requirement("006-FR-016")
+    @pytest.mark.requirement("005-FR-012")
     def test_cube_query_type_exists(
         self,
         cube_client: httpx.Client,
         authenticated_headers: dict[str, str],
     ) -> None:
-        """The 'cube' query field should exist in the schema."""
+        """The 'cube' query field should exist in the schema.
+
+        Covers:
+        - 005-FR-012: System MUST expose GraphQL API with schema introspection
+        """
         query = """
         {
             __type(name: "Query") {
@@ -226,12 +244,18 @@ class TestGraphQLSchemaIntrospection:
         # Cube exposes data through the 'cube' field
         assert "cube" in field_names, f"'cube' field not found in Query type. Fields: {field_names}"
 
+    @pytest.mark.requirement("006-FR-016")
+    @pytest.mark.requirement("005-FR-012")
     def test_orders_cube_introspection(
         self,
         cube_client: httpx.Client,
         authenticated_headers: dict[str, str],
     ) -> None:
-        """Orders cube should be introspectable with expected fields."""
+        """Orders cube should be introspectable with expected fields.
+
+        Covers:
+        - 005-FR-012: System MUST expose GraphQL API with schema introspection
+        """
         # Query to get the Orders type structure
         # Cube generates types like OrdersMembers for each cube
         query = """
@@ -287,6 +311,8 @@ class TestGraphQLNestedRelationships:
     3. Joined data respects defined cube joins
     """
 
+    @pytest.mark.requirement("006-FR-016")
+    @pytest.mark.requirement("005-FR-012")
     def test_basic_orders_query(
         self,
         cube_client: httpx.Client,
@@ -296,6 +322,9 @@ class TestGraphQLNestedRelationships:
 
         Note: First GraphQL data query may take longer due to Cube query compilation
         and Trino connection warm-up. We use retry logic to handle this.
+
+        Covers:
+        - 005-FR-012: System MUST expose GraphQL API with schema introspection
         """
         import time
 
@@ -361,12 +390,18 @@ class TestGraphQLNestedRelationships:
         # Should not reach here
         pytest.fail(f"Failed after {max_retries} attempts. Last error: {last_error}")
 
+    @pytest.mark.requirement("006-FR-016")
+    @pytest.mark.requirement("005-FR-012")
     def test_orders_query_with_dimensions(
         self,
         cube_client: httpx.Client,
         authenticated_headers: dict[str, str],
     ) -> None:
-        """Orders query with multiple dimensions should work."""
+        """Orders query with multiple dimensions should work.
+
+        Covers:
+        - 005-FR-012: System MUST expose GraphQL API with schema introspection
+        """
         query = """
         {
             cube {
@@ -406,12 +441,18 @@ class TestGraphQLNestedRelationships:
         assert "status" in orders_data, f"Missing 'status' in row: {first_row}"
         assert "region" in orders_data, f"Missing 'region' in row: {first_row}"
 
+    @pytest.mark.requirement("006-FR-016")
+    @pytest.mark.requirement("005-FR-012")
     def test_orders_query_with_time_dimension(
         self,
         cube_client: httpx.Client,
         authenticated_headers: dict[str, str],
     ) -> None:
-        """Orders query with time dimension granularity should work."""
+        """Orders query with time dimension granularity should work.
+
+        Covers:
+        - 005-FR-012: System MUST expose GraphQL API with schema introspection
+        """
         query = """
         {
             cube {
@@ -450,6 +491,9 @@ class TestGraphQLNestedRelationships:
         orders_data = first_row.get("orders", first_row)  # Handle both formats
         assert "createdAt" in orders_data, f"Missing 'createdAt' in row: {first_row}"
 
+    @pytest.mark.requirement("006-FR-016")
+    @pytest.mark.requirement("005-FR-012")
+    @pytest.mark.requirement("005-FR-008")
     def test_multi_cube_query(
         self,
         cube_client: httpx.Client,
@@ -460,6 +504,10 @@ class TestGraphQLNestedRelationships:
         Note: This tests the ability to query Orders and Customers together.
         The Customers cube is defined in testing/docker/cube-schema/Customers.js
         with a join to Orders via customer_id.
+
+        Covers:
+        - 005-FR-012: System MUST expose GraphQL API with schema introspection
+        - 005-FR-008: System MUST preserve dbt model relationships as Cube joins
         """
         query = """
         {
@@ -485,22 +533,23 @@ class TestGraphQLNestedRelationships:
 
         data = response.json()
 
-        if "errors" in data:
-            # Check if it's just a "Customers cube not available" error
-            # which is acceptable if the customers table doesn't exist
-            errors_str = str(data["errors"])
-            if "Customers" in errors_str or "customers" in errors_str:
-                pytest.skip("Customers cube not available (table may not exist)")
-            pytest.fail(f"GraphQL errors: {data['errors']}")
+        # Any GraphQL error should fail the test - no skipping
+        assert "errors" not in data, f"GraphQL errors: {data.get('errors')}"
 
         assert "data" in data, f"No data in response: {data}"
 
+    @pytest.mark.requirement("006-FR-016")
+    @pytest.mark.requirement("005-FR-012")
     def test_orders_with_filter(
         self,
         cube_client: httpx.Client,
         authenticated_headers: dict[str, str],
     ) -> None:
-        """Orders query with filter should return filtered data."""
+        """Orders query with filter should return filtered data.
+
+        Covers:
+        - 005-FR-012: System MUST expose GraphQL API with schema introspection
+        """
         query = """
         {
             cube {
@@ -536,12 +585,20 @@ class TestGraphQLNestedRelationships:
                     f"Filter not applied correctly. Expected 'completed', got: {row['status']}"
                 )
 
+    @pytest.mark.requirement("006-FR-016")
+    @pytest.mark.requirement("005-FR-012")
+    @pytest.mark.requirement("005-FR-014")
     def test_orders_with_limit(
         self,
         cube_client: httpx.Client,
         authenticated_headers: dict[str, str],
     ) -> None:
-        """Orders query with limit should respect the limit."""
+        """Orders query with limit should respect the limit.
+
+        Covers:
+        - 005-FR-012: System MUST expose GraphQL API with schema introspection
+        - 005-FR-014: System MUST support pagination for large result sets
+        """
         query = """
         {
             cube(limit: 5) {
@@ -583,6 +640,8 @@ class TestGraphQLEndpointConfiguration:
     3. Error responses follow GraphQL spec
     """
 
+    @pytest.mark.requirement("006-FR-016")
+    @pytest.mark.requirement("005-FR-012")
     def test_graphql_accepts_json_content_type(
         self,
         cube_client: httpx.Client,
@@ -599,12 +658,18 @@ class TestGraphQLEndpointConfiguration:
             f"JSON content type not accepted: {response.status_code}: {response.text}"
         )
 
+    @pytest.mark.requirement("006-FR-016")
+    @pytest.mark.requirement("005-FR-012")
     def test_graphql_returns_json_response(
         self,
         cube_client: httpx.Client,
         authenticated_headers: dict[str, str],
     ) -> None:
-        """GraphQL endpoint should return JSON response."""
+        """GraphQL endpoint should return JSON response.
+
+        Covers:
+        - 005-FR-012: System MUST expose GraphQL API with schema introspection
+        """
         response = execute_graphql(
             cube_client,
             "{ __typename }",
@@ -622,12 +687,18 @@ class TestGraphQLEndpointConfiguration:
         except Exception as e:
             pytest.fail(f"Response is not valid JSON: {e}")
 
+    @pytest.mark.requirement("006-FR-016")
+    @pytest.mark.requirement("005-FR-015")
     def test_graphql_invalid_query_returns_error(
         self,
         cube_client: httpx.Client,
         authenticated_headers: dict[str, str],
     ) -> None:
-        """Invalid GraphQL query should return errors in response."""
+        """Invalid GraphQL query should return errors in response.
+
+        Covers:
+        - 005-FR-015: System MUST return appropriate HTTP error codes for failed requests
+        """
         response = execute_graphql(
             cube_client,
             "{ invalidField }",
@@ -645,12 +716,18 @@ class TestGraphQLEndpointConfiguration:
         # Should have errors for invalid query
         assert "errors" in data, f"Expected errors for invalid query: {data}"
 
+    @pytest.mark.requirement("006-FR-016")
+    @pytest.mark.requirement("005-FR-015")
     def test_graphql_syntax_error_returns_error(
         self,
         cube_client: httpx.Client,
         authenticated_headers: dict[str, str],
     ) -> None:
-        """GraphQL syntax error should return error in response."""
+        """GraphQL syntax error should return error in response.
+
+        Covers:
+        - 005-FR-015: System MUST return appropriate HTTP error codes for failed requests
+        """
         response = execute_graphql(
             cube_client,
             "{ this is not valid graphql syntax",
@@ -666,12 +743,18 @@ class TestGraphQLEndpointConfiguration:
         data = response.json()
         assert "errors" in data, f"Expected errors for syntax error: {data}"
 
+    @pytest.mark.requirement("006-FR-016")
+    @pytest.mark.requirement("005-FR-015")
     def test_graphql_empty_query_returns_error(
         self,
         cube_client: httpx.Client,
         authenticated_headers: dict[str, str],
     ) -> None:
-        """Empty GraphQL query should return error."""
+        """Empty GraphQL query should return error.
+
+        Covers:
+        - 005-FR-015: System MUST return appropriate HTTP error codes for failed requests
+        """
         response = cube_client.post(
             "/cubejs-api/graphql",
             json={"query": ""},
@@ -690,12 +773,18 @@ class TestGraphQLEndpointConfiguration:
             f"Expected errors or null data for empty query: {data}"
         )
 
+    @pytest.mark.requirement("006-FR-016")
+    @pytest.mark.requirement("005-FR-015")
     def test_graphql_missing_query_returns_error(
         self,
         cube_client: httpx.Client,
         authenticated_headers: dict[str, str],
     ) -> None:
-        """Missing query field should return error."""
+        """Missing query field should return error.
+
+        Covers:
+        - 005-FR-015: System MUST return appropriate HTTP error codes for failed requests
+        """
         response = cube_client.post(
             "/cubejs-api/graphql",
             json={},
@@ -709,12 +798,18 @@ class TestGraphQLEndpointConfiguration:
             500,
         ), f"Unexpected status for missing query: {response.status_code}"
 
+    @pytest.mark.requirement("006-FR-016")
+    @pytest.mark.requirement("005-FR-012")
     def test_graphql_variables_work(
         self,
         cube_client: httpx.Client,
         authenticated_headers: dict[str, str],
     ) -> None:
-        """GraphQL variables should be supported."""
+        """GraphQL variables should be supported.
+
+        Covers:
+        - 005-FR-012: System MUST expose GraphQL API with schema introspection
+        """
         query = """
         query OrdersByStatus($limit: Int) {
             cube(limit: $limit) {

@@ -170,31 +170,27 @@ If you find yourself writing skips, ask: "What's the real problem here?"
 
 ## Test Execution Model (MANDATORY)
 
-| Test Type | Location | Execution Environment |
-|-----------|----------|----------------------|
-| Unit tests | `packages/*/tests/unit/` | Host (`uv run pytest`) |
-| Contract tests | `packages/*/tests/contract/` | Host (`uv run pytest`) |
-| **Integration tests** | `packages/*/tests/integration/` | **Docker (test-runner)** |
-| **E2E tests** | `packages/*/tests/e2e/` | **Docker (test-runner)** |
+**ALL tests run in Docker** for consistent hostname resolution and reliable execution.
 
-**Rules:**
-- Unit/contract tests: Fast, isolated, mock external dependencies, run on host
-- Integration tests: Require Docker services (DB, S3, Polaris), MUST run inside test-runner container
-- E2E tests: End-to-end workflows, MUST run inside test-runner container
+| Command | Description |
+|---------|-------------|
+| `make test` | Run ALL tests (unit + integration) in Docker |
+| `make test-unit` | Run unit tests only (no Docker, fast) |
+| `make test-integration` | Run integration tests only in Docker |
 
 **Local development:**
 ```bash
-# Unit tests (host)
-uv run pytest packages/<package>/tests/unit/ -v
+# Run ALL tests (recommended)
+make test
 
-# Integration tests (Docker)
-./testing/docker/scripts/run-integration-tests.sh
+# Or directly via script
+./testing/docker/scripts/run-all-tests.sh
 ```
 
-**Why Docker for integration tests?**
+**Why ALL tests in Docker?**
 - Docker networking resolves service hostnames (localstack, polaris, etc.)
 - Consistent environment between local development and CI
-- Tests that require S3, databases, or external services work reliably
+- No "works on my machine" issues - same environment everywhere
 
 ## Documentation: Google-Style Docstrings
 

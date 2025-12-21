@@ -166,3 +166,112 @@ class TestFloeTranslator:
 
         metadata = translator.get_metadata(node)
         assert metadata is not None
+
+    def test_get_tags_from_dbt_tags(
+        self,
+        translator: Any,
+        sample_dbt_manifest_node: dict[str, Any],
+    ) -> None:
+        """Test tag extraction includes dbt tags."""
+        tags = translator.get_tags(sample_dbt_manifest_node)
+
+        # Should include dbt tags with dbt: prefix
+        assert "dbt:pii" in tags or any("pii" in str(v) for v in tags.values())
+
+    def test_get_tags_includes_materialization(
+        self,
+        translator: Any,
+        sample_dbt_manifest_node: dict[str, Any],
+    ) -> None:
+        """Test tag extraction includes materialization."""
+        tags = translator.get_tags(sample_dbt_manifest_node)
+
+        # Should include materialization tag
+        assert "materialization" in tags
+        assert tags["materialization"] == "table"
+
+    def test_get_tags_includes_classification(
+        self,
+        translator: Any,
+        sample_dbt_manifest_node: dict[str, Any],
+    ) -> None:
+        """Test tag extraction includes floe classification."""
+        tags = translator.get_tags(sample_dbt_manifest_node)
+
+        # Should include classification from meta.floe
+        assert "classification" in tags
+        assert tags["classification"] == "internal"
+
+    def test_get_tags_empty_when_no_tags(
+        self,
+        translator: Any,
+    ) -> None:
+        """Test tags returns empty dict when no tags configured."""
+        node = {
+            "unique_id": "model.project.my_model",
+            "name": "my_model",
+            "schema": "analytics",
+            "database": "warehouse",
+            "config": {},  # No materialization
+            # No tags, no meta
+        }
+
+        tags = translator.get_tags(node)
+        assert isinstance(tags, dict)
+
+    def test_get_asset_key_fallback_to_name(
+        self,
+        translator: Any,
+    ) -> None:
+        """Test asset key falls back to name when no alias."""
+        node = {
+            "unique_id": "model.project.my_model",
+            "name": "my_model",
+            # No alias, no schema, no database
+        }
+
+        asset_key = translator.get_asset_key(node)
+        assert "my_model" in asset_key.path
+
+    def test_get_group_name_fallback_to_package(
+        self,
+        translator: Any,
+    ) -> None:
+        """Test group name falls back to package when no schema."""
+        node = {
+            "unique_id": "model.project.my_model",
+            "name": "my_model",
+            "package_name": "my_package",
+            # No schema
+        }
+
+        group = translator.get_group_name(node)
+        assert group == "my_package"
+
+    def test_get_group_name_none_when_nothing(
+        self,
+        translator: Any,
+    ) -> None:
+        """Test group name returns None when no schema or package."""
+        node = {
+            "unique_id": "model.project.my_model",
+            "name": "my_model",
+            # No schema, no package_name
+        }
+
+        group = translator.get_group_name(node)
+        assert group is None
+
+    def test_get_owners_none_when_no_floe_meta(
+        self,
+        translator: Any,
+    ) -> None:
+        """Test owners returns None when no floe meta."""
+        node = {
+            "unique_id": "model.project.my_model",
+            "name": "my_model",
+            "meta": {},  # No floe namespace
+        }
+
+        owners = translator.get_owners(node)
+        assert owners is None

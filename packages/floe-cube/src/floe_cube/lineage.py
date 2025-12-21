@@ -227,7 +227,7 @@ class QueryLineageEmitter:
         if self.enabled:
             self._init_client()
 
-    def _init_client(self) -> None:
+    def _init_client(self) -> None:  # pragma: no cover - integration tested
         """Initialize the OpenLineage client."""
         if not self.endpoint:
             return
@@ -377,7 +377,9 @@ class QueryLineageEmitter:
                 error=str(e),
             )
 
-    def _emit_event_internal(self, event: QueryLineageEvent) -> None:
+    def _emit_event_internal(  # pragma: no cover - integration tested
+        self, event: QueryLineageEvent
+    ) -> None:
         """Internal method to emit event to OpenLineage API.
 
         Args:

@@ -18,13 +18,13 @@ Prerequisites:
 from __future__ import annotations
 
 import os
-import time
 import uuid
 from collections.abc import Generator
 from typing import Any
 
 import httpx
 import pytest
+from testing.fixtures.services import poll_until
 
 # Mark all tests in this module as integration tests
 pytestmark = pytest.mark.integration
@@ -129,14 +129,23 @@ def emit_openlineage_event(
 
 
 class TestOpenLineageEventEmission:
-    """T080: Integration test events appear in Marquez."""
+    """T080: Integration test events appear in Marquez.
 
+    Covers: FR-025 (OpenLineage lineage emission to Marquez)
+    """
+
+    @pytest.mark.requirement("006-FR-025")
+    @pytest.mark.requirement("005-FR-020")
     def test_start_event_creates_run(
         self,
         marquez_client: httpx.Client,
         unique_job_name: str,
     ) -> None:
-        """START event should create a run in Marquez."""
+        """START event should create a run in Marquez.
+
+        Covers:
+        - 005-FR-020: Emit OpenLineage START event before query execution
+        """
         run_id = str(uuid.uuid4())
 
         # Emit START event
@@ -154,26 +163,35 @@ class TestOpenLineageEventEmission:
             201,
         ), f"Failed to emit START event: {response.status_code} - {response.text}"
 
-        # Give Marquez time to process
-        time.sleep(0.5)
+        # Poll until run appears in Marquez (replaces fixed sleep)
+        def fetch_runs() -> list[dict[str, Any]]:
+            run_response = marquez_client.get(
+                f"/api/v1/namespaces/{OPENLINEAGE_NAMESPACE}/jobs/{unique_job_name}/runs"
+            )
+            if run_response.status_code != 200:
+                return []
+            return run_response.json().get("runs", [])
 
-        # Verify run exists in Marquez
-        run_response = marquez_client.get(
-            f"/api/v1/namespaces/{OPENLINEAGE_NAMESPACE}/jobs/{unique_job_name}/runs"
+        runs = poll_until(
+            fetch_func=fetch_runs,
+            check_func=lambda r: run_id in [x["id"] for x in r],
+            timeout=5,
+            description="run to appear in Marquez",
         )
+        assert runs is not None, f"Run {run_id} not found in Marquez"
 
-        assert run_response.status_code == 200, f"Failed to get runs: {run_response.status_code}"
-
-        runs = run_response.json().get("runs", [])
-        run_ids = [r["id"] for r in runs]
-        assert run_id in run_ids, f"Run {run_id} not found in Marquez"
-
+    @pytest.mark.requirement("006-FR-025")
+    @pytest.mark.requirement("005-FR-021")
     def test_complete_event_marks_run_finished(
         self,
         marquez_client: httpx.Client,
         unique_job_name: str,
     ) -> None:
-        """COMPLETE event should mark run as finished."""
+        """COMPLETE event should mark run as finished.
+
+        Covers:
+        - 005-FR-021: Emit OpenLineage COMPLETE event after query success
+        """
         run_id = str(uuid.uuid4())
 
         # Emit START event
@@ -196,29 +214,39 @@ class TestOpenLineageEventEmission:
         )
         assert complete_response.status_code in (200, 201)
 
-        # Give Marquez time to process
-        time.sleep(0.5)
+        # Poll until run is marked as COMPLETED (replaces fixed sleep)
+        def fetch_run_state() -> dict[str, Any] | None:
+            run_response = marquez_client.get(
+                f"/api/v1/namespaces/{OPENLINEAGE_NAMESPACE}/jobs/{unique_job_name}/runs"
+            )
+            if run_response.status_code != 200:
+                return None
+            runs = run_response.json().get("runs", [])
+            return next((r for r in runs if r["id"] == run_id), None)
 
-        # Verify run is marked as completed by getting runs list
-        run_response = marquez_client.get(
-            f"/api/v1/namespaces/{OPENLINEAGE_NAMESPACE}/jobs/{unique_job_name}/runs"
+        run_data = poll_until(
+            fetch_func=fetch_run_state,
+            check_func=lambda r: r is not None and r.get("state") == "COMPLETED",
+            timeout=5,
+            description="run to be marked COMPLETED",
         )
-
-        assert run_response.status_code == 200
-        runs = run_response.json().get("runs", [])
-        run_data = next((r for r in runs if r["id"] == run_id), None)
-        assert run_data is not None, f"Run {run_id} not found"
-        # Marquez run states: NEW, RUNNING, COMPLETED, FAILED, ABORTED
+        assert run_data is not None, f"Run {run_id} not found or not COMPLETED"
         assert run_data.get("state") == "COMPLETED", (
             f"Expected COMPLETED, got {run_data.get('state')}"
         )
 
+    @pytest.mark.requirement("006-FR-025")
+    @pytest.mark.requirement("005-FR-022")
     def test_fail_event_marks_run_failed(
         self,
         marquez_client: httpx.Client,
         unique_job_name: str,
     ) -> None:
-        """FAIL event should mark run as failed."""
+        """FAIL event should mark run as failed.
+
+        Covers:
+        - 005-FR-022: Emit OpenLineage FAIL event after query failure
+        """
         run_id = str(uuid.uuid4())
 
         # Emit START event
@@ -241,26 +269,37 @@ class TestOpenLineageEventEmission:
         )
         assert fail_response.status_code in (200, 201)
 
-        # Give Marquez time to process
-        time.sleep(0.5)
+        # Poll until run is marked as FAILED (replaces fixed sleep)
+        def fetch_run_state() -> dict[str, Any] | None:
+            run_response = marquez_client.get(
+                f"/api/v1/namespaces/{OPENLINEAGE_NAMESPACE}/jobs/{unique_job_name}/runs"
+            )
+            if run_response.status_code != 200:
+                return None
+            runs = run_response.json().get("runs", [])
+            return next((r for r in runs if r["id"] == run_id), None)
 
-        # Verify run is marked as failed by getting runs list
-        run_response = marquez_client.get(
-            f"/api/v1/namespaces/{OPENLINEAGE_NAMESPACE}/jobs/{unique_job_name}/runs"
+        run_data = poll_until(
+            fetch_func=fetch_run_state,
+            check_func=lambda r: r is not None and r.get("state") == "FAILED",
+            timeout=5,
+            description="run to be marked FAILED",
         )
-
-        assert run_response.status_code == 200
-        runs = run_response.json().get("runs", [])
-        run_data = next((r for r in runs if r["id"] == run_id), None)
-        assert run_data is not None, f"Run {run_id} not found"
+        assert run_data is not None, f"Run {run_id} not found or not FAILED"
         assert run_data.get("state") == "FAILED", f"Expected FAILED, got {run_data.get('state')}"
 
+    @pytest.mark.requirement("006-FR-025")
+    @pytest.mark.requirement("005-FR-023")
     def test_namespace_created(
         self,
         marquez_client: httpx.Client,
         unique_job_name: str,
     ) -> None:
-        """Namespace should be created when event is emitted."""
+        """Namespace should be created when event is emitted.
+
+        Covers:
+        - 005-FR-023: Include cube name and query metadata in lineage events
+        """
         run_id = str(uuid.uuid4())
 
         # Emit event to create namespace
@@ -272,20 +311,36 @@ class TestOpenLineageEventEmission:
             event_type="START",
         )
 
-        time.sleep(0.5)
+        # Poll until namespace exists (replaces fixed sleep)
+        def fetch_namespace() -> dict[str, Any] | None:
+            ns_response = marquez_client.get(f"/api/v1/namespaces/{OPENLINEAGE_NAMESPACE}")
+            if ns_response.status_code != 200:
+                return None
+            return ns_response.json()
 
-        # Verify namespace exists
-        ns_response = marquez_client.get(f"/api/v1/namespaces/{OPENLINEAGE_NAMESPACE}")
+        ns_data = poll_until(
+            fetch_func=fetch_namespace,
+            check_func=lambda ns: ns is not None and ns.get("name") == OPENLINEAGE_NAMESPACE,
+            timeout=5,
+            description="namespace to be created",
+        )
+        assert ns_data is not None, "Namespace not created"
+        assert ns_data["name"] == OPENLINEAGE_NAMESPACE
 
-        assert ns_response.status_code == 200
-        assert ns_response.json()["name"] == OPENLINEAGE_NAMESPACE
-
+    @pytest.mark.requirement("006-FR-025")
+    @pytest.mark.requirement("005-FR-023")
+    @pytest.mark.requirement("005-FR-024")
     def test_job_created_with_inputs(
         self,
         marquez_client: httpx.Client,
         unique_job_name: str,
     ) -> None:
-        """Job should be created with input datasets."""
+        """Job should be created with input datasets.
+
+        Covers:
+        - 005-FR-023: Include cube name and query metadata in lineage events
+        - 005-FR-024: Include input/output dataset references in lineage events
+        """
         run_id = str(uuid.uuid4())
         inputs = ["orders", "customers"]
 
@@ -298,28 +353,52 @@ class TestOpenLineageEventEmission:
             inputs=inputs,
         )
 
-        time.sleep(0.5)
+        # Poll until job exists with inputs (replaces fixed sleep)
+        def fetch_job() -> dict[str, Any] | None:
+            job_response = marquez_client.get(
+                f"/api/v1/namespaces/{OPENLINEAGE_NAMESPACE}/jobs/{unique_job_name}"
+            )
+            if job_response.status_code != 200:
+                return None
+            return job_response.json()
 
-        # Verify job exists with inputs
-        job_response = marquez_client.get(
-            f"/api/v1/namespaces/{OPENLINEAGE_NAMESPACE}/jobs/{unique_job_name}"
+        def has_expected_inputs(job: dict[str, Any] | None) -> bool:
+            if job is None:
+                return False
+            input_names = [i["name"] for i in job.get("inputs", [])]
+            return all(inp in input_names for inp in inputs)
+
+        job_data = poll_until(
+            fetch_func=fetch_job,
+            check_func=has_expected_inputs,
+            timeout=5,
+            description="job with inputs to appear",
         )
-
-        assert job_response.status_code == 200
-        job_data = job_response.json()
+        assert job_data is not None, "Job not found"
         input_names = [i["name"] for i in job_data.get("inputs", [])]
         for expected_input in inputs:
             assert expected_input in input_names, f"Input {expected_input} not found in job inputs"
 
 
 class TestQueryLineageEmitterIntegration:
-    """Test QueryLineageEmitter with real Marquez backend."""
+    """Test QueryLineageEmitter with real Marquez backend.
 
+    Covers: FR-025 (OpenLineage lineage emission)
+    """
+
+    @pytest.mark.requirement("006-FR-025")
+    @pytest.mark.requirement("005-FR-020")
+    @pytest.mark.requirement("005-FR-021")
     def test_emitter_sends_to_marquez(
         self,
         marquez_client: httpx.Client,
     ) -> None:
-        """QueryLineageEmitter should send events to Marquez."""
+        """QueryLineageEmitter should send events to Marquez.
+
+        Covers:
+        - 005-FR-020: Emit OpenLineage START event before query execution
+        - 005-FR-021: Emit OpenLineage COMPLETE event after query success
+        """
         from floe_cube.lineage import QueryLineageEmitter
 
         # Create emitter pointing to Marquez
@@ -351,22 +430,36 @@ class TestQueryLineageEmitterIntegration:
             row_count=100,
         )
 
-        time.sleep(1)
-
-        # Verify run exists in Marquez
+        # Poll until run exists in Marquez (replaces fixed sleep)
         job_name = f"cube.{cube_name}.query"
-        run_response = marquez_client.get(
-            f"/api/v1/namespaces/{OPENLINEAGE_NAMESPACE}/jobs/{job_name}/runs"
-        )
 
-        # May get 404 if openlineage client version incompatible
-        if run_response.status_code == 200:
-            runs = run_response.json().get("runs", [])
+        def fetch_runs() -> list[dict[str, Any]]:
+            run_response = marquez_client.get(
+                f"/api/v1/namespaces/{OPENLINEAGE_NAMESPACE}/jobs/{job_name}/runs"
+            )
+            if run_response.status_code != 200:
+                return []
+            return run_response.json().get("runs", [])
+
+        # May get 404 if openlineage client version incompatible - poll tolerates this
+        runs = poll_until(
+            fetch_func=fetch_runs,
+            check_func=lambda r: any(x.get("id", {}).get("runId") == run_id for x in r),
+            timeout=5,
+            description="run to appear in Marquez",
+        )
+        if runs:
             run_ids = [r["id"]["runId"] for r in runs]
             assert run_id in run_ids, f"Run {run_id} not found in Marquez"
 
+    @pytest.mark.requirement("006-FR-025")
+    @pytest.mark.requirement("005-FR-029")
     def test_emitter_handles_connection_error_gracefully(self) -> None:
-        """Emitter should handle connection errors without raising."""
+        """Emitter should handle connection errors without raising.
+
+        Covers:
+        - 005-FR-029: Support disabling lineage via configuration (graceful degradation)
+        """
         from floe_cube.lineage import QueryLineageEmitter
 
         # Create emitter pointing to non-existent endpoint

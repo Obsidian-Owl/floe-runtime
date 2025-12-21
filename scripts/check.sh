@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pre-push validation script - mirrors CI checks exactly
+# Pre-push validation script - uses standardized Makefile targets
 # Run this before pushing to catch issues early
 
 set -e
@@ -10,25 +10,19 @@ echo ""
 cd "$(git rev-parse --show-toplevel)"
 
 echo "📋 Lint checks..."
-uv run ruff check .
-uv run ruff format --check .
-uv run isort --check packages/
-echo "✅ Lint passed"
+make lint
 echo ""
 
 echo "🔬 Type check..."
-uv run mypy --strict packages/*/src/
-echo "✅ Type check passed"
+make typecheck
 echo ""
 
 echo "🔒 Security scan..."
-uv run bandit -r packages/*/src/ -ll -q
-echo "✅ Security scan passed"
+make security
 echo ""
 
-echo "🧪 Tests..."
-uv run pytest packages/*/tests/ -q --tb=short
-echo "✅ Tests passed"
+echo "🧪 Unit Tests (integration tests run in Docker CI)..."
+make test-unit
 echo ""
 
 echo "🎉 All checks passed! Safe to push."

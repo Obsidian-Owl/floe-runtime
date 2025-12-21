@@ -177,6 +177,7 @@ Available markers (defined in `pyproject.toml`):
 | `adapter` | Specific compute adapter | `@pytest.mark.adapter("snowflake")` |
 | `requires_dbt` | Require dbt-core installed | `@pytest.mark.requires_dbt` |
 | `requires_container` | Require Docker | `@pytest.mark.requires_container` |
+| `requirement` | Links test to spec requirement | `@pytest.mark.requirement("006-FR-012")` |
 
 ### Running by Marker
 
@@ -193,6 +194,79 @@ uv run pytest -m contract -v
 # Exclude integration and slow
 uv run pytest -m "not integration and not slow" -v
 ```
+
+## Requirement Traceability Markers
+
+### The @pytest.mark.requirement Marker
+
+Every integration test MUST have at least one requirement marker linking it to
+a functional requirement in the specification. This enables traceability between
+specs and tests.
+
+```python
+@pytest.mark.requirement("006-FR-012")  # Covers integration test coverage for floe-polaris
+@pytest.mark.requirement("004-FR-001")  # Covers Polaris REST catalog connection
+def test_create_catalog():
+    """Test catalog creation with OAuth2 authentication.
+
+    Covers:
+    - 006-FR-012: floe-polaris MUST have integration tests
+    - 004-FR-001: System MUST connect to Polaris REST catalogs
+    """
+    pass
+```
+
+### Requirement ID Format
+
+Use feature-scoped format: `{feature}-FR-{id}`
+
+| Example | Meaning |
+|---------|---------|
+| `006-FR-012` | Feature 006 (Integration Testing), Requirement FR-012 |
+| `004-FR-001` | Feature 004 (Storage Catalog), Requirement FR-001 |
+| `001-FR-005` | Feature 001 (Core Foundation), Requirement FR-005 |
+
+### Multi-Feature Coverage
+
+A single test can satisfy requirements from multiple features (N-dimensional):
+
+```python
+@pytest.mark.requirement("006-FR-012")  # Meta: tests exist
+@pytest.mark.requirement("004-FR-001")  # Functional: REST connection
+@pytest.mark.requirement("004-FR-002")  # Functional: OAuth2 auth
+def test_polaris_connection():
+    """Test that covers requirements from multiple features."""
+    ...
+```
+
+### Running Traceability Reports
+
+```bash
+# Generate multi-feature report
+python -m testing.traceability --all
+
+# Verify 100% coverage (CI gate)
+python -m testing.traceability --all --threshold 100
+
+# Single feature report
+python -m testing.traceability --feature-id 006
+
+# JSON output for CI
+python -m testing.traceability --all --format json
+```
+
+### Coverage Requirement
+
+**100% coverage is MANDATORY.** The traceability report MUST show no gaps
+before features can be considered complete. This is enforced as a CI gate.
+
+If the traceability report shows gaps:
+
+1. Review the uncovered requirements in the spec file
+2. Identify which tests should cover the requirement
+3. Add `@pytest.mark.requirement()` markers to existing tests, OR
+4. Write new tests if no existing test covers the requirement
+5. Re-run the report until 100% coverage achieved
 
 ## Tests FAIL, Never Skip (CRITICAL PHILOSOPHY)
 

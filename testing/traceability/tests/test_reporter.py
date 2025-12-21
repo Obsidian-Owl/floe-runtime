@@ -3,6 +3,10 @@
 These tests verify the generate_matrix function that orchestrates
 requirement parsing, test scanning, and mapping to create a complete
 TraceabilityMatrix.
+
+Covers:
+- FR-002: Coverage gap reporting (reporter identifies uncovered requirements)
+- FR-003: Coverage reports per feature (generate_matrix creates per-feature reports)
 """
 
 from __future__ import annotations
@@ -46,8 +50,12 @@ class TestGenerateMatrix:
         assert matrix.mappings == []
         assert matrix.get_coverage_percentage() == pytest.approx(100.0)  # Empty = 100%
 
+    @pytest.mark.requirement("006-FR-002")
     def test_generate_matrix_with_uncovered_requirements(self, tmp_path: Path) -> None:
-        """Generate matrix with requirements but no tests."""
+        """Generate matrix with requirements but no tests.
+
+        Covers: FR-002 (coverage gap reporting - identifies uncovered requirements)
+        """
         from testing.traceability.reporter import generate_matrix
 
         # Create spec file with requirements
@@ -82,8 +90,12 @@ class TestGenerateMatrix:
         assert len(matrix.mappings) == 2
         assert matrix.get_coverage_percentage() == pytest.approx(0.0)
 
+    @pytest.mark.requirement("006-FR-003")
     def test_generate_matrix_with_covered_requirements(self, tmp_path: Path) -> None:
-        """Generate matrix with matching requirements and tests."""
+        """Generate matrix with matching requirements and tests.
+
+        Covers: FR-003 (coverage reports per feature)
+        """
         from testing.traceability.reporter import generate_matrix
 
         # Create spec file
@@ -104,7 +116,7 @@ class TestGenerateMatrix:
             """
             import pytest
 
-            @pytest.mark.requirement("FR-001")
+            @pytest.mark.requirement("006-FR-001")
             def test_traceability():
                 pass
         """
@@ -147,7 +159,7 @@ class TestGenerateMatrix:
             """
             import pytest
 
-            @pytest.mark.requirement("FR-001")
+            @pytest.mark.requirement("006-FR-001")
             def test_first():
                 pass
         """
@@ -209,7 +221,7 @@ class TestGenerateMatrix:
             """
             import pytest
 
-            @pytest.mark.requirement("FR-001")
+            @pytest.mark.requirement("006-FR-001")
             def test_from_dir1():
                 pass
         """
@@ -222,7 +234,7 @@ class TestGenerateMatrix:
             """
             import pytest
 
-            @pytest.mark.requirement("FR-001")
+            @pytest.mark.requirement("006-FR-001")
             def test_from_dir2():
                 pass
         """
@@ -296,7 +308,7 @@ class TestGenerateMatrixGaps:
             """
             import pytest
 
-            @pytest.mark.requirement("FR-001")
+            @pytest.mark.requirement("006-FR-001")
             def test_covered():
                 pass
         """
@@ -448,7 +460,7 @@ class TestFormatConsoleReport:
             """
             import pytest
 
-            @pytest.mark.requirement("FR-001")
+            @pytest.mark.requirement("006-FR-001")
             def test_covered():
                 pass
         """
@@ -613,7 +625,7 @@ class TestFormatJsonReport:
             """
             import pytest
 
-            @pytest.mark.requirement("FR-001")
+            @pytest.mark.requirement("006-FR-001")
             def test_covered():
                 pass
         """

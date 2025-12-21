@@ -22,11 +22,11 @@ Note: This test validates that:
 from __future__ import annotations
 
 import os
-import time
 from typing import TYPE_CHECKING, Any
 
 import httpx
 import pytest
+from testing.fixtures.services import poll_until
 
 from floe_cube.models import SpanKind, SpanStatus
 from floe_cube.tracing import QueryTracer
@@ -103,17 +103,21 @@ def _wait_for_traces(
     if operation:
         params["operation"] = operation
 
-    start_time = time.time()
-    while time.time() - start_time < max_wait_seconds:
+    def fetch_traces() -> list[dict[str, Any]]:
         response = client.get("/api/traces", params=params)
         if response.status_code == 200:
             data = response.json()
-            traces = data.get("data", [])
-            if traces:
-                return traces
-        time.sleep(poll_interval)
+            return data.get("data", [])
+        return []
 
-    return []
+    result = poll_until(
+        fetch_func=fetch_traces,
+        check_func=lambda traces: len(traces) > 0,
+        timeout=max_wait_seconds,
+        poll_interval=poll_interval,
+        description="traces to appear in Jaeger",
+    )
+    return result if result is not None else []
 
 
 class TestTracesAppearInJaeger:
@@ -124,6 +128,9 @@ class TestTracesAppearInJaeger:
     FR-033: Support W3C Trace Context propagation
     """
 
+    @pytest.mark.requirement("006-FR-024")
+    @pytest.mark.requirement("005-FR-031")
+    @pytest.mark.requirement("005-FR-032")
     def test_tracer_emits_spans_to_jaeger(
         self,
         jaeger_client: httpx.Client,
@@ -134,6 +141,10 @@ class TestTracesAppearInJaeger:
         1. Create a QueryTracer with OTLP endpoint
         2. Emit a trace span
         3. Query Jaeger API to verify span arrived
+
+        Covers:
+        - 005-FR-031: Emit OpenTelemetry trace for each query
+        - 005-FR-032: Include safe metadata in spans
         """
         # Note: This test uses the QueryTracer model-based approach.
         # The actual OTLP export would require additional OTel SDK setup
@@ -166,11 +177,17 @@ class TestTracesAppearInJaeger:
             assert span.attributes["cube.dimensions_count"] == 2
             assert span.attributes["cube.filter_count"] == 3
 
+    @pytest.mark.requirement("006-FR-024")
+    @pytest.mark.requirement("005-FR-031")
     def test_span_hierarchy_created(
         self,
         jaeger_client: httpx.Client,
     ) -> None:
-        """Test that child spans maintain parent relationship."""
+        """Test that child spans maintain parent relationship.
+
+        Covers:
+        - 005-FR-031: Emit OpenTelemetry trace for each query
+        """
         tracer = QueryTracer(
             service_name=TEST_SERVICE_NAME,
             enabled=True,
@@ -198,13 +215,16 @@ class TestTracesAppearInJaeger:
             assert execute_span.parent_span_id == parent_span.span_id
             assert execute_span.trace_id == parent_span.trace_id
 
+    @pytest.mark.requirement("006-FR-024")
+    @pytest.mark.requirement("005-FR-033")
     def test_w3c_trace_context_propagation(
         self,
         jaeger_client: httpx.Client,
     ) -> None:
         """Test W3C Trace Context extraction from headers.
 
-        FR-033: Support W3C Trace Context propagation
+        Covers:
+        - 005-FR-033: Support W3C Trace Context propagation
         """
         tracer = QueryTracer(
             service_name=TEST_SERVICE_NAME,
@@ -226,11 +246,19 @@ class TestTracesAppearInJaeger:
             # Should have parent set to incoming span
             assert span.parent_span_id == incoming_parent_id
 
+    @pytest.mark.requirement("006-FR-024")
+    @pytest.mark.requirement("005-FR-031")
+    @pytest.mark.requirement("005-FR-032")
     def test_query_result_recording(
         self,
         jaeger_client: httpx.Client,
     ) -> None:
-        """Test that query results are recorded in spans."""
+        """Test that query results are recorded in spans.
+
+        Covers:
+        - 005-FR-031: Emit OpenTelemetry trace for each query
+        - 005-FR-032: Include safe metadata in spans
+        """
         tracer = QueryTracer(
             service_name=TEST_SERVICE_NAME,
             enabled=True,
@@ -251,11 +279,19 @@ class TestTracesAppearInJaeger:
             assert updated_span.status == SpanStatus.OK
             assert updated_span.end_time is not None
 
+    @pytest.mark.requirement("006-FR-024")
+    @pytest.mark.requirement("005-FR-031")
+    @pytest.mark.requirement("005-FR-035")
     def test_error_recording(
         self,
         jaeger_client: httpx.Client,
     ) -> None:
-        """Test that errors are recorded in spans."""
+        """Test that errors are recorded in spans.
+
+        Covers:
+        - 005-FR-031: Emit OpenTelemetry trace for each query
+        - 005-FR-035: Include error type in span when query fails
+        """
         tracer = QueryTracer(
             service_name=TEST_SERVICE_NAME,
             enabled=True,
@@ -275,14 +311,17 @@ class TestTracesAppearInJaeger:
             assert updated_span.attributes["cube.error_type"] == "ValidationError"
             assert updated_span.status == SpanStatus.ERROR
 
+    @pytest.mark.requirement("006-FR-024")
+    @pytest.mark.requirement("005-FR-032")
     def test_safe_attributes_only(
         self,
         jaeger_client: httpx.Client,
     ) -> None:
         """Test that forbidden attributes are filtered.
 
-        FR-032: Include safe metadata in spans (cube name, filter count)
-        NEVER include filter values, JWT claims, or row data.
+        Covers:
+        - 005-FR-032: Include safe metadata in spans (cube name, filter count)
+          NEVER include filter values, JWT claims, or row data.
         """
         tracer = QueryTracer(
             service_name=TEST_SERVICE_NAME,
@@ -311,13 +350,16 @@ class TestTracesAppearInJaeger:
             assert "jwt_token" not in updated_span.attributes
             assert "password" not in updated_span.attributes
 
+    @pytest.mark.requirement("006-FR-024")
+    @pytest.mark.requirement("005-FR-036")
     def test_disabled_tracing_produces_no_spans(
         self,
         jaeger_client: httpx.Client,
     ) -> None:
         """Test that disabled tracing produces no spans.
 
-        FR-036: Support disabling tracing via configuration
+        Covers:
+        - 005-FR-036: Support disabling tracing via configuration
         """
         tracer = QueryTracer(
             service_name=TEST_SERVICE_NAME,
@@ -335,6 +377,8 @@ class TestTracesAppearInJaeger:
         )
         assert child is None
 
+    @pytest.mark.requirement("006-FR-024")
+    @pytest.mark.requirement("005-FR-031")
     def test_jaeger_query_api_available(
         self,
         jaeger_client: httpx.Client,
@@ -342,6 +386,9 @@ class TestTracesAppearInJaeger:
         """Verify Jaeger Query API is available and returns services.
 
         This validates the test infrastructure is correctly configured.
+
+        Covers:
+        - 005-FR-031: Emit OpenTelemetry trace for each query
         """
         # Query available services
         response = jaeger_client.get("/api/services")
@@ -352,13 +399,17 @@ class TestTracesAppearInJaeger:
         # Services list may or may not have entries depending on what's been traced
         assert isinstance(data["data"], list)
 
+    @pytest.mark.requirement("006-FR-024")
+    @pytest.mark.requirement("006-FR-025")
+    @pytest.mark.requirement("005-FR-034")
     def test_openlineage_run_id_linking(
         self,
         jaeger_client: httpx.Client,
     ) -> None:
         """Test that OpenLineage run_id is included in spans.
 
-        FR-034: Link to OpenLineage run_id in trace spans
+        Covers:
+        - 005-FR-034: Link to OpenLineage run_id in trace spans
         """
         tracer = QueryTracer(
             service_name=TEST_SERVICE_NAME,

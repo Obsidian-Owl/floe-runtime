@@ -63,8 +63,9 @@ if [[ -n "$SPEC_DIR" && -f "${SPEC_DIR}/spec.md" ]]; then
 fi
 
 # Find test directories with requirement markers
+# Include: packages/*/tests/integration, packages/*/tests/e2e, testing/tests
 TEST_DIRS=""
-for pkg_dir in packages/*/tests/integration packages/*/tests/e2e; do
+for pkg_dir in packages/*/tests/integration packages/*/tests/e2e testing/tests testing/traceability/tests; do
     if [[ -d "$pkg_dir" ]]; then
         if [[ -n "$TEST_DIRS" ]]; then
             TEST_DIRS="$TEST_DIRS,$pkg_dir"
