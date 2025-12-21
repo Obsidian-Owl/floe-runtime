@@ -1,0 +1,120 @@
+# ArgoCD ApplicationSet for multi-environment deployment
+#
+# Deploy with: kubectl apply -f applicationset.yaml
+#
+# This creates one Application per environment (dev, staging, prod),
+# promoting through environments via Git branches or directories.
+#
+# Covers: 007-FR-003 (environment promotion pipeline)
+# Covers: 007-FR-004 (GitOps deployment with ArgoCD)
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: floe-runtime-environments
+  namespace: argocd
+spec:
+  # Generate applications from a list of environments
+  generators:
+    - list:
+        elements:
+          - env: dev
+            namespace: floe-dev
+            cluster: https://kubernetes.default.svc
+            valuesFile: examples/environments/dev/values.yaml
+            autoSync: true
+          - env: staging
+            namespace: floe-staging
+            cluster: https://kubernetes.default.svc
+            valuesFile: examples/environments/staging/values.yaml
+            autoSync: true
+          - env: prod
+            namespace: floe-prod
+            cluster: https://kubernetes.default.svc
+            valuesFile: examples/environments/prod/values.yaml
+            autoSync: false  # Manual sync for production
+
+  template:
+    metadata:
+      name: 'floe-runtime-{{env}}'
+      namespace: argocd
+      labels:
+        app.kubernetes.io/environment: '{{env}}'
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+
+    spec:
+      project: default
+
+      source:
+        repoURL: https://github.com/your-org/floe-project
+        targetRevision: HEAD
+        path: charts/floe-runtime
+
+        helm:
+          valueFiles:
+            - values.yaml
+            - '../../{{valuesFile}}'
+
+          parameters:
+            - name: global.labels.environment
+              value: '{{env}}'
+
+      destination:
+        server: '{{cluster}}'
+        namespace: '{{namespace}}'
+
+      syncPolicy:
+        automated:
+          prune: '{{autoSync}}'
+          selfHeal: '{{autoSync}}'
+
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+
+      info:
+        - name: Environment
+          value: '{{env}}'
+
+---
+# Optional: Progressive sync policy for canary deployments
+# Uncomment to enable progressive delivery
+#
+# apiVersion: argoproj.io/v1alpha1
+# kind: ApplicationSet
+# metadata:
+#   name: floe-runtime-progressive
+#   namespace: argocd
+# spec:
+#   generators:
+#     - git:
+#         repoURL: https://github.com/your-org/floe-project
+#         revision: HEAD
+#         directories:
+#           - path: examples/environments/*
+#   strategy:
+#     type: RollingSync
+#     rollingSync:
+#       steps:
+#         - matchExpressions:
+#             - key: env
+#               operator: In
+#               values:
+#                 - dev
+#         - matchExpressions:
+#             - key: env
+#               operator: In
+#               values:
+#                 - staging
+#         - matchExpressions:
+#             - key: env
+#               operator: In
+#               values:
+#                 - prod
