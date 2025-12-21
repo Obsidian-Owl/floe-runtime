@@ -1,0 +1,131 @@
+{
+  "feature": "007-deployment-automation",
+  "generated": "2025-12-21",
+  "source": "tasks.md",
+  "total_tasks": 97,
+  "mapping": {
+    "phase1_setup": {
+      "T001": "floe-runtime-pis2",
+      "T002": "floe-runtime-cq9w",
+      "T003": "floe-runtime-r7mb",
+      "T004": "floe-runtime-cwxz",
+      "T005": "floe-runtime-h4hs",
+      "T006": "floe-runtime-kdoo",
+      "T007": "floe-runtime-tkts",
+      "T008": "floe-runtime-b799",
+      "T009": "floe-runtime-ddhi",
+      "T010": "floe-runtime-zhpq"
+    },
+    "phase2_foundational": {
+      "T011": "floe-runtime-sdvv",
+      "T012": "floe-runtime-th2m",
+      "T013": "floe-runtime-v7bi",
+      "T014": "floe-runtime-28vz",
+      "T015": "floe-runtime-qv9v",
+      "T016": "floe-runtime-5ojy"
+    },
+    "phase3_us1_kubernetes": {
+      "T017": "floe-runtime-mqp1",
+      "T018": "floe-runtime-wco6",
+      "T019": "floe-runtime-0n0o",
+      "T020": "floe-runtime-v7dw",
+      "T021": "floe-runtime-b5fk",
+      "T022": "floe-runtime-wmr8",
+      "T023": "floe-runtime-zosw",
+      "T024": "floe-runtime-7dyl",
+      "T025": "floe-runtime-px20"
+    },
+    "phase4_us2_gitops": {
+      "T026": "floe-runtime-hjdo",
+      "T027": "floe-runtime-pvjn",
+      "T028": "floe-runtime-11cl",
+      "T029": "floe-runtime-7igh",
+      "T030": "floe-runtime-cq55",
+      "T031": "floe-runtime-6zr9",
+      "T032": "floe-runtime-6ff6"
+    },
+    "phase5_us3_preflight": {
+      "T033": "floe-runtime-hmgv",
+      "T034": "floe-runtime-trf7",
+      "T035": "floe-runtime-5q4o",
+      "T036": "floe-runtime-9xwf",
+      "T037": "floe-runtime-tu2x",
+      "T038": "floe-runtime-aunb",
+      "T039": "floe-runtime-p7iv",
+      "T040": "floe-runtime-cr4p",
+      "T041": "floe-runtime-9d3y",
+      "T042": "floe-runtime-s77r",
+      "T043": "floe-runtime-6qby",
+      "T044": "floe-runtime-teb9",
+      "T045": "floe-runtime-mazf",
+      "T046": "floe-runtime-4m3i",
+      "T047": "floe-runtime-4f0h"
+    },
+    "phase6_us4_secrets": {
+      "T048": "floe-runtime-yuqk",
+      "T049": "floe-runtime-v2g9",
+      "T050": "floe-runtime-1a2t",
+      "T051": "floe-runtime-qiph",
+      "T052": "floe-runtime-xu69",
+      "T053": "floe-runtime-k83k",
+      "T054": "floe-runtime-z7cq"
+    },
+    "phase7_us5_cube": {
+      "T055": "floe-runtime-dyfx",
+      "T056": "floe-runtime-1qzr",
+      "T057": "floe-runtime-27a8",
+      "T058": "floe-runtime-7xl4",
+      "T059": "floe-runtime-0fvv",
+      "T060": "floe-runtime-nhac",
+      "T061": "floe-runtime-ncra",
+      "T062": "floe-runtime-l6fm",
+      "T063": "floe-runtime-w40v"
+    },
+    "phase8_us6_e2e_demo": {
+      "T064": "floe-runtime-1j9n",
+      "T065": "floe-runtime-4b77",
+      "T066": "floe-runtime-8v2y",
+      "T067": "floe-runtime-er5h",
+      "T068": "floe-runtime-ftkh",
+      "T069": "floe-runtime-2i5l",
+      "T070": "floe-runtime-a6wn",
+      "T071": "floe-runtime-1ylk",
+      "T072": "floe-runtime-27te",
+      "T073": "floe-runtime-lokn",
+      "T074": "floe-runtime-rhmw",
+      "T075": "floe-runtime-180d",
+      "T076": "floe-runtime-brkd",
+      "T077": "floe-runtime-av5j",
+      "T078": "floe-runtime-ccua",
+      "T079": "floe-runtime-m9xp",
+      "T080": "floe-runtime-hvai",
+      "T081": "floe-runtime-tp0t",
+      "T082": "floe-runtime-gich",
+      "T083": "floe-runtime-cfxi",
+      "T084": "floe-runtime-euvk",
+      "T085": "floe-runtime-jnnf",
+      "T086": "floe-runtime-1868",
+      "T087": "floe-runtime-jrd3",
+      "T088": "floe-runtime-7d9b",
+      "T089": "floe-runtime-5iu4"
+    },
+    "phase9_polish": {
+      "T090": "floe-runtime-fgq3",
+      "T091": "floe-runtime-531j",
+      "T092": "floe-runtime-jofm",
+      "T093": "floe-runtime-l2o5",
+      "T094": "floe-runtime-0lc2",
+      "T095": "floe-runtime-1n2d",
+      "T096": "floe-runtime-uyxm",
+      "T097": "floe-runtime-z841"
+    }
+  },
+  "dependencies": [
+    {"from": "floe-runtime-mqp1", "to": "floe-runtime-sdvv", "reason": "US1 depends on Foundational Dockerfiles"},
+    {"from": "floe-runtime-hjdo", "to": "floe-runtime-mqp1", "reason": "US2 depends on US1 Helm charts"},
+    {"from": "floe-runtime-dyfx", "to": "floe-runtime-th2m", "reason": "US5 depends on Foundational Cube Dockerfile"},
+    {"from": "floe-runtime-1j9n", "to": "floe-runtime-v7bi", "reason": "US6 depends on Foundational OrderItem schema"},
+    {"from": "floe-runtime-fgq3", "to": "floe-runtime-px20", "reason": "Polish docs depend on US1 helm template"},
+    {"from": "floe-runtime-z841", "to": "floe-runtime-jrd3", "reason": "Polish integration tests depend on US6 E2E tests"}
+  ]
+}
