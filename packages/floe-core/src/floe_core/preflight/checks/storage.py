@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import socket
 from typing import Any
+from urllib.parse import urlparse
 
 import structlog
 
@@ -22,6 +23,9 @@ logger = structlog.get_logger(__name__)
 
 # Localhost addresses - allow HTTP for local development
 LOCALHOST_ADDRESSES = frozenset({"localhost", "127.0.0.1", "::1"})
+
+# S5332: Define secure protocol constant
+SECURE_SCHEME = "https"
 
 
 def _is_localhost(host: str) -> bool:
@@ -39,21 +43,30 @@ def _is_localhost(host: str) -> bool:
 def _parse_endpoint(endpoint: str) -> tuple[str, bool]:
     """Parse endpoint URL to extract host and detect insecure protocol.
 
-    S5332: Flag HTTP usage for non-localhost endpoints as security concern.
+    S5332: Flag non-HTTPS usage for non-localhost endpoints as security concern.
+    Uses urllib.parse for proper URL handling.
 
     Args:
-        endpoint: Endpoint URL (may include http:// or https://)
+        endpoint: Endpoint URL (may include protocol scheme)
 
     Returns:
-        Tuple of (host, is_insecure) where is_insecure is True if HTTP
+        Tuple of (host, is_insecure) where is_insecure is True if non-HTTPS
         is used for a non-localhost host.
     """
-    is_http = endpoint.startswith("http://")
-    # Strip protocol prefix
-    host = endpoint.replace("https://", "").replace("http://", "").split(":")[0]
+    # Use urllib.parse to properly extract URL components (S5332 compliant)
+    parsed = urlparse(endpoint)
 
-    # HTTP is only acceptable for localhost development
-    is_insecure = is_http and not _is_localhost(host)
+    # Extract hostname - use netloc for URLs with scheme, otherwise treat as host
+    if parsed.scheme and parsed.netloc:
+        host = parsed.hostname or parsed.netloc.split(":")[0]
+        is_secure = parsed.scheme.lower() == SECURE_SCHEME
+    else:
+        # No scheme - treat entire endpoint as host (after stripping port)
+        host = endpoint.split(":")[0]
+        is_secure = True  # Assume secure if no scheme specified
+
+    # Non-HTTPS is only acceptable for localhost development
+    is_insecure = not is_secure and not _is_localhost(host)
 
     return host, is_insecure
 
