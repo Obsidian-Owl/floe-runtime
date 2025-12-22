@@ -335,6 +335,70 @@ docker exec floe-dagster-webserver python -c "import demo.orchestration"
 
 ---
 
+## Understanding the Demo Environment
+
+### Why Jaeger Shows No Traces
+
+The demo assets are **placeholder implementations** that return mock data. They don't execute real operations (dbt runs, API calls) and therefore don't generate traces.
+
+```python
+# Current demo asset (placeholder - no spans created)
+def synthetic_data() -> dict[str, int]:
+    return {"customers": 100, "products": 50, ...}
+```
+
+**The tracing infrastructure is fully implemented** in `floe-dagster`:
+- `TracingManager` with OpenTelemetry integration
+- OTLP exporter configured for Jaeger
+- Span creation, attributes, and error recording
+
+**To see traces**: Use the full `FloeAssetFactory` which automatically instruments assets, or manually add `TracingManager.start_span()` calls.
+
+### Why Marquez Shows No Lineage
+
+OpenLineage emission is **disabled in the demo configuration** and demo assets don't emit lineage events.
+
+**The lineage infrastructure is fully implemented** in `floe-dagster`:
+- `OpenLineageEmitter` with START/COMPLETE/FAIL lifecycle
+- Dataset tracking (inputs/outputs)
+- Integration with `FloeAssetFactory`
+
+**To see lineage**: Enable `lineage.enabled: true` in configuration and use assets that emit OpenLineage events.
+
+### DuckDB vs Trino
+
+The architecture supports **both compute engines** for different use cases:
+
+| Engine | Use Case | Admin UI |
+|--------|----------|----------|
+| **DuckDB** | Local development, embedded | None (use DBeaver, VS Code SQLTools) |
+| **Trino** | Integration testing with Iceberg/Polaris | http://localhost:8080 |
+
+- **DuckDB** is the default compute target for local development (fast, zero-config)
+- **Trino** is used in Docker Compose for integration testing (Iceberg table operations, OAuth2 with Polaris)
+- Both are valid - the architecture is target-agnostic
+
+See `docs/03-solution-strategy.md` for the "Target agnostic" design principle.
+
+### Cube Pre-Aggregation Warning
+
+The warning "consider using external pre-aggregation" is **expected and correct** for this demo environment.
+
+| Setting | Environment | Storage Location |
+|---------|-------------|------------------|
+| `external: false` | Dev/Testing | Source database (Trino) |
+| `external: true` | Production | Cube Store + S3/GCS |
+
+**Current configuration is intentional**:
+- No cloud storage dependency (S3/GCS not required)
+- Pre-aggregations stored in Trino tables
+- Sufficient for single-user development
+- Warning is informational, not an error
+
+**For production**: Enable `external: true` with Cube Store and S3 bucket configuration. See `docs/adr/0001-cube-semantic-layer.md` for details.
+
+---
+
 ## Next Steps
 
 - See [docs/api-examples.md](api-examples.md) for comprehensive API reference
