@@ -75,7 +75,8 @@ check_container() {
         return 1
     fi
 
-    local health=$(docker inspect -f '{{.State.Health.Status}}' "$name" 2>/dev/null || echo "none")
+    local health
+    health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$name" 2>/dev/null || echo "none")
     local status=$(docker inspect -f '{{.State.Status}}' "$name" 2>/dev/null)
 
     if [[ "$health" == "healthy" ]]; then
@@ -211,7 +212,7 @@ fi
 # ==============================================================================
 # FULL PROFILE
 # ==============================================================================
-if [[ "$PROFILE" == "full" ]]; then
+if [[ "$PROFILE" == "full" || "$PROFILE" == "demo" ]]; then
     echo ""
     echo -e "${BLUE}Full Profile Services:${NC}"
 
@@ -235,6 +236,35 @@ if [[ "$PROFILE" == "full" ]]; then
             echo -e "  ${GREEN}✓${NC} Cube schema: loaded"
         else
             echo -e "  ${YELLOW}~${NC} Cube schema: may need cube-init"
+        fi
+    fi
+fi
+
+# ==============================================================================
+# DEMO PROFILE
+# ==============================================================================
+if [[ "$PROFILE" == "demo" ]]; then
+    echo ""
+    echo -e "${BLUE}Demo Profile Services:${NC}"
+
+    check_container "floe-dagster-webserver" "Dagster Webserver" || FAILED=1
+    check_container "floe-dagster-daemon" "Dagster Daemon" || FAILED=1
+
+    echo ""
+    echo -e "${BLUE}Demo Profile Endpoints:${NC}"
+    check_endpoint "http://localhost:3000/health" "Dagster UI" || FAILED=1
+
+    # Verify Dagster can load definitions
+    if [[ "$VERBOSE" == "true" ]]; then
+        echo ""
+        echo -e "${BLUE}Dagster Connectivity:${NC}"
+        dagster_response=$(curl -s "http://localhost:3000/graphql" \
+            -H "Content-Type: application/json" \
+            -d '{"query": "{ repositoriesOrError { ... on RepositoryConnection { nodes { name } } } }"}' 2>/dev/null)
+        if echo "$dagster_response" | grep -q "nodes"; then
+            echo -e "  ${GREEN}✓${NC} Dagster definitions: loaded"
+        else
+            echo -e "  ${YELLOW}~${NC} Dagster definitions: may be loading"
         fi
     fi
 fi

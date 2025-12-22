@@ -149,6 +149,7 @@ dbt_refresh_job = define_asset_job(
 
 # Hourly schedule for synthetic data generation
 demo_hourly_schedule = ScheduleDefinition(
+    name="demo_hourly_schedule",
     job=demo_pipeline_job,
     cron_schedule="0 * * * *",  # Every hour
     default_status=DefaultScheduleStatus.STOPPED,  # Start stopped for demo
@@ -157,6 +158,7 @@ demo_hourly_schedule = ScheduleDefinition(
 
 # Daily schedule for full refresh
 demo_daily_schedule = ScheduleDefinition(
+    name="demo_daily_schedule",
     job=demo_pipeline_job,
     cron_schedule="0 6 * * *",  # Every day at 6 AM
     default_status=DefaultScheduleStatus.STOPPED,  # Start stopped for demo

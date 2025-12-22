@@ -125,6 +125,7 @@ services:
       - storage
       - compute
       - full
+      - demo
 
   # Create S3 buckets and IAM roles on startup
   # Bucket names are defined in config/buckets.env (single source of truth)
@@ -163,6 +164,7 @@ services:
       - storage
       - compute
       - full
+      - demo
 
   polaris:
     # LocalStack's pre-configured Polaris image - designed for LocalStack S3 compatibility
@@ -204,6 +206,7 @@ services:
       - storage
       - compute
       - full
+      - demo
 
   # Initialize Polaris catalog on startup
   # This container extracts auto-generated credentials from Polaris logs
@@ -238,6 +241,7 @@ services:
       - storage
       - compute
       - full
+      - demo
 
   # ==============================================================================
   # COMPUTE PROFILE (--profile compute)
@@ -279,6 +283,7 @@ services:
     profiles:
       - compute
       - full
+      - demo
 
   spark-iceberg:
     image: tabulario/spark-iceberg:3.5.1_1.5.0
@@ -311,6 +316,7 @@ services:
     profiles:
       - compute
       - full
+      - demo
 
   # ==============================================================================
   # FULL PROFILE (--profile full)
@@ -346,6 +352,7 @@ services:
     restart: unless-stopped
     profiles:
       - full
+      - demo
 
   marquez-web:
     image: marquezproject/marquez-web:0.49.0
@@ -371,6 +378,7 @@ services:
     restart: unless-stopped
     profiles:
       - full
+      - demo
 
   cube:
     image: cubejs/cube:v0.36
@@ -417,6 +425,7 @@ services:
     restart: unless-stopped
     profiles:
       - full
+      - demo
 
   # Initialize Cube test data in Iceberg via Trino
   # Creates orders table and loads 15k+ rows for pagination tests
@@ -438,6 +447,7 @@ services:
       - floe-network
     profiles:
       - full
+      - demo
 
   # ==============================================================================
   # TEST PROFILE (--profile test)
@@ -503,16 +513,16 @@ services:
   # ==============================================================================
 
   dagster-webserver:
-    image: dagster/dagster-dev:latest
+    build:
+      context: ../..
+      dockerfile: testing/docker/Dockerfile.dagster
     container_name: floe-dagster-webserver
     ports:
       - "3000:3000"
     environment:
       DAGSTER_HOME: /opt/dagster
-      DAGSTER_POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      DAGSTER_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      DAGSTER_POSTGRES_HOST: postgres
-      DAGSTER_POSTGRES_DB: dagster
+      # PostgreSQL connection string for Dagster storage
+      DAGSTER_PG_CONN_STRING: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/dagster
       # Demo configuration
       FLOE_DEMO_CATALOG: floe_demo
       FLOE_DEMO_SCHEMA: raw
@@ -522,9 +532,12 @@ services:
       CUBE_API_URL: http://cube:4000
       # OpenTelemetry
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      # Python path
+      PYTHONPATH: /workspace
     volumes:
       - ../..:/workspace:ro
       - ./config/polaris-credentials.env:/opt/dagster/.env:ro
+      - ./config/dagster.yaml:/opt/dagster/dagster.yaml:ro
     working_dir: /workspace
     command:
       - dagster
@@ -553,14 +566,14 @@ services:
       - demo
 
   dagster-daemon:
-    image: dagster/dagster-dev:latest
+    build:
+      context: ../..
+      dockerfile: testing/docker/Dockerfile.dagster
     container_name: floe-dagster-daemon
     environment:
       DAGSTER_HOME: /opt/dagster
-      DAGSTER_POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      DAGSTER_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      DAGSTER_POSTGRES_HOST: postgres
-      DAGSTER_POSTGRES_DB: dagster
+      # PostgreSQL connection string for Dagster storage
+      DAGSTER_PG_CONN_STRING: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/dagster
       # Demo configuration
       FLOE_DEMO_CATALOG: floe_demo
       FLOE_DEMO_SCHEMA: raw
@@ -568,13 +581,19 @@ services:
       POLARIS_URL: http://polaris:8181
       # Cube API
       CUBE_API_URL: http://cube:4000
+      # Python path
+      PYTHONPATH: /workspace
     volumes:
       - ../..:/workspace:ro
       - ./config/polaris-credentials.env:/opt/dagster/.env:ro
+      - ./config/dagster.yaml:/opt/dagster/dagster.yaml:ro
+      - ./config/workspace.yaml:/opt/dagster/workspace.yaml:ro
     working_dir: /workspace
     command:
       - dagster-daemon
       - run
+      - -w
+      - /opt/dagster/workspace.yaml
     depends_on:
       dagster-webserver:
         condition: service_healthy

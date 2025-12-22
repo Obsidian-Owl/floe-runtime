@@ -1,0 +1,40 @@
+# Dockerfile for Dagster demo services
+# Used by docker-compose demo profile for dagster-webserver and dagster-daemon
+#
+# This image contains:
+# - Dagster core packages
+# - Demo orchestration code
+# - Required Python dependencies
+
+FROM python:3.10-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /workspace
+
+# Install Dagster and dependencies
+RUN pip install --no-cache-dir \
+    dagster \
+    dagster-webserver \
+    dagster-postgres \
+    structlog \
+    pydantic \
+    pydantic-settings
+
+# Create dagster home directory
+RUN mkdir -p /opt/dagster
+
+# Copy demo code
+COPY demo/ /workspace/demo/
+COPY pyproject.toml /workspace/
+
+# Set Python path to include workspace
+ENV PYTHONPATH=/workspace
+
+# Default command (overridden by docker-compose)
+CMD ["dagster", "dev", "-h", "0.0.0.0", "-p", "3000", "-m", "demo.orchestration"]
