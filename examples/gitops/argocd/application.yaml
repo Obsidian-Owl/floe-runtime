@@ -1,0 +1,86 @@
+# ArgoCD Application for floe-runtime
+#
+# Deploy with: kubectl apply -f application.yaml
+#
+# Prerequisites:
+#   - ArgoCD installed in the cluster
+#   - floe-runtime Helm chart accessible
+#   - Destination namespace created
+#
+# Covers: 007-FR-004 (GitOps deployment with ArgoCD)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: floe-runtime
+  namespace: argocd
+  # Finalizer to handle cascade deletion
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    # Git repository containing floe-runtime
+    repoURL: https://github.com/your-org/floe-project
+    targetRevision: HEAD
+    path: charts/floe-runtime
+
+    # Helm-specific configuration
+    helm:
+      # Environment-specific values file
+      valueFiles:
+        - values.yaml
+        - ../../examples/environments/dev/values.yaml
+
+      # Override specific values
+      parameters:
+        - name: global.labels.app\.kubernetes\.io/managed-by
+          value: argocd
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: floe
+
+  # Sync policy for automated deployments
+  syncPolicy:
+    automated:
+      # Enable auto-pruning of removed resources
+      prune: true
+      # Enable self-healing (auto-sync on drift)
+      selfHeal: true
+      # Don't sync when only metadata changes
+      allowEmpty: false
+
+    syncOptions:
+      # Create namespace if it doesn't exist
+      - CreateNamespace=true
+      # Use server-side apply for better diff
+      - ServerSideApply=true
+      # Replace resources instead of patch (for immutable fields)
+      - RespectIgnoreDifferences=true
+
+    # Retry configuration
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Ignore differences for certain fields
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+    - group: ""
+      kind: ConfigMap
+      jsonPointers:
+        - /data
+
+  # Health check customization
+  info:
+    - name: Documentation
+      value: https://github.com/your-org/floe-project/docs
+    - name: Environment
+      value: development

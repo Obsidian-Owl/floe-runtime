@@ -1,0 +1,218 @@
+# Floe Dagster Helm Chart Values
+#
+# Default configuration values for floe-dagster chart.
+# Override in values-dev.yaml or values-prod.yaml for environment-specific settings.
+#
+# Covers: 007-FR-001 (Helm chart for Kubernetes deployment)
+
+# Enable/disable the dagster subchart
+dagster:
+  enabled: true
+
+# Floe-specific configuration
+floe:
+  # CompiledArtifacts configuration
+  compiledArtifacts:
+    # Enable CompiledArtifacts ConfigMap creation
+    enabled: true
+    # ConfigMap name (leave empty to use generated name)
+    configMapName: ""
+    # Mount path inside containers
+    mountPath: "/app/.floe/compiled_artifacts.json"
+    # Content of compiled_artifacts.json (set via --set-file or values override)
+    content: ""
+    # Additional annotations for the ConfigMap
+    annotations: {}
+
+  # External Secrets Operator integration
+  # Syncs secrets from external providers (AWS Secrets Manager, Vault, GCP, Azure)
+  # Requires: External Secrets Operator installed in cluster
+  # Covers: 007-FR-003 (External Secrets integration)
+  externalSecrets:
+    # Enable External Secrets integration
+    enabled: false
+
+    # Secret store reference (required when enabled)
+    # This references a SecretStore or ClusterSecretStore resource
+    secretStoreRef: ""
+
+    # Secret store kind: SecretStore (namespace-scoped) or ClusterSecretStore (cluster-wide)
+    secretStoreKind: "SecretStore"
+
+    # How often to refresh secrets from external provider
+    refreshInterval: "1h"
+
+    # Creation policy for target secrets: Owner, Merge, or None
+    creationPolicy: "Owner"
+
+    # Common annotations for all ExternalSecret resources
+    annotations: {}
+
+    # Template configuration for secret transformation
+    template:
+      enabled: false
+      # Generate connection string from individual fields
+      connectionString: false
+
+    # PostgreSQL database credentials
+    # Creates secret: {{ fullname }}-postgresql-secret
+    postgresql:
+      enabled: false
+      # Remote key path for password (e.g., /floe/prod/dagster-db or floe/prod/dagster-db)
+      passwordKey: ""
+      # Property within the secret (for JSON secrets)
+      passwordProperty: ""
+      # Remote key path for username (optional, can be in same secret as password)
+      usernameKey: ""
+      usernameProperty: ""
+      # Remote key for host (optional)
+      hostKey: ""
+      hostProperty: ""
+      # Additional secrets to sync
+      additionalSecrets: []
+      # - secretKey: postgresql-port
+      #   remoteKey: /floe/prod/dagster-db
+      #   property: port
+
+    # Compute engine credentials (Snowflake, BigQuery, Trino, etc.)
+    # Creates secret: {{ fullname }}-compute-secret
+    compute:
+      enabled: false
+      # List of secrets to sync
+      secrets: []
+      # Example for Snowflake:
+      # - secretKey: SNOWFLAKE_ACCOUNT
+      #   remoteKey: /floe/prod/snowflake
+      #   property: account
+      # - secretKey: SNOWFLAKE_USER
+      #   remoteKey: /floe/prod/snowflake
+      #   property: user
+      # - secretKey: SNOWFLAKE_PASSWORD
+      #   remoteKey: /floe/prod/snowflake
+      #   property: password
+
+    # Storage credentials (S3, GCS, ADLS)
+    # Creates secret: {{ fullname }}-storage-secret
+    storage:
+      enabled: false
+      # List of secrets to sync
+      secrets: []
+      # Example for S3:
+      # - secretKey: AWS_ACCESS_KEY_ID
+      #   remoteKey: /floe/prod/s3-credentials
+      #   property: access_key
+      # - secretKey: AWS_SECRET_ACCESS_KEY
+      #   remoteKey: /floe/prod/s3-credentials
+      #   property: secret_key
+
+    # Catalog credentials (Polaris OAuth2)
+    # Creates secret: {{ fullname }}-catalog-secret
+    catalog:
+      enabled: false
+      # Polaris OAuth2 client credentials
+      clientIdKey: ""
+      clientIdProperty: ""
+      clientSecretKey: ""
+      clientSecretProperty: ""
+      # Additional catalog secrets
+      additionalSecrets: []
+
+    # Custom external secrets
+    # Creates secrets: {{ fullname }}-{{ name }} for each entry
+    custom: []
+    # Example:
+    # - name: api-keys
+    #   component: api
+    #   secretStoreRef: ""  # Override default secretStoreRef
+    #   refreshInterval: "30m"
+    #   data:
+    #     - secretKey: OPENAI_API_KEY
+    #       remoteKey: /floe/prod/api-keys
+    #       property: openai
+
+  # Sealed Secrets integration
+  # Encrypts secrets for safe storage in Git (GitOps compatible)
+  # Requires: Sealed Secrets controller installed in cluster
+  # Covers: 007-FR-003 (Sealed Secrets integration)
+  sealedSecrets:
+    # Enable Sealed Secrets integration
+    enabled: false
+
+    # Common annotations for all SealedSecret resources
+    annotations: {}
+
+    # PostgreSQL database credentials (encrypted)
+    # Creates SealedSecret: {{ fullname }}-postgresql-secret
+    postgresql:
+      enabled: false
+      # Encrypted data (generated with kubeseal)
+      # kubeseal --raw --scope namespace-wide --name <secret-name> --namespace <ns>
+      encryptedData: {}
+      # postgresql-password: "AgBy3i4OJSWK+..."
+      # postgresql-username: "AgBy8j9PLSWQ+..."
+
+    # Compute engine credentials (encrypted)
+    # Creates SealedSecret: {{ fullname }}-compute-secret
+    compute:
+      enabled: false
+      encryptedData: {}
+      # SNOWFLAKE_PASSWORD: "AgBy3i4OJSWK+..."
+
+    # Storage credentials (encrypted)
+    # Creates SealedSecret: {{ fullname }}-storage-secret
+    storage:
+      enabled: false
+      encryptedData: {}
+      # AWS_SECRET_ACCESS_KEY: "AgBy3i4OJSWK+..."
+
+    # Catalog credentials (encrypted)
+    # Creates SealedSecret: {{ fullname }}-catalog-secret
+    catalog:
+      enabled: false
+      encryptedData: {}
+      # polaris-client-secret: "AgBy3i4OJSWK+..."
+
+    # Custom sealed secrets
+    custom: []
+    # - name: api-keys
+    #   component: api
+    #   encryptedData:
+    #     API_KEY: "AgBy3i4OJSWK+..."
+
+# Image configuration (for custom Dagster image with floe packages)
+image:
+  repository: ghcr.io/obsidian-owl/floe-dagster
+  tag: ""  # Defaults to chart appVersion
+  pullPolicy: IfNotPresent
+
+# Image pull secrets for private registries
+imagePullSecrets: []
+
+# Resource defaults (override in values-prod.yaml)
+resources:
+  webserver:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  daemon:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Ingress configuration
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: dagster.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []

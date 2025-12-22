@@ -1,17 +1,18 @@
 # floe-runtime Makefile
 # Provides consistent commands that mirror CI exactly
 
-.PHONY: check lint typecheck security test test-unit test-contract test-integration format install hooks docker-up docker-down docker-logs help
+.PHONY: check lint typecheck security test test-unit test-contract test-integration test-helm helm-lint format install hooks docker-up docker-down docker-logs help
 
 # Default target
 help:
 	@echo "floe-runtime development commands:"
 	@echo ""
 	@echo "Code Quality:"
-	@echo "  make check           - Run all CI checks (lint, type, security, test)"
+	@echo "  make check           - Run all CI checks (lint, type, security, helm, test)"
 	@echo "  make lint            - Run linting (ruff check + format)"
 	@echo "  make typecheck       - Run mypy strict type checking"
 	@echo "  make security        - Run security scans (bandit)"
+	@echo "  make helm-lint       - Lint Helm charts"
 	@echo "  make format          - Auto-format code"
 	@echo ""
 	@echo "Testing:"
@@ -19,6 +20,7 @@ help:
 	@echo "  make test-unit       - Run unit tests only (no Docker required)"
 	@echo "  make test-contract   - Run contract tests only (no Docker required)"
 	@echo "  make test-integration - Run integration tests only in Docker"
+	@echo "  make test-helm       - Run Helm chart validation tests"
 	@echo ""
 	@echo "Docker Services:"
 	@echo "  make docker-up       - Start test infrastructure"
@@ -31,7 +33,7 @@ help:
 	@echo ""
 
 # Full CI check - mirrors .github/workflows/ci.yml exactly
-check: lint typecheck security test
+check: lint typecheck security helm-lint test
 	@echo "✅ All checks passed!"
 
 # Lint checks - mirrors CI lint job exactly
@@ -108,3 +110,18 @@ docker-down:
 # View Docker service logs
 docker-logs:
 	cd testing/docker && docker compose --profile storage logs -f
+
+# ==============================================================================
+# Helm Chart Validation
+# ==============================================================================
+
+# Lint Helm charts
+helm-lint:
+	@echo "⎈ Linting Helm charts..."
+	@helm lint charts/floe-dagster/
+	@helm lint charts/floe-cube/
+
+# Run Helm chart validation tests
+test-helm:
+	@echo "⎈ Running Helm chart tests..."
+	uv run pytest testing/tests/test_helm_charts.py testing/tests/test_dockerfiles.py -v --tb=short

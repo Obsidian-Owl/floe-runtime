@@ -72,7 +72,51 @@ uv run pytest packages/floe-cube/tests/integration/ -v
 
 ### Pre-aggregation Configuration
 
-Cube pre-aggregations use `external: false` to store in Trino/Iceberg instead of requiring GCS (the Trino driver only supports GCS for external bucket, not S3/LocalStack).
+Cube pre-aggregations can be stored in two locations:
+
+| Environment | `external` | Storage | Use Case |
+|-------------|-----------|---------|----------|
+| **Testing** | `false` | Source database (Trino/DuckDB) | No S3/GCS setup required |
+| **Production** | `true` | Cube Store + S3/GCS | High concurrency, sub-second queries |
+
+**Testing configuration** (used in Docker Compose):
+
+```yaml
+# floe.yaml
+consumption:
+  pre_aggregations:
+    external: false  # Store in source database
+```
+
+This is the default for local testing because:
+- No additional S3/GCS infrastructure required
+- Pre-aggregations are stored as tables in Trino/DuckDB
+- Sufficient for development and integration testing
+
+**Production configuration** (recommended):
+
+```yaml
+# floe.yaml
+consumption:
+  pre_aggregations:
+    external: true
+    cube_store:
+      enabled: true
+      s3_bucket: "my-cube-preaggs"
+      s3_region: "us-east-1"
+    # For Trino/Snowflake with large datasets (>100k rows)
+    export_bucket:
+      enabled: true
+      bucket_type: "s3"
+      name: "my-cube-export"
+      region: "us-east-1"
+```
+
+**Database-specific notes**:
+
+- **DuckDB**: Uses batching strategy. Does NOT support export buckets.
+- **Trino**: Supports S3 and GCS export buckets for large pre-aggregation builds.
+- **Snowflake**: Supports S3, GCS, and Azure export buckets. Uses storage integration.
 
 ## License
 

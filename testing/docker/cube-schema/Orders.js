@@ -1,41 +1,57 @@
 /**
- * Sample Cube.js schema for E2E testing
+ * Orders Cube schema for production-quality demo
  *
- * This schema demonstrates how Cube connects to Iceberg tables via Trino.
- * It provides a semantic layer over the raw Iceberg data.
+ * This schema demonstrates how Cube connects to Iceberg tables via Trino
+ * with external pre-aggregations stored in Cube Store + LocalStack S3.
  *
- * In production, floe-cube will generate these schemas from CompiledArtifacts.
+ * The demo uses production-like architecture:
+ * - Cube Store cluster (router + workers) for pre-aggregation compute
+ * - S3-compatible storage (LocalStack) for pre-aggregation data
+ * - External pre-aggregations for realistic query performance
  *
- * Table schema (created by cube-init):
+ * Table schema (populated by demo pipeline):
  *   - id: BIGINT (primary key)
  *   - customer_id: BIGINT
- *   - status: VARCHAR ('pending', 'processing', 'completed', 'cancelled')
- *   - region: VARCHAR ('north', 'south', 'east', 'west')
- *   - amount: DECIMAL(10,2)
+ *   - status: VARCHAR ('pending', 'processing', 'shipped', 'delivered', 'cancelled')
+ *   - region: VARCHAR
+ *   - amount: DOUBLE
  *   - created_at: TIMESTAMP
+ *
+ * Covers: 007-FR-029 (E2E validation tests)
+ * Covers: 007-FR-031 (Medallion architecture demo)
  */
 
 cube(`Orders`, {
-  // Query the Iceberg table via Trino
+  // Query the orders Iceberg table via Trino
+  // Note: Table is created by cube-init container (03-init-cube-data.sh)
   sql: `SELECT * FROM iceberg.default.orders`,
 
-  // Pre-aggregations for performance
-  // Using external: false stores in Trino/Iceberg instead of requiring GCS bucket
-  // This enables pre-aggregation testing without cloud storage dependencies
+  // Pre-aggregations using internal storage (Trino)
+  // Note: External pre-aggregations (Cube Store + S3) are production-recommended but
+  // require real AWS S3 or compatible storage. LocalStack has XML response compatibility
+  // issues with Cube Store's Rust AWS SDK. See: https://github.com/localstack/localstack/issues/7541
   preAggregations: {
-    // Base materialization of the source query (stored in Trino)
-    base: {
-      type: `originalSql`,
-      external: false,
-    },
-    // Rollup pre-aggregation using the base (also stored in Trino)
+    // Daily order rollup - stored in Trino
     ordersByDay: {
-      measures: [CUBE.count, CUBE.totalAmount],
+      measures: [CUBE.count, CUBE.totalAmount, CUBE.averageAmount],
       dimensions: [CUBE.status],
       timeDimension: CUBE.createdAt,
       granularity: `day`,
-      external: false,
-      useOriginalSqlPreAggregations: true,
+      external: false,  // Internal storage via Trino (LocalStack S3 not compatible)
+      refreshKey: {
+        every: `1 hour`,
+      },
+    },
+    // Weekly summary for trend analysis
+    ordersByWeek: {
+      measures: [CUBE.count, CUBE.totalAmount],
+      dimensions: [CUBE.status],
+      timeDimension: CUBE.createdAt,
+      granularity: `week`,
+      external: false,  // Internal storage via Trino
+      refreshKey: {
+        every: `6 hours`,
+      },
     },
   },
 
@@ -50,6 +66,14 @@ cube(`Orders`, {
     averageAmount: {
       sql: `amount`,
       type: `avg`,
+    },
+    minAmount: {
+      sql: `amount`,
+      type: `min`,
+    },
+    maxAmount: {
+      sql: `amount`,
+      type: `max`,
     },
   },
 

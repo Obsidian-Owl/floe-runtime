@@ -1,0 +1,101 @@
+# Production Dockerfile for Floe Cube Client
+# Multi-stage build for the floe-cube Python package
+#
+# This image provides:
+#   - Cube configuration generator (from CompiledArtifacts)
+#   - Cube REST/GraphQL/SQL client libraries
+#   - Configuration watcher for dynamic updates
+#
+# Build:
+#   docker build -t floe-cube:latest -f docker/Dockerfile.cube .
+#
+# Run (config generator):
+#   docker run -v /path/to/artifacts:/config floe-cube:latest generate
+#
+# Run (config watcher):
+#   docker run floe-cube:latest watch --manifest /path/to/manifest.json
+#
+# Note: This is NOT the Cube server. For Cube server, use cubejs/cube:v0.36
+#
+# Security:
+#   - Non-root user (cube, UID 1000)
+#   - Minimal base image (python:3.10-slim)
+#   - No secrets in build layers
+
+# =============================================================================
+# Stage 1: Builder - Install dependencies
+# =============================================================================
+FROM python:3.10-slim AS builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv for fast dependency management
+RUN pip install --no-cache-dir uv
+
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
+
+# Copy package manifests for local packages
+COPY packages/floe-core/pyproject.toml packages/floe-core/
+COPY packages/floe-cube/pyproject.toml packages/floe-cube/
+
+# Create minimal __init__.py files for editable installs
+RUN mkdir -p packages/floe-core/src/floe_core && touch packages/floe-core/src/floe_core/__init__.py
+RUN mkdir -p packages/floe-cube/src/floe_cube && touch packages/floe-cube/src/floe_cube/__init__.py
+
+# Install dependencies (frozen from lockfile, no dev dependencies)
+RUN uv sync --frozen --no-dev
+
+# =============================================================================
+# Stage 2: Production - Minimal runtime image
+# =============================================================================
+FROM python:3.10-slim AS production
+
+WORKDIR /app
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user (UID 1000 for Kubernetes compatibility)
+RUN useradd -m -u 1000 cube
+
+# Copy virtual environment from builder
+COPY --from=builder /app/.venv /app/.venv
+
+# Set PATH to use virtual environment
+ENV PATH="/app/.venv/bin:$PATH"
+
+# Copy floe-core and floe-cube packages
+COPY packages/floe-core/ ./packages/floe-core/
+COPY packages/floe-cube/ ./packages/floe-cube/
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV FLOE_CUBE_HOME=/app/config
+
+# Create config directory
+RUN mkdir -p /app/config && chown -R cube:cube /app
+
+# Switch to non-root user
+USER cube
+
+# Health check - verify floe-cube is importable
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import floe_cube; print('healthy')" || exit 1
+
+# Default entrypoint: Run floe-cube command
+# Commands:
+#   generate - Generate Cube configuration from CompiledArtifacts
+#   watch - Watch manifest.json for changes and regenerate
+#   validate - Validate Cube configuration
+ENTRYPOINT ["python", "-m", "floe_cube"]
+CMD ["--help"]

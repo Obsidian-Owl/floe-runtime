@@ -11,6 +11,9 @@ daemon.log
 daemon.pid
 bd.sock
 
+# Local version tracking (per-machine state)
+.local_version
+
 # Legacy database files
 db.sqlite
 bd.db

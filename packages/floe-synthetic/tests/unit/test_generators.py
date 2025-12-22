@@ -211,6 +211,154 @@ class TestEcommerceGenerator:
         assert len(batches[1]) == 100
         assert len(batches[2]) == 50
 
+    # =========================================================================
+    # Order Items Tests (007-FR-027a)
+    # =========================================================================
+
+    @pytest.mark.requirement("007-FR-027a")
+    def test_generate_order_items_schema(self) -> None:
+        """Generated order_items have correct schema."""
+        gen = EcommerceGenerator(seed=42)
+        gen.generate_customers(100)
+        gen.generate_products(50)
+        order_items = gen.generate_order_items(200)
+
+        assert isinstance(order_items, pa.Table)
+        assert len(order_items) == 200
+
+        # Check expected columns
+        expected_columns = {
+            "order_item_id",
+            "order_id",
+            "product_id",
+            "quantity",
+            "unit_price",
+            "discount",
+            "subtotal",
+        }
+        assert set(order_items.column_names) == expected_columns
+
+    @pytest.mark.requirement("007-FR-027a")
+    def test_generate_order_items_types(self) -> None:
+        """Generated order_items have correct types."""
+        gen = EcommerceGenerator(seed=42)
+        gen.generate_customers(100)
+        gen.generate_products(50)
+        order_items = gen.generate_order_items(100)
+
+        schema = order_items.schema
+        assert schema.field("order_item_id").type == pa.int64()
+        assert schema.field("order_id").type == pa.int64()
+        assert schema.field("product_id").type == pa.int64()
+        assert schema.field("quantity").type == pa.int64()
+        assert schema.field("unit_price").type == pa.float64()
+        assert schema.field("discount").type == pa.float64()
+        assert schema.field("subtotal").type == pa.float64()
+
+    @pytest.mark.requirement("007-FR-027a")
+    def test_generate_order_items_valid_quantities(self) -> None:
+        """All order item quantities are positive integers."""
+        gen = EcommerceGenerator(seed=42)
+        gen.generate_customers(100)
+        gen.generate_products(50)
+        order_items = gen.generate_order_items(200)
+
+        quantities = order_items.column("quantity").to_pylist()
+        assert all(qty >= 1 for qty in quantities)
+
+    @pytest.mark.requirement("007-FR-027a")
+    def test_generate_order_items_valid_prices(self) -> None:
+        """All unit prices are non-negative."""
+        gen = EcommerceGenerator(seed=42)
+        gen.generate_customers(100)
+        gen.generate_products(50)
+        order_items = gen.generate_order_items(200)
+
+        prices = order_items.column("unit_price").to_pylist()
+        assert all(price >= 0 for price in prices)
+
+    @pytest.mark.requirement("007-FR-027a")
+    def test_generate_order_items_valid_discounts(self) -> None:
+        """All discounts are non-negative."""
+        gen = EcommerceGenerator(seed=42)
+        gen.generate_customers(100)
+        gen.generate_products(50)
+        order_items = gen.generate_order_items(200)
+
+        discounts = order_items.column("discount").to_pylist()
+        assert all(discount >= 0 for discount in discounts)
+
+    @pytest.mark.requirement("007-FR-027a")
+    def test_generate_order_items_subtotal_calculation(self) -> None:
+        """Subtotal is correctly calculated as quantity * unit_price - discount."""
+        gen = EcommerceGenerator(seed=42)
+        gen.generate_customers(100)
+        gen.generate_products(50)
+        order_items = gen.generate_order_items(100)
+
+        for i in range(len(order_items)):
+            qty = order_items.column("quantity")[i].as_py()
+            price = order_items.column("unit_price")[i].as_py()
+            discount = order_items.column("discount")[i].as_py()
+            subtotal = order_items.column("subtotal")[i].as_py()
+
+            expected = (qty * price) - discount
+            assert abs(subtotal - expected) < 0.01, f"Expected subtotal {expected}, got {subtotal}"
+
+    @pytest.mark.requirement("007-FR-027a")
+    def test_generate_order_items_references_valid_products(self) -> None:
+        """Order items reference valid product IDs."""
+        gen = EcommerceGenerator(seed=42)
+        gen.generate_customers(100)
+        gen.generate_products(50)
+        order_items = gen.generate_order_items(200)
+
+        product_ids = set(order_items.column("product_id").to_pylist())
+        valid_product_ids = set(gen._product_ids)
+
+        assert product_ids.issubset(valid_product_ids)
+
+    @pytest.mark.requirement("007-FR-027a")
+    def test_generate_order_items_auto_generates_products(self) -> None:
+        """Order items auto-generate products if none exist."""
+        gen = EcommerceGenerator(seed=42)
+        gen.generate_customers(100)
+        # No products generated
+
+        order_items = gen.generate_order_items(100)
+
+        # Products should have been auto-generated
+        assert len(gen._product_ids) > 0
+        assert len(order_items) == 100
+
+    @pytest.mark.requirement("007-FR-027a")
+    def test_generate_order_items_with_order_id_range(self) -> None:
+        """Order items use specified order ID range."""
+        gen = EcommerceGenerator(seed=42)
+        gen.generate_customers(100)
+        gen.generate_products(50)
+
+        order_items = gen.generate_order_items(
+            100,
+            order_id_start=1000,
+            order_id_end=1010,
+        )
+
+        order_ids = set(order_items.column("order_id").to_pylist())
+        assert all(1000 <= oid <= 1010 for oid in order_ids)
+
+    @pytest.mark.requirement("007-FR-027a")
+    def test_generate_order_items_tracks_order_item_ids(self) -> None:
+        """Generated order item IDs are tracked for relationships."""
+        gen = EcommerceGenerator(seed=42)
+        gen.generate_customers(100)
+        gen.generate_products(50)
+        gen.generate_order_items(100, start_id=500)
+
+        assert len(gen._order_item_ids) == 100
+        assert gen._order_item_ids[0] == 500
+        assert gen._order_item_ids[-1] == 599
+
 
 class TestSaaSGenerator:
     """Tests for SaaSGenerator."""

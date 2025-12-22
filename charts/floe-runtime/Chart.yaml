@@ -1,0 +1,61 @@
+# Floe Runtime Umbrella Helm Chart
+#
+# Parent chart that bundles all floe-runtime components:
+# - floe-dagster: Orchestration layer (Dagster)
+# - floe-cube: Semantic layer (Cube) - optional
+#
+# This chart simplifies deployment by allowing a single helm install
+# to deploy the complete floe-runtime stack.
+#
+# Covers: 007-FR-001 (Helm chart for Kubernetes deployment)
+# Covers: 007-FR-011 (Umbrella chart for full stack deployment)
+
+apiVersion: v2
+name: floe-runtime
+description: Complete Floe Runtime data platform deployment
+type: application
+
+# Chart version (follows SemVer 2.0.0)
+version: 0.1.0
+
+# App version - aligns with floe-runtime version
+appVersion: "0.1.0"
+
+# Minimum Kubernetes version required
+kubeVersion: ">=1.25.0"
+
+# Keywords for chart discovery
+keywords:
+  - floe-runtime
+  - data-platform
+  - dagster
+  - cube
+  - orchestration
+  - analytics
+
+# Home and sources for documentation
+home: https://github.com/obsidian-owl/floe-runtime
+sources:
+  - https://github.com/obsidian-owl/floe-runtime
+
+# Maintainers
+maintainers:
+  - name: Floe Team
+    url: https://github.com/obsidian-owl
+
+# Annotations for artifact hub and other registries
+annotations:
+  category: data-platform
+  licenses: Apache-2.0
+
+# Subchart dependencies
+dependencies:
+  - name: floe-dagster
+    version: "0.1.x"
+    repository: "file://../floe-dagster"
+    condition: floe-dagster.enabled
+
+  - name: floe-cube
+    version: "0.1.x"
+    repository: "file://../floe-cube"
+    condition: floe-cube.enabled

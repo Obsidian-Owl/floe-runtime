@@ -1,0 +1,6 @@
+# Mart models (mart_*) - Gold layer
+# Business-ready aggregations
+# See plan.md for model specifications:
+# - mart_revenue.sql
+# - mart_customer_segments.sql
+# - mart_product_analytics.sql

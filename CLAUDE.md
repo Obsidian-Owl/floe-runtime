@@ -11,6 +11,8 @@ Auto-generated from all feature plans. Last updated: 2025-12-18
 - PyIceberg 0.9+ for Iceberg table operations (004-storage-catalog)
 - Apache Polaris REST catalog for Iceberg metadata management (004-storage-catalog)
 - File-based configuration generation (.floe/cube/), S3 for pre-aggregations (005-consumption-layer)
+- Python 3.10+ (Dagster/dbt minimum), Helm 3.x, Docker + Dagster 1.6+, dbt-core 1.7+, Cube v0.36+, Helm, Docker, ArgoCD/Flux (007-deployment-automation)
+- Iceberg tables (via Polaris REST catalog), PostgreSQL (Dagster metadata), S3/GCS/ADLS (object storage) (007-deployment-automation)
 
 ## Project Structure
 
@@ -153,11 +155,9 @@ curl http://localhost:4000/readyz                 # Cube
 - Pre-aggregations: Uses `external: false` for Trino storage (GCS not available)
 
 ## Recent Changes
+- 007-deployment-automation: Added Python 3.10+ (Dagster/dbt minimum), Helm 3.x, Docker + Dagster 1.6+, dbt-core 1.7+, Cube v0.36+, Helm, Docker, ArgoCD/Flux
 - 005-consumption-layer: Added floe-cube with 21 integration tests passing
 - 005-consumption-layer: Cube pre-aggregations using internal Trino storage
-- 005-consumption-layer: Trino 479 with OAuth2 authentication to Polaris
-- 004-storage-catalog: Zero-config Docker test runner (62 integration tests passing)
-- 004-storage-catalog: Added floe-polaris, floe-iceberg packages with full integration tests
 
 
 <!-- MANUAL ADDITIONS START -->

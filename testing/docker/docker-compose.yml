@@ -6,12 +6,14 @@
 #   docker compose --profile storage up -d  # Include Polaris + LocalStack
 #   docker compose --profile compute up -d  # Include Spark + Trino
 #   docker compose --profile full up -d     # All services including Cube
+#   docker compose --profile demo up -d     # Demo e-commerce pipeline (full + Dagster)
 #
 # Services:
 #   Base:     PostgreSQL, Jaeger
 #   Storage:  LocalStack (S3 + STS), Polaris (Iceberg catalog)
 #   Compute:  Trino, Spark
 #   Full:     Cube (semantic layer), Marquez (lineage)
+#   Demo:     Dagster (orchestration), synthetic data generation
 #
 # Security Note:
 #   LocalStack provides AWS S3 + STS emulation, enabling production-aligned
@@ -123,6 +125,7 @@ services:
       - storage
       - compute
       - full
+      - demo
 
   # Create S3 buckets and IAM roles on startup
   # Bucket names are defined in config/buckets.env (single source of truth)
@@ -161,6 +164,7 @@ services:
       - storage
       - compute
       - full
+      - demo
 
   polaris:
     # LocalStack's pre-configured Polaris image - designed for LocalStack S3 compatibility
@@ -202,6 +206,7 @@ services:
       - storage
       - compute
       - full
+      - demo
 
   # Initialize Polaris catalog on startup
   # This container extracts auto-generated credentials from Polaris logs
@@ -236,6 +241,7 @@ services:
       - storage
       - compute
       - full
+      - demo
 
   # ==============================================================================
   # COMPUTE PROFILE (--profile compute)
@@ -277,6 +283,7 @@ services:
     profiles:
       - compute
       - full
+      - demo
 
   spark-iceberg:
     image: tabulario/spark-iceberg:3.5.1_1.5.0
@@ -309,6 +316,7 @@ services:
     profiles:
       - compute
       - full
+      - demo
 
   # ==============================================================================
   # FULL PROFILE (--profile full)
@@ -344,6 +352,7 @@ services:
     restart: unless-stopped
     profiles:
       - full
+      - demo
 
   marquez-web:
     image: marquezproject/marquez-web:0.49.0
@@ -369,6 +378,7 @@ services:
     restart: unless-stopped
     profiles:
       - full
+      - demo
 
   cube:
     image: cubejs/cube:v0.36
@@ -387,15 +397,17 @@ services:
       # API configuration
       CUBEJS_API_SECRET: ${CUBEJS_API_SECRET:-floe-cube-secret}
       CUBEJS_DEV_MODE: "true"
-      CUBEJS_EXTERNAL_DEFAULT: "true"
+      # Pre-aggregations: Use internal storage via Trino (not external Cube Store)
+      # Note: External pre-aggregations (Cube Store + S3) are production-recommended
+      # but LocalStack has XML response compatibility issues with Cube Store's Rust SDK.
+      # See: https://github.com/localstack/localstack/issues/7541
+      CUBEJS_EXTERNAL_DEFAULT: "false"
       # Telemetry
       CUBEJS_TELEMETRY: "false"
       # SQL API (Postgres wire protocol) configuration
       CUBEJS_PG_SQL_PORT: "15432"
       CUBEJS_SQL_USER: ${CUBEJS_SQL_USER:-cube}
       CUBEJS_SQL_PASSWORD: ${CUBEJS_SQL_PASSWORD:-cube_password}
-      # Note: Pre-aggregations disabled - Trino driver doesn't support S3 export bucket
-      # Pre-aggregation refresh would require GCS which isn't available in test environment
     volumes:
       # Note: Cube v0.36+ uses 'model' directory by default (changed from 'schema')
       - ./cube-schema:/cube/conf/model:ro
@@ -414,6 +426,7 @@ services:
     restart: unless-stopped
     profiles:
       - full
+      - demo
 
   # Initialize Cube test data in Iceberg via Trino
   # Creates orders table and loads 15k+ rows for pagination tests
@@ -435,6 +448,86 @@ services:
       - floe-network
     profiles:
       - full
+      - demo
+
+  # ==============================================================================
+  # CUBE STORE SERVICES
+  # Cube Store provides distributed query caching and external pre-aggregation
+  # storage. Uses LocalStack S3 for production-like pre-aggregation workflows.
+  # ==============================================================================
+
+  cubestore-router:
+    # Multi-arch image - Docker selects correct architecture (amd64 or arm64)
+    image: cubejs/cubestore:v0.36
+    container_name: floe-cubestore-router
+    environment:
+      CUBESTORE_SERVER_NAME: cubestore-router:10000
+      CUBESTORE_META_PORT: "10000"
+      CUBESTORE_WORKERS: cubestore-worker-1:10001,cubestore-worker-2:10002
+      # S3 storage for pre-aggregations via LocalStack
+      CUBESTORE_S3_BUCKET: floe-cube-preaggs
+      CUBESTORE_S3_REGION: ${AWS_REGION:-us-east-1}
+      CUBESTORE_S3_ENDPOINT: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+    # No external port needed - Cube connects via Docker network
+    depends_on:
+      localstack-init:
+        condition: service_completed_successfully
+    # No healthcheck - cubestore image doesn't have curl/wget
+    # Cube will fail gracefully if cubestore is unavailable
+    networks:
+      - floe-network
+    restart: unless-stopped
+    profiles:
+      - full
+      - demo
+
+  cubestore-worker-1:
+    # Multi-arch image - Docker selects correct architecture (amd64 or arm64)
+    image: cubejs/cubestore:v0.36
+    container_name: floe-cubestore-worker-1
+    environment:
+      CUBESTORE_SERVER_NAME: cubestore-worker-1:10001
+      CUBESTORE_WORKER_PORT: "10001"
+      CUBESTORE_META_ADDR: cubestore-router:10000
+      # S3 storage for pre-aggregations via LocalStack
+      CUBESTORE_S3_BUCKET: floe-cube-preaggs
+      CUBESTORE_S3_REGION: ${AWS_REGION:-us-east-1}
+      CUBESTORE_S3_ENDPOINT: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+    depends_on:
+      - cubestore-router
+    networks:
+      - floe-network
+    restart: unless-stopped
+    profiles:
+      - full
+      - demo
+
+  cubestore-worker-2:
+    # Multi-arch image - Docker selects correct architecture (amd64 or arm64)
+    image: cubejs/cubestore:v0.36
+    container_name: floe-cubestore-worker-2
+    environment:
+      CUBESTORE_SERVER_NAME: cubestore-worker-2:10002
+      CUBESTORE_WORKER_PORT: "10002"
+      CUBESTORE_META_ADDR: cubestore-router:10000
+      # S3 storage for pre-aggregations via LocalStack
+      CUBESTORE_S3_BUCKET: floe-cube-preaggs
+      CUBESTORE_S3_REGION: ${AWS_REGION:-us-east-1}
+      CUBESTORE_S3_ENDPOINT: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+    depends_on:
+      - cubestore-router
+    networks:
+      - floe-network
+    restart: unless-stopped
+    profiles:
+      - full
+      - demo
 
   # ==============================================================================
   # TEST PROFILE (--profile test)
@@ -489,3 +582,145 @@ services:
       - floe-network
     profiles:
       - test
+
+  # ==============================================================================
+  # DEMO PROFILE (--profile demo)
+  # Complete demo environment with Dagster orchestration for the e-commerce
+  # pipeline. Includes all 'full' profile services plus Dagster webserver.
+  #
+  # Covers: 007-FR-029 (E2E validation tests)
+  # Covers: 007-FR-031 (Medallion architecture demo)
+  # ==============================================================================
+
+  dagster-webserver:
+    build:
+      context: ../..
+      dockerfile: testing/docker/Dockerfile.dagster
+    container_name: floe-dagster-webserver
+    ports:
+      - "3000:3000"
+    environment:
+      DAGSTER_HOME: /opt/dagster
+      # PostgreSQL connection string for Dagster storage
+      DAGSTER_PG_CONN_STRING: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/dagster
+      # Demo configuration (configurable data volumes)
+      FLOE_DEMO_CATALOG: floe_demo
+      FLOE_DEMO_SCHEMA: raw
+      DEMO_CUSTOMERS_COUNT: ${DEMO_CUSTOMERS_COUNT:-1000}
+      DEMO_ORDERS_COUNT: ${DEMO_ORDERS_COUNT:-5000}
+      DEMO_PRODUCTS_COUNT: ${DEMO_PRODUCTS_COUNT:-100}
+      DEMO_ORDER_ITEMS_COUNT: ${DEMO_ORDER_ITEMS_COUNT:-10000}
+      # Polaris catalog (OAuth2 credentials loaded from env file)
+      POLARIS_URI: http://polaris:8181/api/catalog
+      POLARIS_WAREHOUSE: warehouse
+      # LocalStack S3 configuration
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      # Cube API
+      CUBE_API_URL: http://cube:4000
+      # OpenTelemetry for Jaeger tracing
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_SERVICE_NAME: floe-demo
+      # OpenLineage for Marquez lineage (internal Docker port 5000, external 5002)
+      OPENLINEAGE_URL: http://marquez:5000/api/v1/lineage
+      OPENLINEAGE_NAMESPACE: demo
+      # Trino for dbt transformations
+      TRINO_HOST: trino
+      TRINO_PORT: "8080"
+      # Python path
+      PYTHONPATH: /workspace
+    env_file:
+      - ./config/polaris-credentials.env
+    volumes:
+      - ../..:/workspace:ro
+      - ./config/dagster.yaml:/opt/dagster/dagster.yaml:ro
+    working_dir: /workspace
+    command:
+      - dagster
+      - dev
+      - -h
+      - "0.0.0.0"
+      - -p
+      - "3000"
+      - -m
+      - demo.orchestration
+    depends_on:
+      postgres:
+        condition: service_healthy
+      cube:
+        condition: service_healthy
+      marquez:
+        condition: service_healthy
+      trino:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - floe-network
+    restart: unless-stopped
+    profiles:
+      - demo
+
+  dagster-daemon:
+    build:
+      context: ../..
+      dockerfile: testing/docker/Dockerfile.dagster
+    container_name: floe-dagster-daemon
+    environment:
+      DAGSTER_HOME: /opt/dagster
+      # PostgreSQL connection string for Dagster storage
+      DAGSTER_PG_CONN_STRING: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/dagster
+      # Demo configuration (configurable data volumes)
+      FLOE_DEMO_CATALOG: floe_demo
+      FLOE_DEMO_SCHEMA: raw
+      DEMO_CUSTOMERS_COUNT: ${DEMO_CUSTOMERS_COUNT:-1000}
+      DEMO_ORDERS_COUNT: ${DEMO_ORDERS_COUNT:-5000}
+      DEMO_PRODUCTS_COUNT: ${DEMO_PRODUCTS_COUNT:-100}
+      DEMO_ORDER_ITEMS_COUNT: ${DEMO_ORDER_ITEMS_COUNT:-10000}
+      # Polaris catalog (OAuth2 credentials loaded from env file)
+      POLARIS_URI: http://polaris:8181/api/catalog
+      POLARIS_WAREHOUSE: warehouse
+      # LocalStack S3 configuration
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      # Cube API
+      CUBE_API_URL: http://cube:4000
+      # OpenTelemetry for Jaeger tracing
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_SERVICE_NAME: floe-demo
+      # OpenLineage for Marquez lineage
+      OPENLINEAGE_URL: http://marquez:5000/api/v1/lineage
+      OPENLINEAGE_NAMESPACE: demo
+      # Trino for dbt transformations
+      TRINO_HOST: trino
+      TRINO_PORT: "8080"
+      # Python path
+      PYTHONPATH: /workspace
+    env_file:
+      - ./config/polaris-credentials.env
+    volumes:
+      - ../..:/workspace:ro
+      - ./config/dagster.yaml:/opt/dagster/dagster.yaml:ro
+      - ./config/workspace.yaml:/opt/dagster/workspace.yaml:ro
+    working_dir: /workspace
+    command:
+      - dagster-daemon
+      - run
+      - -w
+      - /opt/dagster/workspace.yaml
+    depends_on:
+      dagster-webserver:
+        condition: service_healthy
+    networks:
+      - floe-network
+    restart: unless-stopped
+    profiles:
+      - demo

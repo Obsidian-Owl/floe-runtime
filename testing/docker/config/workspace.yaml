@@ -1,0 +1,5 @@
+# Dagster workspace configuration
+# Defines code locations for the demo orchestration
+
+load_from:
+  - python_module: demo.orchestration

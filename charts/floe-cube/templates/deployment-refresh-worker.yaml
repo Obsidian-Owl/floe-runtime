@@ -1,0 +1,120 @@
+{{/*
+Cube Refresh Worker Deployment
+
+Deploys the Cube refresh worker that handles:
+- Pre-aggregation refresh jobs
+- Scheduled refresh of cached data
+- Background data processing
+
+The refresh worker runs as a separate deployment from the API
+to avoid blocking API requests during heavy refresh operations.
+
+Covers: 007-FR-001 (Helm chart for Kubernetes deployment)
+Covers: 007-FR-002 (Cube semantic layer deployment)
+*/}}
+{{- if .Values.refreshWorker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "floe-cube.fullname" . }}-refresh-worker
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "floe-cube.labels" . | nindent 4 }}
+    app.kubernetes.io/component: refresh-worker
+spec:
+  replicas: {{ .Values.refreshWorker.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "floe-cube.refreshWorker.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- if .Values.refreshWorker.podAnnotations }}
+        {{- toYaml .Values.refreshWorker.podAnnotations | nindent 8 }}
+        {{- end }}
+        # Restart on schema changes
+        checksum/schema: {{ include (print $.Template.BasePath "/configmap-schema.yaml") . | sha256sum }}
+      labels:
+        {{- include "floe-cube.refreshWorker.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 | default "{}" }}
+      containers:
+        - name: refresh-worker
+          image: {{ include "floe-cube.image" . }}
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          env:
+            {{- include "floe-cube.env" . | nindent 12 }}
+            # Mark this as a refresh worker (not API server)
+            - name: CUBEJS_REFRESH_WORKER
+              value: "true"
+            - name: CUBEJS_SCHEDULED_REFRESH_TIMER
+              value: {{ .Values.refreshWorker.refreshTimer | default "30" | quote }}
+            {{- if .Values.cubeStore.enabled }}
+            - name: CUBEJS_CUBESTORE_HOST
+              value: {{ include "floe-cube.fullname" . }}-store
+            - name: CUBEJS_CUBESTORE_PORT
+              value: "3030"
+            {{- end }}
+            {{- with .Values.refreshWorker.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- if .Values.refreshWorker.envFrom }}
+          envFrom:
+            {{- toYaml .Values.refreshWorker.envFrom | nindent 12 }}
+          {{- end }}
+          # Refresh worker doesn't expose HTTP - use process health
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pgrep -f "node" > /dev/null
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.refreshWorker.resources | nindent 12 }}
+          volumeMounts:
+            - name: schema
+              mountPath: {{ .Values.floe.schemaPath }}
+              readOnly: true
+            {{- if .Values.floe.compiledArtifacts.enabled }}
+            - name: compiled-artifacts
+              mountPath: {{ .Values.floe.compiledArtifacts.mountPath }}
+              subPath: compiled_artifacts.json
+              readOnly: true
+            {{- end }}
+            {{- with .Values.refreshWorker.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        - name: schema
+          configMap:
+            name: {{ include "floe-cube.schemaConfigMapName" . }}
+        {{- if .Values.floe.compiledArtifacts.enabled }}
+        - name: compiled-artifacts
+          configMap:
+            name: {{ include "floe-cube.compiledArtifactsConfigMapName" . }}
+        {{- end }}
+        {{- with .Values.refreshWorker.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

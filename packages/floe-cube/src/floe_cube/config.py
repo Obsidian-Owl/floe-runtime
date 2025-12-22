@@ -161,6 +161,7 @@ class CubeConfigGenerator:
         self._add_security_config(config)
         self._add_observability_config(config)
         self._add_cube_store_config(config)
+        self._add_export_bucket_config(config)
 
         # T018: Add secret references
         self._add_secret_refs(config)
@@ -196,6 +197,12 @@ class CubeConfigGenerator:
 
             timezone = pre_agg.get("timezone", "UTC")
             config["CUBEJS_SCHEDULED_REFRESH_TIMEZONE"] = timezone
+
+            # Set external storage default (Cube Store vs source DB)
+            # Default True for production, set False for testing
+            external = pre_agg.get("external", True)
+            config["CUBEJS_EXTERNAL_DEFAULT"] = str(external).lower()
+            self._log.debug("pre_aggregation_external", external=external)
 
     def _add_security_config(self, config: dict[str, str]) -> None:
         """Add security configuration.
@@ -238,11 +245,17 @@ class CubeConfigGenerator:
         """Add Cube Store configuration for pre-aggregations (T094).
 
         Configures S3 storage for external pre-aggregations via Cube Store.
+        Reads from pre_aggregations.cube_store path in ConsumptionConfig.
 
         Args:
             config: Configuration dict to update
         """
-        cube_store = self.config.get("cube_store", {})
+        pre_agg = self.config.get("pre_aggregations", {})
+        cube_store = pre_agg.get("cube_store", {})
+
+        # Only configure if cube_store is enabled
+        if not cube_store.get("enabled", False):
+            return
 
         # S3 bucket for pre-aggregation storage
         s3_bucket = cube_store.get("s3_bucket")
@@ -269,6 +282,55 @@ class CubeConfigGenerator:
         s3_endpoint = cube_store.get("s3_endpoint")
         if s3_endpoint:
             config["CUBEJS_CUBESTORE_S3_ENDPOINT"] = s3_endpoint
+
+    def _add_export_bucket_config(self, config: dict[str, str]) -> None:
+        """Add export bucket configuration for large pre-aggregation builds.
+
+        Export buckets are used by Trino/Snowflake for datasets >100k rows.
+        The source database writes temporary data to this bucket during builds,
+        which is then loaded into Cube Store in parallel for faster ingestion.
+
+        Note: DuckDB does NOT support export buckets - it uses batching only.
+
+        Args:
+            config: Configuration dict to update
+        """
+        pre_agg = self.config.get("pre_aggregations", {})
+        export_bucket = pre_agg.get("export_bucket", {})
+
+        # Only configure if export_bucket is enabled
+        if not export_bucket.get("enabled", False):
+            return
+
+        # Bucket type (s3 or gcs)
+        bucket_type = export_bucket.get("bucket_type")
+        if bucket_type:
+            config["CUBEJS_DB_EXPORT_BUCKET_TYPE"] = bucket_type
+
+        # Bucket name
+        bucket_name = export_bucket.get("name")
+        if bucket_name:
+            config["CUBEJS_DB_EXPORT_BUCKET"] = bucket_name
+            self._log.debug("export_bucket_configured", bucket=bucket_name)
+
+        # Region (for S3 buckets)
+        region = export_bucket.get("region")
+        if region:
+            config["CUBEJS_DB_EXPORT_BUCKET_AWS_REGION"] = region
+
+        # S3 credentials via K8s secret references (NEVER embed plaintext)
+        access_key_ref = export_bucket.get("access_key_ref")
+        if access_key_ref:
+            config["CUBEJS_DB_EXPORT_BUCKET_AWS_KEY"] = f"${{{access_key_ref}}}"
+
+        secret_key_ref = export_bucket.get("secret_key_ref")
+        if secret_key_ref:
+            config["CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET"] = f"${{{secret_key_ref}}}"
+
+        # Snowflake storage integration (Snowflake-specific)
+        integration = export_bucket.get("integration")
+        if integration:
+            config["CUBEJS_DB_EXPORT_INTEGRATION"] = integration
 
     def _add_secret_refs(self, config: dict[str, str]) -> None:
         """Add Kubernetes secret references (T018).

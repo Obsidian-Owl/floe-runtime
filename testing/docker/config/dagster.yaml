@@ -1,0 +1,27 @@
+# Dagster instance configuration for demo deployment
+# Used by both dagster-webserver and dagster-daemon
+
+run_storage:
+  module: dagster_postgres.run_storage
+  class: PostgresRunStorage
+  config:
+    postgres_url:
+      env: DAGSTER_PG_CONN_STRING
+
+event_log_storage:
+  module: dagster_postgres.event_log
+  class: PostgresEventLogStorage
+  config:
+    postgres_url:
+      env: DAGSTER_PG_CONN_STRING
+
+schedule_storage:
+  module: dagster_postgres.schedule_storage
+  class: PostgresScheduleStorage
+  config:
+    postgres_url:
+      env: DAGSTER_PG_CONN_STRING
+
+# Where to find code to load
+code_servers:
+  local_startup_timeout: 120

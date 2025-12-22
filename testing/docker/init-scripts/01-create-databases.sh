@@ -27,6 +27,10 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
     -- Database for dbt compute target testing
     CREATE DATABASE floe_dbt;
     COMMENT ON DATABASE floe_dbt IS 'dbt PostgreSQL compute target for testing';
+
+    -- Database for Dagster (orchestration metadata)
+    CREATE DATABASE dagster;
+    COMMENT ON DATABASE dagster IS 'Dagster orchestration metadata and run storage';
 EOSQL
 
 echo "Databases created successfully:"
@@ -34,3 +38,4 @@ echo "  - polaris   (Iceberg catalog)"
 echo "  - marquez   (OpenLineage)"
 echo "  - floe_dev  (Development)"
 echo "  - floe_dbt  (dbt target)"
+echo "  - dagster   (Orchestration)"

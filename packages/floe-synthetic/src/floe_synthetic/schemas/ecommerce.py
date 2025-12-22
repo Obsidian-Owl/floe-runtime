@@ -14,7 +14,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 # Valid values for categorical fields
 RegionType = Literal["north", "south", "east", "west"]
@@ -92,6 +92,60 @@ class Order(BaseModel):
         description="Order total amount",
     )
     created_at: datetime = Field(..., description="Order creation timestamp")
+
+
+class OrderItem(BaseModel):
+    """Order line item entity linking orders to products.
+
+    Represents a single line item within an order, including quantity,
+    pricing, and calculated subtotal. Added for 007-FR-027a (E2E demo).
+
+    Attributes:
+        order_item_id: Unique line item identifier
+        order_id: Reference to parent Order.order_id
+        product_id: Reference to Product.product_id
+        quantity: Quantity ordered (positive integer)
+        unit_price: Price per unit at time of order
+        discount: Discount applied to this line item (default: 0)
+        subtotal: Computed as quantity * unit_price - discount
+
+    Example:
+        >>> item = OrderItem(
+        ...     order_item_id=1,
+        ...     order_id=100,
+        ...     product_id=50,
+        ...     quantity=2,
+        ...     unit_price=Decimal("49.99"),
+        ...     discount=Decimal("5.00"),
+        ... )
+        >>> item.subtotal
+        Decimal('94.98')
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    order_item_id: int = Field(..., ge=1, description="Unique line item identifier")
+    order_id: int = Field(..., ge=1, description="Foreign key to Order")
+    product_id: int = Field(..., ge=1, description="Foreign key to Product")
+    quantity: int = Field(..., ge=1, description="Quantity ordered")
+    unit_price: Decimal = Field(
+        ...,
+        ge=Decimal("0"),
+        decimal_places=2,
+        description="Price per unit at time of order",
+    )
+    discount: Decimal = Field(
+        default=Decimal("0.00"),
+        ge=Decimal("0"),
+        decimal_places=2,
+        description="Discount applied to line item",
+    )
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def subtotal(self) -> Decimal:
+        """Calculate subtotal as quantity * unit_price - discount."""
+        return (self.quantity * self.unit_price) - self.discount
 
 
 class Product(BaseModel):

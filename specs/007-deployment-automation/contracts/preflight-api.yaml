@@ -1,0 +1,398 @@
+openapi: 3.0.3
+info:
+  title: Floe Preflight Validation API
+  description: |
+    CLI command specification for `floe preflight` - infrastructure validation
+    before deployment. This is a CLI tool, not a REST API, but OpenAPI format
+    provides a structured way to define inputs, outputs, and behaviors.
+  version: 1.0.0
+  contact:
+    name: Floe Runtime Team
+
+# CLI Command Specification (using OpenAPI as structured documentation)
+paths:
+  /preflight:
+    post:
+      operationId: runPreflight
+      summary: Validate infrastructure connectivity before deployment
+      description: |
+        CLI Usage:
+        ```bash
+        floe preflight [OPTIONS]
+
+        Options:
+          --check-compute    Validate compute engine connectivity
+          --check-storage    Validate object storage access
+          --check-catalog    Validate Iceberg catalog authentication
+          --check-postgres   Validate PostgreSQL connection
+          --all              Run all checks (default if no specific checks)
+          --json             Output results as JSON
+          --timeout SECONDS  Timeout per check (default: 30)
+          --config PATH      Path to floe.yaml (default: ./floe.yaml)
+        ```
+
+        Exit Codes:
+        - 0: All checks passed
+        - 1: One or more checks failed
+        - 2: Configuration error
+      tags:
+        - CLI Commands
+      requestBody:
+        description: CLI options translated to request body for documentation
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreflightOptions'
+      responses:
+        '200':
+          description: Preflight checks completed (may contain failures)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreflightReport'
+              examples:
+                allPassed:
+                  summary: All checks passed
+                  value:
+                    timestamp: "2025-12-21T10:30:00Z"
+                    overall_status: pass
+                    duration_ms: 1234
+                    checks:
+                      - service: compute
+                        status: ok
+                        message: "Trino connection successful"
+                        duration_ms: 456
+                      - service: storage
+                        status: ok
+                        message: "S3 bucket accessible with read/write permissions"
+                        duration_ms: 234
+                      - service: catalog
+                        status: ok
+                        message: "Polaris OAuth2 authentication successful"
+                        duration_ms: 345
+                      - service: postgres
+                        status: ok
+                        message: "PostgreSQL connection established"
+                        duration_ms: 199
+                someFailed:
+                  summary: Some checks failed
+                  value:
+                    timestamp: "2025-12-21T10:30:00Z"
+                    overall_status: fail
+                    duration_ms: 2345
+                    checks:
+                      - service: compute
+                        status: ok
+                        message: "Trino connection successful"
+                        duration_ms: 456
+                      - service: catalog
+                        status: error
+                        message: "OAuth2 authentication failed (401 Unauthorized)"
+                        duration_ms: 1234
+                        remediation: "Verify POLARIS_CLIENT_ID and POLARIS_CLIENT_SECRET environment variables"
+                        details:
+                          endpoint: "https://polaris.example.com/api/catalog/v1/oauth/tokens"
+                          http_status: 401
+        '422':
+          description: Configuration error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigurationError'
+
+components:
+  schemas:
+    PreflightOptions:
+      type: object
+      description: CLI options for preflight command
+      properties:
+        check_compute:
+          type: boolean
+          default: false
+          description: Validate compute engine (Trino, Snowflake, BigQuery, DuckDB)
+        check_storage:
+          type: boolean
+          default: false
+          description: Validate object storage (S3, GCS, ADLS)
+        check_catalog:
+          type: boolean
+          default: false
+          description: Validate Iceberg catalog (Polaris OAuth2)
+        check_postgres:
+          type: boolean
+          default: false
+          description: Validate PostgreSQL connection (Dagster metadata)
+        all:
+          type: boolean
+          default: true
+          description: Run all checks if no specific checks requested
+        json_output:
+          type: boolean
+          default: false
+          description: Output as JSON instead of Rich table
+        timeout:
+          type: integer
+          default: 30
+          minimum: 5
+          maximum: 300
+          description: Timeout per check in seconds
+        config_path:
+          type: string
+          default: "./floe.yaml"
+          description: Path to floe.yaml configuration file
+
+    PreflightConfig:
+      type: object
+      description: Configuration derived from floe.yaml and environment
+      required:
+        - compute_type
+      properties:
+        compute_type:
+          type: string
+          enum: [trino, snowflake, bigquery, duckdb]
+          description: Compute engine type
+        compute_host:
+          type: string
+          description: Compute engine hostname
+          example: "trino.example.com"
+        compute_port:
+          type: integer
+          description: Compute engine port
+          example: 8080
+        storage_type:
+          type: string
+          enum: [s3, gcs, adls]
+          description: Object storage provider
+        storage_bucket:
+          type: string
+          description: Bucket name for validation
+          example: "floe-data-bucket"
+        catalog_uri:
+          type: string
+          format: uri
+          description: Polaris catalog REST API endpoint
+          example: "https://polaris.example.com/api/catalog"
+        postgres_host:
+          type: string
+          description: PostgreSQL hostname
+          example: "postgres.example.com"
+        postgres_port:
+          type: integer
+          default: 5432
+          description: PostgreSQL port
+        postgres_database:
+          type: string
+          description: PostgreSQL database name
+          example: "dagster"
+
+    PreflightResult:
+      type: object
+      description: Result of a single preflight check
+      required:
+        - service
+        - status
+        - message
+        - duration_ms
+      properties:
+        service:
+          type: string
+          enum: [compute, storage, catalog, postgres]
+          description: Service being validated
+        status:
+          type: string
+          enum: [ok, warning, error]
+          description: Check result status
+        message:
+          type: string
+          description: Human-readable result message
+          example: "Trino connection successful"
+        duration_ms:
+          type: integer
+          minimum: 0
+          description: Time taken for check in milliseconds
+        remediation:
+          type: string
+          description: Suggested fix for error/warning status
+          example: "Verify POLARIS_CLIENT_ID environment variable"
+        details:
+          type: object
+          additionalProperties: true
+          description: Additional diagnostic information
+          example:
+            endpoint: "https://polaris.example.com"
+            http_status: 401
+
+    PreflightReport:
+      type: object
+      description: Complete preflight validation report
+      required:
+        - timestamp
+        - overall_status
+        - duration_ms
+        - checks
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: When the report was generated
+        overall_status:
+          type: string
+          enum: [pass, fail]
+          description: Overall pass/fail status
+        duration_ms:
+          type: integer
+          minimum: 0
+          description: Total time for all checks
+        environment:
+          type: string
+          description: Environment being validated
+          example: "production"
+        checks:
+          type: array
+          items:
+            $ref: '#/components/schemas/PreflightResult'
+          description: Individual check results
+
+    ConfigurationError:
+      type: object
+      description: Error when configuration is invalid
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          enum: [config_not_found, config_invalid, missing_credentials]
+          description: Error type
+        message:
+          type: string
+          description: Error message
+          example: "floe.yaml not found at ./floe.yaml"
+        details:
+          type: object
+          additionalProperties: true
+          description: Additional error details
+
+  # Environment Variables (documented as part of the API contract)
+  x-environment-variables:
+    compute:
+      TRINO_HOST:
+        description: Trino coordinator hostname
+        required: false
+      TRINO_PORT:
+        description: Trino coordinator port
+        required: false
+        default: "8080"
+      SNOWFLAKE_ACCOUNT:
+        description: Snowflake account identifier
+        required: false
+      SNOWFLAKE_USER:
+        description: Snowflake username
+        required: false
+      SNOWFLAKE_PASSWORD:
+        description: Snowflake password (SecretStr)
+        required: false
+        sensitive: true
+    storage:
+      AWS_ACCESS_KEY_ID:
+        description: AWS access key for S3
+        required: false
+        sensitive: true
+      AWS_SECRET_ACCESS_KEY:
+        description: AWS secret key for S3
+        required: false
+        sensitive: true
+      AWS_REGION:
+        description: AWS region for S3
+        required: false
+        default: "us-east-1"
+      GOOGLE_APPLICATION_CREDENTIALS:
+        description: Path to GCP service account JSON
+        required: false
+      AZURE_STORAGE_ACCOUNT:
+        description: Azure storage account name
+        required: false
+    catalog:
+      POLARIS_URI:
+        description: Polaris REST catalog endpoint
+        required: false
+      POLARIS_CLIENT_ID:
+        description: Polaris OAuth2 client ID
+        required: false
+        sensitive: true
+      POLARIS_CLIENT_SECRET:
+        description: Polaris OAuth2 client secret
+        required: false
+        sensitive: true
+    postgres:
+      DAGSTER_PG_HOST:
+        description: PostgreSQL hostname for Dagster
+        required: false
+      DAGSTER_PG_PORT:
+        description: PostgreSQL port
+        required: false
+        default: "5432"
+      DAGSTER_PG_USER:
+        description: PostgreSQL username
+        required: false
+      DAGSTER_PG_PASSWORD:
+        description: PostgreSQL password (SecretStr)
+        required: false
+        sensitive: true
+      DAGSTER_PG_DB:
+        description: PostgreSQL database name
+        required: false
+        default: "dagster"
+
+# Check Implementations (documented as x-extensions)
+x-check-implementations:
+  compute:
+    trino:
+      method: "JDBC/HTTP connection"
+      validation: "SELECT 1"
+      success_criteria: "Query returns without error"
+    snowflake:
+      method: "snowflake-connector-python"
+      validation: "SELECT 1"
+      success_criteria: "Query returns without error"
+    bigquery:
+      method: "google-cloud-bigquery client"
+      validation: "SELECT 1"
+      success_criteria: "Query returns without error"
+    duckdb:
+      method: "duckdb-python"
+      validation: "SELECT 1"
+      success_criteria: "Query returns without error (embedded, always passes)"
+  storage:
+    s3:
+      method: "boto3 head_bucket"
+      validation: "Bucket exists and is accessible"
+      success_criteria: "HTTP 200 response"
+    gcs:
+      method: "google-cloud-storage get_bucket"
+      validation: "Bucket exists and is accessible"
+      success_criteria: "No exception raised"
+    adls:
+      method: "azure-storage-blob get_container_client"
+      validation: "Container exists and is accessible"
+      success_criteria: "No exception raised"
+  catalog:
+    polaris:
+      method: "OAuth2 token request + /v1/config endpoint"
+      validation: "Token obtained and config retrieved"
+      success_criteria: "HTTP 200 with valid token"
+  postgres:
+    default:
+      method: "psycopg2 connection"
+      validation: "Connection established"
+      success_criteria: "SELECT 1 returns without error"
+
+# Error Messages (standardized format)
+x-error-messages:
+  format: "[SERVICE] [STATUS]: [MESSAGE]. Remediation: [SUGGESTION]"
+  examples:
+    - "[COMPUTE] ERROR: Trino connection refused (Connection refused). Remediation: Verify TRINO_HOST and TRINO_PORT, ensure Trino is running."
+    - "[STORAGE] ERROR: S3 bucket not found (NoSuchBucket). Remediation: Verify bucket name and AWS region."
+    - "[CATALOG] ERROR: OAuth2 authentication failed (401 Unauthorized). Remediation: Verify POLARIS_CLIENT_ID and POLARIS_CLIENT_SECRET environment variables."
+    - "[POSTGRES] ERROR: Connection refused (Connection refused). Remediation: Verify DAGSTER_PG_HOST and DAGSTER_PG_PORT, ensure PostgreSQL is running."
+    - "[CATALOG] WARNING: Slow response (2345ms > 1000ms threshold). Remediation: Consider network latency or catalog load."

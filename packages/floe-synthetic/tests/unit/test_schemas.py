@@ -15,7 +15,7 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from floe_synthetic.schemas.ecommerce import Customer, Order, Product
+from floe_synthetic.schemas.ecommerce import Customer, Order, OrderItem, Product
 from floe_synthetic.schemas.saas_metrics import Event, Subscription, User
 
 
@@ -154,6 +154,137 @@ class TestOrderSchema:
                 created_at=datetime(2025, 1, 1),
             )
         assert "amount" in str(exc_info.value)
+
+
+class TestOrderItemSchema:
+    """Tests for OrderItem Pydantic model.
+
+    Covers: 007-FR-027a (OrderItem schema for E2E demo)
+    """
+
+    @pytest.mark.requirement("007-FR-027a")
+    def test_valid_order_item(self) -> None:
+        """Create valid order item with all required fields."""
+        order_item = OrderItem(
+            order_item_id=1,
+            order_id=100,
+            product_id=50,
+            quantity=2,
+            unit_price=Decimal("49.99"),
+            discount=Decimal("5.00"),
+        )
+        assert order_item.order_item_id == 1
+        assert order_item.order_id == 100
+        assert order_item.product_id == 50
+        assert order_item.quantity == 2
+        assert order_item.unit_price == Decimal("49.99")
+        assert order_item.discount == Decimal("5.00")
+        # subtotal = quantity * unit_price - discount = 2 * 49.99 - 5.00 = 94.98
+        assert order_item.subtotal == Decimal("94.98")
+
+    @pytest.mark.requirement("007-FR-027a")
+    def test_order_item_default_discount(self) -> None:
+        """OrderItem discount defaults to 0."""
+        order_item = OrderItem(
+            order_item_id=1,
+            order_id=100,
+            product_id=50,
+            quantity=1,
+            unit_price=Decimal("29.99"),
+        )
+        assert order_item.discount == Decimal("0.00")
+        assert order_item.subtotal == Decimal("29.99")
+
+    @pytest.mark.requirement("007-FR-027a")
+    def test_order_item_frozen(self) -> None:
+        """OrderItem model is immutable."""
+        order_item = OrderItem(
+            order_item_id=1,
+            order_id=100,
+            product_id=50,
+            quantity=1,
+            unit_price=Decimal("10.00"),
+        )
+        with pytest.raises(ValidationError):
+            order_item.quantity = 5  # type: ignore[misc]
+
+    @pytest.mark.requirement("007-FR-027a")
+    def test_order_item_invalid_quantity(self) -> None:
+        """Non-positive quantity raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            OrderItem(
+                order_item_id=1,
+                order_id=100,
+                product_id=50,
+                quantity=0,
+                unit_price=Decimal("10.00"),
+            )
+        assert "quantity" in str(exc_info.value)
+
+    @pytest.mark.requirement("007-FR-027a")
+    def test_order_item_negative_price(self) -> None:
+        """Negative unit_price raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            OrderItem(
+                order_item_id=1,
+                order_id=100,
+                product_id=50,
+                quantity=1,
+                unit_price=Decimal("-10.00"),
+            )
+        assert "unit_price" in str(exc_info.value)
+
+    @pytest.mark.requirement("007-FR-027a")
+    def test_order_item_negative_discount(self) -> None:
+        """Negative discount raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            OrderItem(
+                order_item_id=1,
+                order_id=100,
+                product_id=50,
+                quantity=1,
+                unit_price=Decimal("10.00"),
+                discount=Decimal("-5.00"),
+            )
+        assert "discount" in str(exc_info.value)
+
+    @pytest.mark.requirement("007-FR-027a")
+    def test_order_item_extra_field_forbidden(self) -> None:
+        """Extra fields are rejected."""
+        with pytest.raises(ValidationError) as exc_info:
+            OrderItem(
+                order_item_id=1,
+                order_id=100,
+                product_id=50,
+                quantity=1,
+                unit_price=Decimal("10.00"),
+                extra_field="value",  # type: ignore[call-arg]
+            )
+        assert "extra_field" in str(exc_info.value)
+
+    @pytest.mark.requirement("007-FR-027a")
+    def test_order_item_subtotal_calculation(self) -> None:
+        """Subtotal is correctly calculated from quantity, unit_price, discount."""
+        # Test various combinations
+        test_cases = [
+            (1, Decimal("100.00"), Decimal("0.00"), Decimal("100.00")),
+            (2, Decimal("50.00"), Decimal("0.00"), Decimal("100.00")),
+            (3, Decimal("33.33"), Decimal("0.00"), Decimal("99.99")),
+            (1, Decimal("100.00"), Decimal("10.00"), Decimal("90.00")),
+            (5, Decimal("20.00"), Decimal("25.00"), Decimal("75.00")),
+        ]
+        for qty, price, discount, expected in test_cases:
+            order_item = OrderItem(
+                order_item_id=1,
+                order_id=1,
+                product_id=1,
+                quantity=qty,
+                unit_price=price,
+                discount=discount,
+            )
+            assert order_item.subtotal == expected, (
+                f"Expected {expected} for qty={qty}, price={price}, discount={discount}"
+            )
 
 
 class TestProductSchema:

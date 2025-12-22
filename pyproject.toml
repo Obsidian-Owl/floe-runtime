@@ -31,6 +31,7 @@ dev-dependencies = [
     "jsonschema>=4.0",       # Schema validation tests
     # Type stubs
     "types-PyYAML>=6.0",     # Type hints for PyYAML
+    "types-requests>=2.31",  # Type hints for requests (E2E tests)
 ]
 
 [tool.black]
@@ -60,6 +61,13 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4"]
+
+[tool.ruff.lint.per-file-ignores]
+# demo/orchestration uses old-style type hints (Dict, Optional, List) because
+# Dagster 1.12.x's type validation uses identity checks that break with PEP 563
+# string annotations (from __future__ import annotations). See:
+# https://github.com/dagster-io/dagster/issues
+"demo/orchestration/*.py" = ["UP006", "UP007", "UP035", "UP045"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["floe_core", "floe_cli", "floe_dagster", "floe_dbt", "floe_iceberg", "floe_polaris", "floe_cube", "floe_synthetic"]

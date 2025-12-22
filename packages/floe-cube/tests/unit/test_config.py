@@ -515,17 +515,69 @@ class TestObservabilityConfig:
         assert result.get("FLOE_OPENLINEAGE_NAMESPACE") == "my-namespace"
 
 
-class TestCubeStoreConfig:
-    """Tests for Cube Store configuration (T094)."""
+class TestPreAggregationExternalConfig:
+    """Tests for pre-aggregation external storage configuration."""
 
-    def test_cube_store_s3_bucket_configuration(self) -> None:
-        """S3 bucket should configure Cube Store."""
+    def test_external_default_true_for_production(self) -> None:
+        """CUBEJS_EXTERNAL_DEFAULT should default to true (Cube Store)."""
         from floe_cube.config import CubeConfigGenerator
 
         config = {
             "database_type": "postgres",
-            "cube_store": {
-                "s3_bucket": "my-pre-aggregations-bucket",
+            "pre_aggregations": {
+                "refresh_schedule": "*/30 * * * *",
+            },
+        }
+        generator = CubeConfigGenerator(config)
+        result = generator.generate()
+
+        assert result["CUBEJS_EXTERNAL_DEFAULT"] == "true"
+
+    def test_external_false_for_testing(self) -> None:
+        """CUBEJS_EXTERNAL_DEFAULT should be false when external=False."""
+        from floe_cube.config import CubeConfigGenerator
+
+        config = {
+            "database_type": "postgres",
+            "pre_aggregations": {
+                "external": False,
+            },
+        }
+        generator = CubeConfigGenerator(config)
+        result = generator.generate()
+
+        assert result["CUBEJS_EXTERNAL_DEFAULT"] == "false"
+
+    def test_external_true_explicitly_set(self) -> None:
+        """CUBEJS_EXTERNAL_DEFAULT should be true when explicitly set."""
+        from floe_cube.config import CubeConfigGenerator
+
+        config = {
+            "database_type": "postgres",
+            "pre_aggregations": {
+                "external": True,
+            },
+        }
+        generator = CubeConfigGenerator(config)
+        result = generator.generate()
+
+        assert result["CUBEJS_EXTERNAL_DEFAULT"] == "true"
+
+
+class TestCubeStoreConfig:
+    """Tests for Cube Store configuration (nested under pre_aggregations)."""
+
+    def test_cube_store_s3_bucket_configuration(self) -> None:
+        """S3 bucket should configure Cube Store when enabled."""
+        from floe_cube.config import CubeConfigGenerator
+
+        config = {
+            "database_type": "postgres",
+            "pre_aggregations": {
+                "cube_store": {
+                    "enabled": True,
+                    "s3_bucket": "my-pre-aggregations-bucket",
+                },
             },
         }
         generator = CubeConfigGenerator(config)
@@ -534,15 +586,37 @@ class TestCubeStoreConfig:
         assert result["CUBEJS_EXT_DB_TYPE"] == "cubestore"
         assert result["CUBEJS_CUBESTORE_S3_BUCKET"] == "my-pre-aggregations-bucket"
 
+    def test_cube_store_not_configured_when_disabled(self) -> None:
+        """Cube Store should not be configured when enabled=False."""
+        from floe_cube.config import CubeConfigGenerator
+
+        config = {
+            "database_type": "postgres",
+            "pre_aggregations": {
+                "cube_store": {
+                    "enabled": False,
+                    "s3_bucket": "my-bucket",
+                },
+            },
+        }
+        generator = CubeConfigGenerator(config)
+        result = generator.generate()
+
+        assert "CUBEJS_EXT_DB_TYPE" not in result
+        assert "CUBEJS_CUBESTORE_S3_BUCKET" not in result
+
     def test_cube_store_s3_region_configuration(self) -> None:
         """S3 region should be configurable."""
         from floe_cube.config import CubeConfigGenerator
 
         config = {
             "database_type": "postgres",
-            "cube_store": {
-                "s3_bucket": "my-bucket",
-                "s3_region": "us-west-2",
+            "pre_aggregations": {
+                "cube_store": {
+                    "enabled": True,
+                    "s3_bucket": "my-bucket",
+                    "s3_region": "us-west-2",
+                },
             },
         }
         generator = CubeConfigGenerator(config)
@@ -556,10 +630,13 @@ class TestCubeStoreConfig:
 
         config = {
             "database_type": "postgres",
-            "cube_store": {
-                "s3_bucket": "my-bucket",
-                "s3_access_key_ref": "aws-access-key",
-                "s3_secret_key_ref": "aws-secret-key",
+            "pre_aggregations": {
+                "cube_store": {
+                    "enabled": True,
+                    "s3_bucket": "my-bucket",
+                    "s3_access_key_ref": "aws-access-key",
+                    "s3_secret_key_ref": "aws-secret-key",
+                },
             },
         }
         generator = CubeConfigGenerator(config)
@@ -575,9 +652,12 @@ class TestCubeStoreConfig:
 
         config = {
             "database_type": "postgres",
-            "cube_store": {
-                "s3_bucket": "my-bucket",
-                "s3_endpoint": "http://localhost:4566",
+            "pre_aggregations": {
+                "cube_store": {
+                    "enabled": True,
+                    "s3_bucket": "my-bucket",
+                    "s3_endpoint": "http://localhost:4566",
+                },
             },
         }
         generator = CubeConfigGenerator(config)
@@ -585,8 +665,8 @@ class TestCubeStoreConfig:
 
         assert result["CUBEJS_CUBESTORE_S3_ENDPOINT"] == "http://localhost:4566"
 
-    def test_cube_store_not_configured_without_bucket(self) -> None:
-        """Cube Store should not be configured without S3 bucket."""
+    def test_cube_store_not_configured_without_pre_aggregations(self) -> None:
+        """Cube Store should not be configured without pre_aggregations."""
         from floe_cube.config import CubeConfigGenerator
 
         config = {
@@ -604,12 +684,15 @@ class TestCubeStoreConfig:
 
         config = {
             "database_type": "postgres",
-            "cube_store": {
-                "s3_bucket": "prod-preagg-bucket",
-                "s3_region": "eu-west-1",
-                "s3_access_key_ref": "cube-aws-access-key",
-                "s3_secret_key_ref": "cube-aws-secret-key",
-                "s3_endpoint": "https://s3.eu-west-1.amazonaws.com",
+            "pre_aggregations": {
+                "cube_store": {
+                    "enabled": True,
+                    "s3_bucket": "prod-preagg-bucket",
+                    "s3_region": "eu-west-1",
+                    "s3_access_key_ref": "cube-aws-access-key",
+                    "s3_secret_key_ref": "cube-aws-secret-key",
+                    "s3_endpoint": "https://s3.eu-west-1.amazonaws.com",
+                },
             },
         }
         generator = CubeConfigGenerator(config)
@@ -621,3 +704,139 @@ class TestCubeStoreConfig:
         assert result["CUBEJS_CUBESTORE_AWS_ACCESS_KEY_ID"] == "${cube-aws-access-key}"
         assert result["CUBEJS_CUBESTORE_AWS_SECRET_ACCESS_KEY"] == "${cube-aws-secret-key}"
         assert result["CUBEJS_CUBESTORE_S3_ENDPOINT"] == "https://s3.eu-west-1.amazonaws.com"
+
+
+class TestExportBucketConfig:
+    """Tests for export bucket configuration (for large pre-aggregation builds)."""
+
+    def test_export_bucket_s3_configuration(self) -> None:
+        """S3 export bucket should be configured when enabled."""
+        from floe_cube.config import CubeConfigGenerator
+
+        config = {
+            "database_type": "trino",
+            "pre_aggregations": {
+                "export_bucket": {
+                    "enabled": True,
+                    "bucket_type": "s3",
+                    "name": "my-export-bucket",
+                    "region": "us-west-2",
+                },
+            },
+        }
+        generator = CubeConfigGenerator(config)
+        result = generator.generate()
+
+        assert result["CUBEJS_DB_EXPORT_BUCKET_TYPE"] == "s3"
+        assert result["CUBEJS_DB_EXPORT_BUCKET"] == "my-export-bucket"
+        assert result["CUBEJS_DB_EXPORT_BUCKET_AWS_REGION"] == "us-west-2"
+
+    def test_export_bucket_gcs_configuration(self) -> None:
+        """GCS export bucket should be configured."""
+        from floe_cube.config import CubeConfigGenerator
+
+        config = {
+            "database_type": "bigquery",
+            "pre_aggregations": {
+                "export_bucket": {
+                    "enabled": True,
+                    "bucket_type": "gcs",
+                    "name": "my-gcs-export-bucket",
+                },
+            },
+        }
+        generator = CubeConfigGenerator(config)
+        result = generator.generate()
+
+        assert result["CUBEJS_DB_EXPORT_BUCKET_TYPE"] == "gcs"
+        assert result["CUBEJS_DB_EXPORT_BUCKET"] == "my-gcs-export-bucket"
+
+    def test_export_bucket_not_configured_when_disabled(self) -> None:
+        """Export bucket should not be configured when enabled=False."""
+        from floe_cube.config import CubeConfigGenerator
+
+        config = {
+            "database_type": "trino",
+            "pre_aggregations": {
+                "export_bucket": {
+                    "enabled": False,
+                    "bucket_type": "s3",
+                    "name": "my-bucket",
+                },
+            },
+        }
+        generator = CubeConfigGenerator(config)
+        result = generator.generate()
+
+        assert "CUBEJS_DB_EXPORT_BUCKET_TYPE" not in result
+        assert "CUBEJS_DB_EXPORT_BUCKET" not in result
+
+    def test_export_bucket_s3_credentials_use_secret_refs(self) -> None:
+        """S3 credentials should reference K8s secrets."""
+        from floe_cube.config import CubeConfigGenerator
+
+        config = {
+            "database_type": "trino",
+            "pre_aggregations": {
+                "export_bucket": {
+                    "enabled": True,
+                    "bucket_type": "s3",
+                    "name": "my-bucket",
+                    "access_key_ref": "export-access-key",
+                    "secret_key_ref": "export-secret-key",
+                },
+            },
+        }
+        generator = CubeConfigGenerator(config)
+        result = generator.generate()
+
+        assert result["CUBEJS_DB_EXPORT_BUCKET_AWS_KEY"] == "${export-access-key}"
+        assert result["CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET"] == "${export-secret-key}"
+
+    def test_export_bucket_snowflake_integration(self) -> None:
+        """Snowflake storage integration should be configurable."""
+        from floe_cube.config import CubeConfigGenerator
+
+        config = {
+            "database_type": "snowflake",
+            "pre_aggregations": {
+                "export_bucket": {
+                    "enabled": True,
+                    "bucket_type": "s3",
+                    "name": "my-bucket",
+                    "integration": "my_storage_integration",
+                },
+            },
+        }
+        generator = CubeConfigGenerator(config)
+        result = generator.generate()
+
+        assert result["CUBEJS_DB_EXPORT_INTEGRATION"] == "my_storage_integration"
+
+    def test_export_bucket_full_configuration(self) -> None:
+        """Full export bucket configuration should include all settings."""
+        from floe_cube.config import CubeConfigGenerator
+
+        config = {
+            "database_type": "trino",
+            "pre_aggregations": {
+                "external": True,
+                "export_bucket": {
+                    "enabled": True,
+                    "bucket_type": "s3",
+                    "name": "prod-export-bucket",
+                    "region": "eu-west-1",
+                    "access_key_ref": "export-aws-access",
+                    "secret_key_ref": "export-aws-secret",
+                },
+            },
+        }
+        generator = CubeConfigGenerator(config)
+        result = generator.generate()
+
+        assert result["CUBEJS_EXTERNAL_DEFAULT"] == "true"
+        assert result["CUBEJS_DB_EXPORT_BUCKET_TYPE"] == "s3"
+        assert result["CUBEJS_DB_EXPORT_BUCKET"] == "prod-export-bucket"
+        assert result["CUBEJS_DB_EXPORT_BUCKET_AWS_REGION"] == "eu-west-1"
+        assert result["CUBEJS_DB_EXPORT_BUCKET_AWS_KEY"] == "${export-aws-access}"
+        assert result["CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET"] == "${export-aws-secret}"

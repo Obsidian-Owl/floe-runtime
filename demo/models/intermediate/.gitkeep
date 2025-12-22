@@ -1,0 +1,6 @@
+# Intermediate models (int_*) - Enriched Silver layer
+# Join and transform staging models
+# See plan.md for model specifications:
+# - int_order_items_enriched.sql
+# - int_customer_orders.sql
+# - int_product_performance.sql
