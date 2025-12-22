@@ -102,9 +102,10 @@ class TrinoCheck(BaseCheck):
         try:
             import urllib.request
 
+            # URL is from validated configuration, not user input
             url = f"http://{self.host}:{self.port}/v1/info"
             req = urllib.request.Request(url, method="GET")
-            with urllib.request.urlopen(req, timeout=self.timeout_seconds) as response:
+            with urllib.request.urlopen(req, timeout=self.timeout_seconds) as response:  # nosec B310
                 if response.status == 200:
                     details["api_status"] = "healthy"
                 else:

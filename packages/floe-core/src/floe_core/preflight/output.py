@@ -175,9 +175,6 @@ def print_result(
         # Print raw JSON without Rich formatting to ensure parseable output
         json_str = format_result_json(result, pretty=True)
         # Write directly to the console's file to avoid any formatting
-        if console.file is not None:
-            console.file.write(json_str + "\n")
-        else:
-            print(json_str)
+        console.file.write(json_str + "\n")
     else:
         format_result_table(result, console)

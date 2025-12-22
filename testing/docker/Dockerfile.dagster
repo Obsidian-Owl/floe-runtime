@@ -2,9 +2,14 @@
 # Used by docker-compose demo profile for dagster-webserver and dagster-daemon
 #
 # This image contains:
-# - Dagster core packages
+# - Dagster core packages with dbt integration
+# - OpenTelemetry for Jaeger tracing
+# - OpenLineage for Marquez lineage
+# - floe-* packages for data generation and Iceberg storage
 # - Demo orchestration code
-# - Required Python dependencies
+#
+# Provides a production-like demo environment with real data generation,
+# tracing, and lineage capabilities.
 
 FROM python:3.10-slim
 
@@ -17,17 +22,48 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Set working directory
 WORKDIR /workspace
 
-# Install Dagster and dependencies
+# Install Dagster and all demo dependencies
 RUN pip install --no-cache-dir \
+    # Dagster core
     dagster \
     dagster-webserver \
     dagster-postgres \
+    # Dagster dbt integration
+    dagster-dbt>=0.25 \
+    # dbt with Trino adapter
+    dbt-core>=1.7 \
+    dbt-trino>=1.7 \
+    # OpenTelemetry for Jaeger tracing
+    opentelemetry-api>=1.28 \
+    opentelemetry-sdk>=1.28 \
+    opentelemetry-exporter-otlp-proto-grpc>=1.28 \
+    # HTTP client for OpenLineage
+    httpx \
+    # Iceberg/Polaris integration
+    pyiceberg>=0.9 \
+    pyarrow>=14.0 \
+    # Synthetic data generation
+    faker>=18.0 \
+    # Core dependencies
     structlog \
     pydantic \
     pydantic-settings
 
 # Create dagster home directory
 RUN mkdir -p /opt/dagster
+
+# Copy floe packages (for local development)
+COPY packages/ /workspace/packages/
+
+# Install floe packages in development mode
+# Note: floe-core must be installed first as it's a dependency of other packages
+RUN pip install --no-cache-dir \
+    -e /workspace/packages/floe-core \
+    -e /workspace/packages/floe-dbt \
+    -e /workspace/packages/floe-polaris \
+    -e /workspace/packages/floe-iceberg \
+    -e /workspace/packages/floe-synthetic \
+    -e /workspace/packages/floe-dagster
 
 # Copy demo code
 COPY demo/ /workspace/demo/

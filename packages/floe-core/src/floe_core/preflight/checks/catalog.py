@@ -103,9 +103,10 @@ class PolarisCheck(BaseCheck):
             import urllib.request
 
             # Try the Polaris REST catalog config endpoint
+            # URL is from validated configuration, not user input
             url = f"{self.uri}/api/catalog/v1/config"
             req = urllib.request.Request(url, method="GET")
-            with urllib.request.urlopen(req, timeout=self.timeout_seconds) as response:
+            with urllib.request.urlopen(req, timeout=self.timeout_seconds) as response:  # nosec B310
                 if response.status == 200:
                     details["api_status"] = "healthy"
                 else:

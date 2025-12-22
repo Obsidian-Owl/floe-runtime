@@ -34,12 +34,15 @@ docker compose --profile demo up -d
 |---------|------|-----|---------|
 | **Dagster UI** | 3000 | http://localhost:3000 | Asset orchestration, run monitoring |
 | **Cube Playground** | 4000 | http://localhost:4000 | Visual query builder, semantic layer |
+| **Cube SQL API** | 15432 | - | Postgres wire protocol for BI tools |
 | **Jaeger UI** | 16686 | http://localhost:16686 | Distributed tracing |
 | **Marquez Web** | 3001 | http://localhost:3001 | Data lineage visualization |
 | **Trino UI** | 8080 | http://localhost:8080 | SQL query console |
+| Cube Store Router | 10000 | - | Pre-aggregation compute |
+| Cube Store Workers | 10001-10002 | - | Distributed query workers |
 | PostgreSQL | 5432 | - | Metadata storage |
 | LocalStack | 4566 | - | S3/STS emulation |
-| Polaris | 8181 | - | Iceberg catalog |
+| Polaris | 8181 | - | Iceberg catalog
 
 ---
 
@@ -82,9 +85,8 @@ Synthetic Data (floe-synthetic)
 
 | Cube | Source | Measures | Key Dimensions |
 |------|--------|----------|----------------|
-| **Orders** | mart_revenue | count, totalAmount, averageOrderValue | orderDate |
-| **Customers** | mart_customer_segments | count, totalRevenue, averageOrderValue | segment, churnRisk |
-| **Products** | mart_product_analytics | count, totalRevenue, totalUnitsSold | category, performanceTier |
+| **Orders** | bronze_orders | count, totalAmount, averageAmount | status, region, createdAt |
+| **Customers** | bronze_customers | count, totalOrders, totalRevenue | region, createdAt |
 
 ---
 
@@ -158,35 +160,40 @@ Run the interactive demo showcase:
 ### 1. Dagster UI (http://localhost:3000)
 
 The orchestration layer showing:
-- **Assets**: synthetic_data, dbt_transformations, cube_preaggregations
-- **Jobs**: demo_pipeline_job, dbt_refresh_job
-- **Schedules**: demo_hourly_schedule, demo_daily_schedule
-- **Sensors**: file_arrival_sensor, api_trigger_sensor
+- **Assets**: `bronze_customers`, `bronze_orders`, `bronze_products`, `bronze_order_items`
+- **Groups**: `bronze` (data generation), `transform` (dbt placeholder)
+- **Jobs**: `demo_pipeline_job` (runs all bronze assets)
+- **Schedules**: `demo_hourly_schedule` (configurable)
+- **Sensors**: `file_trigger_sensor` (watches for trigger files)
 
-**Try**: Click on "Assets" → View the dependency graph
+**Try**: Click on "Assets" → View the dependency graph → Materialize all
 
 ### 2. Cube Playground (http://localhost:4000)
 
 Visual query builder for the semantic layer:
-- Select measures (Orders.count, Customers.totalRevenue)
-- Add dimensions (Orders.orderDate, Customers.segment)
+- Select measures (`Orders.count`, `Orders.totalAmount`, `Orders.averageAmount`)
+- Add dimensions (`Orders.status`, `Orders.region`, `Customers.region`)
 - Run queries and see results
 
-**Try**: Build a query showing revenue by customer segment
+**Try**: Build a query showing order count and total amount by status
 
 ### 3. Jaeger UI (http://localhost:16686)
 
 Distributed tracing for pipeline runs:
-- Service: floe-runtime
-- View trace timelines
-- Analyze latency
+- **Service**: `floe-demo` - select from dropdown
+- **Traces**: Each asset materialization creates spans
+- **Attributes**: View rows written, snapshot IDs, timing
+
+**Try**: Materialize assets in Dagster, then find traces by service `floe-demo`
 
 ### 4. Marquez Web (http://localhost:3001)
 
 Data lineage visualization:
-- View job runs
-- Trace data flow between datasets
-- Explore namespaces
+- **Namespace**: `demo` - all demo jobs are here
+- **Jobs**: `bronze_customers`, `bronze_orders`, `bronze_products`, `bronze_order_items`
+- **Datasets**: Iceberg table inputs/outputs
+
+**Try**: View the lineage graph showing data flow between bronze tables
 
 ### 5. Trino UI (http://localhost:8080)
 
@@ -220,7 +227,7 @@ curl -s http://localhost:4000/cubejs-api/v1/load \
 curl -s http://localhost:4000/cubejs-api/graphql \
   -H "Content-Type: application/json" \
   -d '{
-    "query": "{ cube(measures: [\"Customers.count\"], dimensions: [\"Customers.segment\"]) { Customers { count segment } } }"
+    "query": "{ cube(measures: [\"Customers.count\"], dimensions: [\"Customers.region\"]) { Customers { count region } } }"
   }' | jq
 ```
 
@@ -335,67 +342,77 @@ docker exec floe-dagster-webserver python -c "import demo.orchestration"
 
 ---
 
-## Understanding the Demo Environment
+## Production-Quality Demo Architecture
 
-### Why Jaeger Shows No Traces
+This demo runs **as if in production** - it uses real data generation, real tracing, and real lineage:
 
-The demo assets are **placeholder implementations** that return mock data. They don't execute real operations (dbt runs, API calls) and therefore don't generate traces.
+### Real Data Generation
 
-```python
-# Current demo asset (placeholder - no spans created)
-def synthetic_data() -> dict[str, int]:
-    return {"customers": 100, "products": 50, ...}
+The demo generates realistic e-commerce data using `floe-synthetic`:
+
+- **1,000 customers** with names, emails, and regional distribution
+- **5,000 orders** with weighted status distribution and amounts
+- **100 products** across categories (electronics, clothing, home, sports, books)
+- **10,000 order items** linking orders to products
+
+Data volumes are configurable via environment variables:
+```bash
+DEMO_CUSTOMERS_COUNT=10000 DEMO_ORDERS_COUNT=50000 docker compose --profile demo up -d
 ```
 
-**The tracing infrastructure is fully implemented** in `floe-dagster`:
-- `TracingManager` with OpenTelemetry integration
-- OTLP exporter configured for Jaeger
-- Span creation, attributes, and error recording
+### Real Tracing in Jaeger
 
-**To see traces**: Use the full `FloeAssetFactory` which automatically instruments assets, or manually add `TracingManager.start_span()` calls.
+Every asset execution emits OpenTelemetry spans to Jaeger:
 
-### Why Marquez Shows No Lineage
+- **Service**: `floe-demo` (configurable via `OTEL_SERVICE_NAME`)
+- **Spans**: `generate_customers`, `generate_orders`, `generate_products`, `generate_order_items`
+- **Attributes**: `rows_written`, `snapshot_id`, `asset_name`
 
-OpenLineage emission is **disabled in the demo configuration** and demo assets don't emit lineage events.
+**To see traces**:
+1. Run the demo pipeline (materialize assets in Dagster)
+2. Open Jaeger UI: http://localhost:16686
+3. Select service `floe-demo`
+4. View trace timelines and latency analysis
 
-**The lineage infrastructure is fully implemented** in `floe-dagster`:
-- `OpenLineageEmitter` with START/COMPLETE/FAIL lifecycle
-- Dataset tracking (inputs/outputs)
-- Integration with `FloeAssetFactory`
+### Real Lineage in Marquez
 
-**To see lineage**: Enable `lineage.enabled: true` in configuration and use assets that emit OpenLineage events.
+Every asset emits OpenLineage events (START, COMPLETE, FAIL):
 
-### DuckDB vs Trino
+- **Namespace**: `demo` (configurable via `OPENLINEAGE_NAMESPACE`)
+- **Jobs**: `bronze_customers`, `bronze_orders`, `bronze_products`, `bronze_order_items`
+- **Datasets**: `iceberg://demo/default.bronze_*`
 
-The architecture supports **both compute engines** for different use cases:
+**To see lineage**:
+1. Run the demo pipeline (materialize assets in Dagster)
+2. Open Marquez Web: http://localhost:3001
+3. Explore namespaces and job runs
+4. View data flow between datasets
 
-| Engine | Use Case | Admin UI |
-|--------|----------|----------|
-| **DuckDB** | Local development, embedded | None (use DBeaver, VS Code SQLTools) |
-| **Trino** | Integration testing with Iceberg/Polaris | http://localhost:8080 |
+### Production-Like Pre-Aggregations
 
-- **DuckDB** is the default compute target for local development (fast, zero-config)
-- **Trino** is used in Docker Compose for integration testing (Iceberg table operations, OAuth2 with Polaris)
-- Both are valid - the architecture is target-agnostic
+The demo uses **external pre-aggregations** with Cube Store + LocalStack S3:
 
-See `docs/03-solution-strategy.md` for the "Target agnostic" design principle.
+| Component | Purpose |
+|-----------|---------|
+| **Cube Store Router** | Distributed query coordination |
+| **Cube Store Workers** | Pre-aggregation compute nodes |
+| **LocalStack S3** | Pre-aggregation data storage |
 
-### Cube Pre-Aggregation Warning
+Pre-aggregations are stored in the `floe-cube-preaggs` S3 bucket, just like production deployments using AWS S3 or GCS.
 
-The warning "consider using external pre-aggregation" is **expected and correct** for this demo environment.
+### Compute Architecture
 
-| Setting | Environment | Storage Location |
-|---------|-------------|------------------|
-| `external: false` | Dev/Testing | Source database (Trino) |
-| `external: true` | Production | Cube Store + S3/GCS |
+| Engine | Purpose | Admin UI |
+|--------|---------|----------|
+| **Trino** | SQL queries against Iceberg tables | http://localhost:8080 |
+| **Polaris** | Iceberg REST catalog (OAuth2) | http://localhost:8181 |
+| **LocalStack** | S3-compatible storage for Iceberg data files | - |
 
-**Current configuration is intentional**:
-- No cloud storage dependency (S3/GCS not required)
-- Pre-aggregations stored in Trino tables
-- Sufficient for single-user development
-- Warning is informational, not an error
-
-**For production**: Enable `external: true` with Cube Store and S3 bucket configuration. See `docs/adr/0001-cube-semantic-layer.md` for details.
+Data flow:
+1. **floe-synthetic** generates PyArrow tables
+2. **floe-iceberg** writes to Iceberg tables via Polaris catalog
+3. **Trino** queries Iceberg tables for Cube semantic layer
+4. **Cube** exposes REST/GraphQL/SQL APIs
 
 ---
 

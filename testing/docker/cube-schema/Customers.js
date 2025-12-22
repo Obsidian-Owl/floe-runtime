@@ -1,17 +1,35 @@
 /**
- * Sample Cube.js schema for Customers dimension
+ * Customers Cube schema for production-quality demo
  *
  * Demonstrates dimension table modeling with PII classifications.
- * floe-cube will use dbt meta tags to identify PII fields.
+ * floe-cube uses dbt meta tags to identify PII fields.
+ *
+ * Table schema (populated by demo pipeline):
+ *   - customer_id: BIGINT (primary key)
+ *   - name: VARCHAR (PII)
+ *   - email: VARCHAR (PII)
+ *   - region: VARCHAR ('north', 'south', 'east', 'west')
+ *   - created_at: TIMESTAMP
+ *
+ * Covers: 007-FR-029 (E2E validation tests)
+ * Covers: 007-FR-031 (Medallion architecture demo)
  */
 
 cube(`Customers`, {
-  sql: `SELECT * FROM iceberg.default.customers`,
+  // Query the bronze layer Iceberg table via Trino
+  sql: `SELECT * FROM iceberg.default.bronze_customers`,
 
-  joins: {
-    Orders: {
-      relationship: `one_to_many`,
-      sql: `${CUBE}.id = ${Orders}.customer_id`,
+  // Pre-aggregations using internal storage (Trino)
+  // See Orders.js for note on LocalStack S3 compatibility
+  preAggregations: {
+    // Customer counts by region - for dashboards
+    customersByRegion: {
+      measures: [CUBE.count],
+      dimensions: [CUBE.region],
+      external: false,  // Internal storage via Trino
+      refreshKey: {
+        every: `6 hours`,
+      },
     },
   },
 
@@ -22,15 +40,15 @@ cube(`Customers`, {
   },
 
   dimensions: {
-    id: {
-      sql: `id`,
+    customerId: {
+      sql: `customer_id`,
       type: `number`,
       primaryKey: true,
     },
     name: {
       sql: `name`,
       type: `string`,
-      // Note: In production, floe-cube would mark this based on dbt meta tags
+      // PII field - marked for governance tracking
       meta: {
         classification: 'pii',
         pii_type: 'name',
@@ -39,14 +57,14 @@ cube(`Customers`, {
     email: {
       sql: `email`,
       type: `string`,
-      // Note: PII field - would be masked or excluded based on governance rules
+      // PII field - marked for governance tracking
       meta: {
         classification: 'pii',
         pii_type: 'email',
       },
     },
-    segment: {
-      sql: `segment`,
+    region: {
+      sql: `region`,
       type: `string`,
     },
     createdAt: {

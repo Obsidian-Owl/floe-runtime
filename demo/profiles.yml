@@ -1,0 +1,24 @@
+# dbt Profile for Floe Demo Pipeline
+#
+# This profile configures dbt to connect to Trino, which queries
+# Iceberg tables managed by Polaris catalog.
+#
+# Environment variables are set by Docker Compose (demo profile).
+#
+# Covers: 007-FR-029 (E2E validation tests)
+# Covers: 007-FR-031 (Medallion architecture demo)
+
+floe_demo:
+  target: demo
+  outputs:
+    demo:
+      type: trino
+      method: none  # No authentication for local demo
+      host: "{{ env_var('TRINO_HOST', 'trino') }}"
+      port: "{{ env_var('TRINO_PORT', '8080') | int }}"
+      catalog: iceberg
+      schema: "{{ env_var('FLOE_DEMO_SCHEMA', 'default') }}"
+      threads: 4
+      # Trino session properties for Iceberg optimization
+      session_properties:
+        query_max_run_time: 10m
