@@ -22,8 +22,9 @@
  */
 
 cube(`Orders`, {
-  // Query the bronze layer Iceberg table via Trino
-  sql: `SELECT * FROM iceberg.default.bronze_orders`,
+  // Query the orders Iceberg table via Trino
+  // Note: Table is created by cube-init container (03-init-cube-data.sh)
+  sql: `SELECT * FROM iceberg.default.orders`,
 
   // Pre-aggregations using internal storage (Trino)
   // Note: External pre-aggregations (Cube Store + S3) are production-recommended but
