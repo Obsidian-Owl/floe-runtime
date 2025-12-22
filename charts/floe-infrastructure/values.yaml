@@ -1,0 +1,141 @@
+# Default values for floe-infrastructure
+# This is a YAML-formatted file.
+
+# Global settings
+global:
+  storageClass: ""
+
+# PostgreSQL configuration (Dagster + Marquez metadata)
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "floe-postgres"
+    database: "dagster"
+  primary:
+    persistence:
+      enabled: true
+      size: 8Gi
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+# MinIO configuration (Iceberg storage)
+minio:
+  enabled: true
+  mode: standalone
+  rootUser: minioadmin
+  rootPassword: minioadmin
+  persistence:
+    enabled: true
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  buckets:
+    - name: iceberg-data
+      policy: none
+      purge: false
+    - name: cube-preaggs
+      policy: none
+      purge: false
+  consoleIngress:
+    enabled: false
+
+# Polaris configuration (Iceberg REST catalog)
+polaris:
+  enabled: true
+  image:
+    repository: apache/polaris
+    tag: "0.9.0"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 8181
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  # Polaris uses PostgreSQL for metadata
+  persistence:
+    type: postgres
+    postgres:
+      host: "{{ .Release.Name }}-postgresql"
+      port: 5432
+      database: polaris
+      username: postgres
+      existingSecret: ""
+      secretPasswordKey: postgres-password
+
+# Jaeger configuration (distributed tracing)
+jaeger:
+  enabled: true
+  provisionDataStore:
+    cassandra: false
+  allInOne:
+    enabled: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  storage:
+    type: memory
+  agent:
+    enabled: false
+  collector:
+    enabled: false
+  query:
+    enabled: false
+
+# Marquez configuration (data lineage)
+marquez:
+  enabled: true
+  image:
+    repository: marquezproject/marquez
+    tag: "0.49.0"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 5000
+    apiPort: 5001
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  # Marquez uses PostgreSQL for metadata
+  postgres:
+    host: "{{ .Release.Name }}-postgresql"
+    port: 5432
+    database: marquez
+    username: postgres
+    existingSecret: ""
+    secretPasswordKey: postgres-password
+
+# Polaris initialization job
+polarisInit:
+  enabled: true
+  catalogName: "demo_catalog"
+  namespaces:
+    - "demo.bronze"
+    - "demo.silver"
+    - "demo.gold"
+  storageLocation: "s3://iceberg-data/"
+  oauthClientId: "demo_client"

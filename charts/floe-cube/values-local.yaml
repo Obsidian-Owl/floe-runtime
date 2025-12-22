@@ -1,0 +1,288 @@
+# Floe Cube Helm Chart - Local Kubernetes Testing Values
+#
+# Optimized for Docker Desktop Kubernetes with floe-infrastructure services.
+# Uses DuckDB (built-in) for compute, connecting to Polaris and MinIO.
+#
+# Architecture:
+#   Cube API → DuckDB (embedded) → Polaris REST Catalog → MinIO (Iceberg data)
+#
+# Prerequisites:
+#   1. Deploy floe-infrastructure first:
+#      helm install floe-infra charts/floe-infrastructure -n floe -f charts/floe-infrastructure/values-local.yaml
+#   2. Wait for Polaris initialization to complete
+#
+# Usage:
+#   helm install floe-cube charts/floe-cube \
+#     --namespace floe \
+#     --values charts/floe-cube/values-local.yaml
+#
+# Covers: 007-FR-002 (Cube semantic layer deployment)
+# Covers: 008-US1 (Deploy complete stack to Kubernetes)
+# Covers: 008-US2 (Query via Cube REST/GraphQL/SQL)
+
+# Enable development mode (Cube playground)
+devMode: true
+
+# Cube API server configuration
+api:
+  replicaCount: 1
+
+  image:
+    repository: cubejs/cube
+    tag: "v0.36"
+    pullPolicy: IfNotPresent
+
+  # Minimal resources for local testing
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Enable SQL API for BI tools (Tableau, Looker, psycopg2)
+  sqlApi:
+    enabled: true
+    port: 15432
+
+  # Environment variables for DuckDB + Polaris integration
+  extraEnv:
+    # DuckDB configuration (built into Cube)
+    - name: CUBEJS_DB_TYPE
+      value: "duckdb"
+    # DuckDB S3/MinIO connection for Iceberg files
+    - name: CUBEJS_DB_DUCKDB_S3_ENDPOINT
+      value: "http://floe-infra-minio:9000"
+    - name: CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID
+      value: "minioadmin"
+    - name: CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY
+      value: "minioadmin"
+    - name: CUBEJS_DB_DUCKDB_S3_REGION
+      value: "us-east-1"
+    - name: CUBEJS_DB_DUCKDB_S3_USE_SSL
+      value: "false"
+    # Cube Store connection (for pre-aggregations)
+    - name: CUBEJS_CUBESTORE_HOST
+      value: "floe-cube-store"
+    - name: CUBEJS_CUBESTORE_PORT
+      value: "3030"
+    # External pre-aggregations (use Cube Store)
+    - name: CUBEJS_EXTERNAL_DEFAULT
+      value: "true"
+    # SQL API credentials
+    - name: CUBEJS_SQL_USER
+      value: "cube"
+    - name: CUBEJS_SQL_PASSWORD
+      value: "cube_password"
+    # Development mode settings
+    - name: CUBEJS_DEV_MODE
+      value: "true"
+    - name: CUBEJS_LOG_LEVEL
+      value: "debug"
+    # API secret (for demo - use secrets in production)
+    - name: CUBEJS_API_SECRET
+      value: "floe-demo-secret-change-in-production"
+
+# Cube refresh worker configuration
+refreshWorker:
+  enabled: true
+  replicaCount: 1
+
+  # Faster refresh for demo
+  refreshTimer: 30
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Same environment as API
+  extraEnv:
+    - name: CUBEJS_DB_TYPE
+      value: "duckdb"
+    - name: CUBEJS_DB_DUCKDB_S3_ENDPOINT
+      value: "http://floe-infra-minio:9000"
+    - name: CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID
+      value: "minioadmin"
+    - name: CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY
+      value: "minioadmin"
+    - name: CUBEJS_DB_DUCKDB_S3_REGION
+      value: "us-east-1"
+    - name: CUBEJS_DB_DUCKDB_S3_USE_SSL
+      value: "false"
+    - name: CUBEJS_CUBESTORE_HOST
+      value: "floe-cube-store"
+    - name: CUBEJS_CUBESTORE_PORT
+      value: "3030"
+    - name: CUBEJS_EXTERNAL_DEFAULT
+      value: "true"
+    - name: CUBEJS_API_SECRET
+      value: "floe-demo-secret-change-in-production"
+
+# Pre-aggregation configuration
+preAggregations:
+  # Use Cube Store for pre-aggregations (production-like)
+  external: true
+  scheduledRefresh:
+    enabled: true
+    timezone: "UTC"
+  # DuckDB doesn't support export buckets - uses batching
+  exportBucket:
+    enabled: false
+
+# Cube Store configuration (for pre-aggregations)
+cubeStore:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: cubejs/cubestore
+    tag: "v0.36"
+    pullPolicy: IfNotPresent
+
+  # S3 configuration for pre-aggregation storage (MinIO)
+  s3:
+    bucket: "cube-preaggs"
+    region: "us-east-1"
+    endpoint: "http://floe-infra-minio:9000"
+
+  # Minimal resources for local testing
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # No persistence for local testing (emptyDir)
+  persistence:
+    enabled: false
+
+  extraEnv:
+    - name: CUBESTORE_S3_ENDPOINT
+      value: "http://floe-infra-minio:9000"
+    - name: CUBESTORE_AWS_ACCESS_KEY_ID
+      value: "minioadmin"
+    - name: CUBESTORE_AWS_SECRET_ACCESS_KEY
+      value: "minioadmin"
+    - name: CUBESTORE_S3_REGION
+      value: "us-east-1"
+
+# Floe-specific configuration
+floe:
+  schemaPath: "/app/schema"
+  dbtManifestPath: "/app/.floe/manifest.json"
+  compiledArtifacts:
+    enabled: false  # Not using CompiledArtifacts for demo
+
+# Database type (DuckDB)
+database:
+  type: duckdb
+
+# Demo Cube schema for Iceberg tables via DuckDB
+# These queries use DuckDB's Iceberg extension to read from Polaris catalog
+schema:
+  Orders.js: |
+    cube(`Orders`, {
+      // Query Iceberg table via DuckDB
+      // DuckDB connects to Polaris REST catalog for metadata
+      sql: `
+        SELECT *
+        FROM read_parquet('s3://iceberg-data/demo.gold/fct_orders/**/*.parquet')
+      `,
+
+      measures: {
+        count: {
+          type: `count`,
+          description: `Total number of orders`
+        },
+        totalAmount: {
+          sql: `total_amount`,
+          type: `sum`,
+          description: `Sum of all order amounts`
+        },
+        averageAmount: {
+          sql: `total_amount`,
+          type: `avg`,
+          description: `Average order amount`
+        }
+      },
+
+      dimensions: {
+        id: {
+          sql: `order_id`,
+          type: `string`,
+          primaryKey: true
+        },
+        status: {
+          sql: `status`,
+          type: `string`
+        },
+        customerId: {
+          sql: `customer_id`,
+          type: `string`
+        },
+        createdAt: {
+          sql: `created_at`,
+          type: `time`
+        }
+      },
+
+      preAggregations: {
+        ordersByDay: {
+          measures: [CUBE.count, CUBE.totalAmount],
+          dimensions: [CUBE.status],
+          timeDimension: CUBE.createdAt,
+          granularity: `day`,
+          external: true
+        }
+      }
+    });
+
+  Customers.js: |
+    cube(`Customers`, {
+      sql: `
+        SELECT *
+        FROM read_parquet('s3://iceberg-data/demo.silver/dim_customers/**/*.parquet')
+      `,
+
+      measures: {
+        count: {
+          type: `count`,
+          description: `Total number of customers`
+        }
+      },
+
+      dimensions: {
+        id: {
+          sql: `customer_id`,
+          type: `string`,
+          primaryKey: true
+        },
+        name: {
+          sql: `name`,
+          type: `string`
+        },
+        email: {
+          sql: `email`,
+          type: `string`
+        },
+        segment: {
+          sql: `segment`,
+          type: `string`
+        },
+        createdAt: {
+          sql: `created_at`,
+          type: `time`
+        }
+      }
+    });
+
+# No ingress for local testing - use port-forward
+ingress:
+  enabled: false

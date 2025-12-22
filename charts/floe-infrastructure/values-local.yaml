@@ -1,0 +1,121 @@
+# Local development values for floe-infrastructure
+# Optimized for Docker Desktop Kubernetes
+# Uses emptyDir instead of PVCs (Docker Desktop hostpath provisioner is unreliable)
+
+# PostgreSQL - minimal resources, no persistence
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "floe-postgres"
+    database: "dagster"
+  primary:
+    persistence:
+      enabled: false  # Uses emptyDir - data is ephemeral
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    # Fast health checks for local dev
+    livenessProbe:
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      failureThreshold: 3
+    readinessProbe:
+      initialDelaySeconds: 5
+      periodSeconds: 5
+      failureThreshold: 3
+
+# MinIO - minimal resources, no persistence
+minio:
+  enabled: true
+  mode: standalone
+  rootUser: minioadmin
+  rootPassword: minioadmin
+  persistence:
+    enabled: false  # Uses emptyDir - data is ephemeral
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  buckets:
+    - name: iceberg-data
+      policy: none
+      purge: false
+    - name: cube-preaggs
+      policy: none
+      purge: false
+  # Disable console ingress for local
+  consoleIngress:
+    enabled: false
+
+# Polaris - minimal resources
+polaris:
+  enabled: true
+  image:
+    repository: apache/polaris
+    tag: "0.9.0"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Jaeger - all-in-one with memory storage
+jaeger:
+  enabled: true
+  provisionDataStore:
+    cassandra: false
+  allInOne:
+    enabled: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  storage:
+    type: memory
+  agent:
+    enabled: false
+  collector:
+    enabled: false
+  query:
+    enabled: false
+
+# Marquez - minimal resources
+marquez:
+  enabled: true
+  image:
+    repository: marquezproject/marquez
+    tag: "0.49.0"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Polaris initialization for demo
+polarisInit:
+  enabled: true
+  catalogName: "demo_catalog"
+  namespaces:
+    - "demo.bronze"
+    - "demo.silver"
+    - "demo.gold"
+  storageLocation: "s3://iceberg-data/"
+  oauthClientId: "demo_client"

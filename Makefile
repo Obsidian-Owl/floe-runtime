@@ -1,7 +1,7 @@
 # floe-runtime Makefile
 # Provides consistent commands that mirror CI exactly
 
-.PHONY: check lint typecheck security test test-unit test-contract test-integration test-helm helm-lint format install hooks docker-up docker-down docker-logs help
+.PHONY: check lint typecheck security test test-unit test-contract test-integration test-helm helm-lint format install hooks docker-up docker-down docker-logs deploy-local-infra deploy-local-dagster deploy-local-cube deploy-local-full undeploy-local port-forward-all help
 
 # Default target
 help:
@@ -26,6 +26,14 @@ help:
 	@echo "  make docker-up       - Start test infrastructure"
 	@echo "  make docker-down     - Stop test infrastructure"
 	@echo "  make docker-logs     - View service logs"
+	@echo ""
+	@echo "Kubernetes Deployment (Docker Desktop):"
+	@echo "  make deploy-local-infra   - Deploy infrastructure (MinIO, Polaris, PostgreSQL, etc.)"
+	@echo "  make deploy-local-dagster - Deploy Dagster orchestration layer"
+	@echo "  make deploy-local-cube    - Deploy Cube semantic layer"
+	@echo "  make deploy-local-full    - Deploy complete stack (infra + dagster + cube)"
+	@echo "  make undeploy-local       - Remove all local Kubernetes deployments"
+	@echo "  make port-forward-all     - Start all port-forwards in background"
 	@echo ""
 	@echo "Setup:"
 	@echo "  make install         - Install dependencies"
@@ -118,6 +126,7 @@ docker-logs:
 # Lint Helm charts
 helm-lint:
 	@echo "⎈ Linting Helm charts..."
+	@helm lint charts/floe-infrastructure/
 	@helm lint charts/floe-dagster/
 	@helm lint charts/floe-cube/
 
@@ -125,3 +134,129 @@ helm-lint:
 test-helm:
 	@echo "⎈ Running Helm chart tests..."
 	uv run pytest testing/tests/test_helm_charts.py testing/tests/test_dockerfiles.py -v --tb=short
+
+# ==============================================================================
+# Kubernetes Local Deployment (Docker Desktop)
+# ==============================================================================
+# Deploy the complete floe-runtime stack to Docker Desktop Kubernetes.
+# Uses emptyDir storage (no PVCs) for compatibility with Docker Desktop.
+#
+# Architecture:
+#   Infrastructure (floe-infra): PostgreSQL, MinIO, Polaris, Jaeger, Marquez
+#   Orchestration (floe-dagster): Dagster webserver, daemon, workers with DuckDB
+#   Semantic Layer (floe-cube): Cube API, refresh worker, Cube Store
+#
+# Access services via port-forward:
+#   kubectl port-forward svc/floe-dagster-webserver 3000:80 -n floe
+#   kubectl port-forward svc/floe-cube 4000:4000 -n floe
+#   kubectl port-forward svc/floe-infra-jaeger 16686:16686 -n floe
+# ==============================================================================
+
+FLOE_NAMESPACE := floe
+
+# Deploy infrastructure layer (MinIO, Polaris, PostgreSQL, Jaeger, Marquez)
+deploy-local-infra:
+	@echo "⎈ Deploying floe-infrastructure to Kubernetes..."
+	@helm dependency update charts/floe-infrastructure/
+	helm upgrade --install floe-infra charts/floe-infrastructure/ \
+		--namespace $(FLOE_NAMESPACE) --create-namespace \
+		--values charts/floe-infrastructure/values-local.yaml \
+		--wait --timeout 5m
+	@echo "✅ Infrastructure deployed!"
+	@echo ""
+	@echo "Waiting for Polaris initialization..."
+	@kubectl wait --for=condition=complete job/floe-infra-floe-infrastructure-polaris-init \
+		-n $(FLOE_NAMESPACE) --timeout=120s || true
+	@echo "✅ Polaris initialized!"
+
+# Deploy Dagster orchestration layer
+deploy-local-dagster:
+	@echo "⎈ Deploying floe-dagster to Kubernetes..."
+	helm upgrade --install floe-dagster charts/floe-dagster/ \
+		--namespace $(FLOE_NAMESPACE) \
+		--values charts/floe-dagster/values-local.yaml \
+		--wait --timeout 5m
+	@echo "✅ Dagster deployed!"
+	@echo ""
+	@echo "Access Dagster UI:"
+	@echo "  kubectl port-forward svc/floe-dagster-webserver 3000:80 -n $(FLOE_NAMESPACE)"
+	@echo "  Open: http://localhost:3000"
+
+# Deploy Cube semantic layer
+deploy-local-cube:
+	@echo "⎈ Deploying floe-cube to Kubernetes..."
+	helm upgrade --install floe-cube charts/floe-cube/ \
+		--namespace $(FLOE_NAMESPACE) \
+		--values charts/floe-cube/values-local.yaml \
+		--wait --timeout 5m
+	@echo "✅ Cube deployed!"
+	@echo ""
+	@echo "Access Cube APIs:"
+	@echo "  kubectl port-forward svc/floe-cube 4000:4000 -n $(FLOE_NAMESPACE)"
+	@echo "  REST API: http://localhost:4000/cubejs-api/v1/load"
+	@echo "  GraphQL:  http://localhost:4000/cubejs-api/graphql"
+	@echo "  SQL API:  kubectl port-forward svc/floe-cube 15432:15432 -n $(FLOE_NAMESPACE)"
+
+# Deploy complete stack (infrastructure + dagster + cube)
+deploy-local-full: deploy-local-infra
+	@echo ""
+	@echo "Infrastructure ready. Deploying application layers..."
+	@$(MAKE) deploy-local-dagster
+	@$(MAKE) deploy-local-cube
+	@echo ""
+	@echo "=============================================="
+	@echo "✅ Full stack deployed to namespace: $(FLOE_NAMESPACE)"
+	@echo "=============================================="
+	@echo ""
+	@echo "Quick port-forward commands:"
+	@echo "  # Dagster UI"
+	@echo "  kubectl port-forward svc/floe-dagster-webserver 3000:80 -n $(FLOE_NAMESPACE)"
+	@echo ""
+	@echo "  # Cube REST/GraphQL API"
+	@echo "  kubectl port-forward svc/floe-cube 4000:4000 -n $(FLOE_NAMESPACE)"
+	@echo ""
+	@echo "  # Cube SQL API (for BI tools)"
+	@echo "  kubectl port-forward svc/floe-cube 15432:15432 -n $(FLOE_NAMESPACE)"
+	@echo ""
+	@echo "  # Jaeger (tracing)"
+	@echo "  kubectl port-forward svc/floe-infra-jaeger 16686:16686 -n $(FLOE_NAMESPACE)"
+	@echo ""
+	@echo "  # MinIO Console"
+	@echo "  kubectl port-forward svc/floe-infra-minio-console 9001:9001 -n $(FLOE_NAMESPACE)"
+
+# Remove all local Kubernetes deployments
+undeploy-local:
+	@echo "⎈ Removing floe deployments from Kubernetes..."
+	-helm uninstall floe-cube -n $(FLOE_NAMESPACE) 2>/dev/null || true
+	-helm uninstall floe-dagster -n $(FLOE_NAMESPACE) 2>/dev/null || true
+	-helm uninstall floe-infra -n $(FLOE_NAMESPACE) 2>/dev/null || true
+	@echo ""
+	@echo "Delete namespace? (removes all resources)"
+	@echo "  kubectl delete namespace $(FLOE_NAMESPACE)"
+	@echo ""
+	@echo "✅ Deployments removed!"
+
+# Start all port-forwards in background
+# Run this after deploy-local-full to access all services
+port-forward-all:
+	@echo "⎈ Starting port-forwards for all services..."
+	@echo ""
+	@echo "Starting port-forwards in background (logs in /tmp/port-forward-*.log)..."
+	@kubectl port-forward svc/floe-dagster-webserver 3000:80 -n $(FLOE_NAMESPACE) > /tmp/port-forward-dagster.log 2>&1 &
+	@kubectl port-forward svc/floe-cube 4000:4000 -n $(FLOE_NAMESPACE) > /tmp/port-forward-cube.log 2>&1 &
+	@kubectl port-forward svc/floe-cube 15432:15432 -n $(FLOE_NAMESPACE) > /tmp/port-forward-cube-sql.log 2>&1 &
+	@kubectl port-forward svc/floe-infra-jaeger 16686:16686 -n $(FLOE_NAMESPACE) > /tmp/port-forward-jaeger.log 2>&1 &
+	@kubectl port-forward svc/floe-infra-minio-console 9001:9001 -n $(FLOE_NAMESPACE) > /tmp/port-forward-minio.log 2>&1 &
+	@sleep 2
+	@echo ""
+	@echo "✅ Port-forwards started!"
+	@echo ""
+	@echo "Services available at:"
+	@echo "  Dagster UI:      http://localhost:3000"
+	@echo "  Cube API:        http://localhost:4000"
+	@echo "  Cube SQL:        localhost:15432 (user: cube, password: cube_password)"
+	@echo "  Jaeger UI:       http://localhost:16686"
+	@echo "  MinIO Console:   http://localhost:9001 (user: minioadmin, password: minioadmin)"
+	@echo ""
+	@echo "To stop all port-forwards:"
+	@echo "  pkill -f 'kubectl port-forward'"

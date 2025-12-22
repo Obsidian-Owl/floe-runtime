@@ -1,0 +1,165 @@
+# Floe Dagster Helm Chart - Local Kubernetes Testing Values
+#
+# Optimized for Docker Desktop Kubernetes with floe-infrastructure services.
+# Uses DuckDB (embedded) for compute via dbt-duckdb adapter.
+# Connects to Polaris (Iceberg catalog) and MinIO (S3 storage).
+#
+# Prerequisites:
+#   1. Deploy floe-infrastructure first:
+#      helm install floe-infra charts/floe-infrastructure -n floe -f charts/floe-infrastructure/values-local.yaml
+#   2. Wait for Polaris initialization to complete
+#
+# Usage:
+#   helm install floe-dagster charts/floe-dagster \
+#     --namespace floe \
+#     --values charts/floe-dagster/values-local.yaml
+#
+# Covers: 007-FR-001 (Helm chart for Kubernetes deployment)
+# Covers: 008-US1 (Deploy complete stack to Kubernetes)
+
+# Dagster subchart configuration
+dagster:
+  enabled: true
+
+  # Global environment variables for all Dagster components
+  global:
+    env:
+      # Polaris (Iceberg REST catalog) connection
+      - name: POLARIS_URI
+        value: "http://floe-infra-floe-infrastructure-polaris:8181"
+      - name: POLARIS_CATALOG
+        value: "demo_catalog"
+      # MinIO (S3-compatible storage) connection
+      - name: AWS_ENDPOINT_URL
+        value: "http://floe-infra-minio:9000"
+      - name: AWS_ACCESS_KEY_ID
+        value: "minioadmin"
+      - name: AWS_SECRET_ACCESS_KEY
+        value: "minioadmin"
+      - name: AWS_REGION
+        value: "us-east-1"
+      # DuckDB configuration for dbt
+      - name: DBT_PROFILES_DIR
+        value: "/app/demo"
+      # Observability endpoints
+      - name: JAEGER_ENDPOINT
+        value: "http://floe-infra-jaeger-collector:14268/api/traces"
+      - name: MARQUEZ_URL
+        value: "http://floe-infra-floe-infrastructure-marquez:5000"
+
+  # User deployments configuration
+  # Uses floe demo code with DuckDB + Polaris integration
+  dagster-user-deployments:
+    enabled: true
+    enableSubchart: true
+    deployments:
+      - name: "floe-demo"
+        image:
+          repository: "ghcr.io/obsidian-owl/floe-demo"
+          tag: "latest"
+          pullPolicy: IfNotPresent
+        dagsterApiGrpcArgs:
+          - "--module-name"
+          - "demo.orchestration.definitions"
+        port: 3030
+        env:
+          # Inherit global env vars
+          - name: POLARIS_URI
+            value: "http://floe-infra-floe-infrastructure-polaris:8181"
+          - name: POLARIS_CATALOG
+            value: "demo_catalog"
+          - name: AWS_ENDPOINT_URL
+            value: "http://floe-infra-minio:9000"
+          - name: AWS_ACCESS_KEY_ID
+            value: "minioadmin"
+          - name: AWS_SECRET_ACCESS_KEY
+            value: "minioadmin"
+          - name: AWS_REGION
+            value: "us-east-1"
+
+  # PostgreSQL for Dagster metadata
+  # For local testing, disable persistence to avoid PVC provisioning issues
+  # Docker Desktop's hostpath provisioner doesn't work reliably
+  postgresql:
+    enabled: true
+    primary:
+      persistence:
+        enabled: false  # Use emptyDir for local testing
+      # Reduce startup time with healthchecks
+      readinessProbe:
+        initialDelaySeconds: 5
+        periodSeconds: 5
+        timeoutSeconds: 3
+        failureThreshold: 6
+      livenessProbe:
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 6
+
+  # Minimal resource configuration for local testing
+  dagsterWebserver:
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  dagsterDaemon:
+    enabled: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  # Use K8s run launcher for proper orchestration
+  runLauncher:
+    type: K8sRunLauncher
+    config:
+      k8sRunLauncher:
+        envSecrets: []
+        envConfigMaps: []
+
+# Floe-specific configuration
+floe:
+  compiledArtifacts:
+    enabled: false  # No CompiledArtifacts for basic testing
+
+  externalSecrets:
+    enabled: false
+
+  sealedSecrets:
+    enabled: false
+
+# Image configuration (use default Dagster images for testing)
+image:
+  repository: docker.io/dagster/dagster-celery-k8s
+  tag: ""  # Defaults to chart appVersion
+  pullPolicy: IfNotPresent
+
+# Minimal resource defaults for local testing
+resources:
+  webserver:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  daemon:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# No ingress for local testing - use port-forward
+ingress:
+  enabled: false

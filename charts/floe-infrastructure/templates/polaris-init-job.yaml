@@ -1,0 +1,151 @@
+{{- if .Values.polarisInit.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "floe-infrastructure.fullname" . }}-polaris-init
+  labels:
+    {{- include "floe-infrastructure.labels" . | nindent 4 }}
+    app.kubernetes.io/component: polaris-init
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        {{- include "floe-infrastructure.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: polaris-init
+    spec:
+      restartPolicy: Never
+      initContainers:
+        # Wait for Polaris to be ready
+        - name: wait-for-polaris
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Polaris to be ready..."
+              until wget -q --spider http://{{ include "floe-infrastructure.fullname" . }}-polaris:8181/api/catalog/v1/config; do
+                echo "Polaris not ready, waiting..."
+                sleep 5
+              done
+              echo "Polaris is ready!"
+      containers:
+        - name: polaris-init
+          image: python:3.12-slim
+          command:
+            - python
+            - -c
+            - |
+              import json
+              import os
+              import sys
+              import urllib.request
+              import urllib.error
+
+              POLARIS_URI = os.environ["POLARIS_URI"]
+              CATALOG_NAME = os.environ["CATALOG_NAME"]
+              NAMESPACES = os.environ["NAMESPACES"].split(",")
+              STORAGE_LOCATION = os.environ["STORAGE_LOCATION"]
+              MINIO_ENDPOINT = os.environ["MINIO_ENDPOINT"]
+
+              def api_request(method, path, data=None):
+                  """Make API request to Polaris."""
+                  url = f"{POLARIS_URI}{path}"
+                  headers = {"Content-Type": "application/json"}
+                  body = json.dumps(data).encode() if data else None
+                  req = urllib.request.Request(url, data=body, headers=headers, method=method)
+                  try:
+                      with urllib.request.urlopen(req, timeout=30) as resp:
+                          return resp.status, json.loads(resp.read().decode())
+                  except urllib.error.HTTPError as e:
+                      return e.code, {"error": e.reason}
+                  except Exception as e:
+                      return 500, {"error": str(e)}
+
+              print(f"Initializing Polaris catalog: {CATALOG_NAME}")
+
+              # 1. Create catalog
+              print(f"Creating catalog: {CATALOG_NAME}")
+              status, resp = api_request("POST", "/api/management/v1/catalogs", {
+                  "catalog": {
+                      "name": CATALOG_NAME,
+                      "type": "INTERNAL",
+                      "properties": {
+                          "default-base-location": STORAGE_LOCATION
+                      },
+                      "storageConfigInfo": {
+                          "storageType": "S3",
+                          "allowedLocations": [STORAGE_LOCATION],
+                          "s3": {
+                              "endpoint": MINIO_ENDPOINT,
+                              "pathStyleAccess": True,
+                              "region": "us-east-1"
+                          }
+                      }
+                  }
+              })
+              if status == 201:
+                  print(f"  Created catalog: {CATALOG_NAME}")
+              elif status == 409:
+                  print(f"  Catalog already exists: {CATALOG_NAME}")
+              else:
+                  print(f"  Failed to create catalog: {status} - {resp}")
+
+              # 2. Create namespaces
+              for ns in NAMESPACES:
+                  ns_parts = ns.strip().split(".")
+                  print(f"Creating namespace: {ns}")
+                  status, resp = api_request("POST", f"/api/catalog/v1/{CATALOG_NAME}/namespaces", {
+                      "namespace": ns_parts,
+                      "properties": {}
+                  })
+                  if status == 200:
+                      print(f"  Created namespace: {ns}")
+                  elif status == 409:
+                      print(f"  Namespace already exists: {ns}")
+                  else:
+                      print(f"  Failed to create namespace: {status} - {resp}")
+
+              # 3. Create principal for DuckDB access
+              print("Creating OAuth2 principal for DuckDB access")
+              status, resp = api_request("POST", "/api/management/v1/principals", {
+                  "principal": {
+                      "name": "demo_client",
+                      "type": "SERVICE"
+                  }
+              })
+              if status == 201:
+                  print(f"  Created principal: demo_client")
+                  if "credentials" in resp:
+                      print(f"  Client ID: {resp['credentials'].get('clientId', 'N/A')}")
+              elif status == 409:
+                  print(f"  Principal already exists: demo_client")
+              else:
+                  print(f"  Failed to create principal: {status} - {resp}")
+
+              print("Polaris initialization complete!")
+              sys.exit(0)
+          env:
+            - name: POLARIS_URI
+              value: "http://{{ include "floe-infrastructure.fullname" . }}-polaris:8181"
+            - name: CATALOG_NAME
+              value: {{ .Values.polarisInit.catalogName | quote }}
+            - name: NAMESPACES
+              value: {{ .Values.polarisInit.namespaces | join "," | quote }}
+            - name: STORAGE_LOCATION
+              value: {{ .Values.polarisInit.storageLocation | quote }}
+            - name: MINIO_ENDPOINT
+              value: {{ include "floe-infrastructure.minio.endpoint" . | quote }}
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+{{- end }}
