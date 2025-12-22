@@ -42,6 +42,73 @@ def _status_color(status: CheckStatus) -> str:
     return colors.get(status, "white")
 
 
+def _build_header_panel(result: PreflightResult) -> Panel:
+    """Build the header panel for preflight results.
+
+    Args:
+        result: PreflightResult to display
+
+    Returns:
+        Rich Panel with header text
+    """
+    overall_icon = _status_icon(result.overall_status)
+    overall_color = _status_color(result.overall_status)
+    header_text = Text()
+    header_text.append("FLOE PREFLIGHT CHECK REPORT\n\n", style="bold")
+    header_text.append(f"Status: {overall_icon} ", style=overall_color)
+    header_text.append(result.overall_status.value.upper(), style=f"bold {overall_color}")
+    header_text.append(f"\nChecks: {result.passed_count} passed, {result.failed_count} failed")
+    if result.total_duration_ms > 0:
+        header_text.append(f"\nDuration: {result.total_duration_ms}ms")
+    return Panel(header_text, title="[bold]Preflight Results[/bold]")
+
+
+def _build_results_table(result: PreflightResult) -> Table:
+    """Build the results table for preflight checks.
+
+    Args:
+        result: PreflightResult to display
+
+    Returns:
+        Rich Table with check results
+    """
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("Status", width=3, justify="center")
+    table.add_column("Check", min_width=20)
+    table.add_column("Message", min_width=30)
+    table.add_column("Duration", justify="right", width=10)
+
+    for check in result.checks:
+        icon = _status_icon(check.status)
+        color = _status_color(check.status)
+        duration = f"{check.duration_ms}ms" if check.duration_ms > 0 else "-"
+        message_style = "dim" if not check.message else ""
+
+        table.add_row(
+            icon,
+            Text(check.name, style=color),
+            Text(check.message or "-", style=message_style),
+            duration,
+        )
+    return table
+
+
+def _print_failed_details(failed_checks: list[CheckResult], console: Console) -> None:
+    """Print details for failed checks.
+
+    Args:
+        failed_checks: List of failed CheckResults
+        console: Rich console for output
+    """
+    console.print()
+    console.print("[bold red]Failed Check Details:[/bold red]")
+    for check in failed_checks:
+        console.print(f"  [red]• {check.name}[/red]: {check.message}")
+        if check.details:
+            for key, value in check.details.items():
+                console.print(f"    {key}: {value}", style="dim")
+
+
 def format_result_table(result: PreflightResult, console: Console | None = None) -> None:
     """Format preflight results as a Rich table.
 
@@ -56,50 +123,13 @@ def format_result_table(result: PreflightResult, console: Console | None = None)
     if console is None:
         console = Console()
 
-    # Create header panel
-    overall_icon = _status_icon(result.overall_status)
-    overall_color = _status_color(result.overall_status)
-    header_text = Text()
-    header_text.append("FLOE PREFLIGHT CHECK REPORT\n\n", style="bold")
-    header_text.append(f"Status: {overall_icon} ", style=overall_color)
-    header_text.append(result.overall_status.value.upper(), style=f"bold {overall_color}")
-    header_text.append(f"\nChecks: {result.passed_count} passed, {result.failed_count} failed")
-    if result.total_duration_ms > 0:
-        header_text.append(f"\nDuration: {result.total_duration_ms}ms")
-
-    console.print(Panel(header_text, title="[bold]Preflight Results[/bold]"))
-
-    # Create results table
-    table = Table(show_header=True, header_style="bold")
-    table.add_column("Status", width=3, justify="center")
-    table.add_column("Check", min_width=20)
-    table.add_column("Message", min_width=30)
-    table.add_column("Duration", justify="right", width=10)
-
-    for check in result.checks:
-        icon = _status_icon(check.status)
-        color = _status_color(check.status)
-        duration = f"{check.duration_ms}ms" if check.duration_ms > 0 else "-"
-
-        table.add_row(
-            icon,
-            Text(check.name, style=color),
-            Text(check.message or "-", style="dim" if not check.message else ""),
-            duration,
-        )
-
-    console.print(table)
+    console.print(_build_header_panel(result))
+    console.print(_build_results_table(result))
 
     # Show failed check details
     failed_checks = [c for c in result.checks if c.failed]
     if failed_checks:
-        console.print()
-        console.print("[bold red]Failed Check Details:[/bold red]")
-        for check in failed_checks:
-            console.print(f"  [red]• {check.name}[/red]: {check.message}")
-            if check.details:
-                for key, value in check.details.items():
-                    console.print(f"    {key}: {value}", style="dim")
+        _print_failed_details(failed_checks, console)
 
 
 def format_result_json(result: PreflightResult, pretty: bool = True) -> str:

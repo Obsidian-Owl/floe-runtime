@@ -9,6 +9,10 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+# Module constants for Pydantic field descriptions (S1192)
+TIMEOUT_DESCRIPTION = "Timeout in seconds"
+"""Description for timeout fields across all check configs."""
+
 
 class ComputeCheckConfig(BaseModel):
     """Configuration for compute engine connectivity checks.
@@ -22,7 +26,7 @@ class ComputeCheckConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     enabled: bool = Field(default=True, description="Enable compute check")
-    timeout_seconds: int = Field(default=30, ge=1, le=300, description="Timeout in seconds")
+    timeout_seconds: int = Field(default=30, ge=1, le=300, description=TIMEOUT_DESCRIPTION)
     type: str = Field(default="trino", description="Compute engine type")
 
 
@@ -38,7 +42,7 @@ class StorageCheckConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     enabled: bool = Field(default=True, description="Enable storage check")
-    timeout_seconds: int = Field(default=30, ge=1, le=300, description="Timeout in seconds")
+    timeout_seconds: int = Field(default=30, ge=1, le=300, description=TIMEOUT_DESCRIPTION)
     bucket: str = Field(default="", description="Storage bucket name")
 
 
@@ -54,7 +58,7 @@ class CatalogCheckConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     enabled: bool = Field(default=True, description="Enable catalog check")
-    timeout_seconds: int = Field(default=30, ge=1, le=300, description="Timeout in seconds")
+    timeout_seconds: int = Field(default=30, ge=1, le=300, description=TIMEOUT_DESCRIPTION)
     uri: str = Field(default="", description="Catalog URI")
 
 
@@ -74,7 +78,7 @@ class PostgresCheckConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     enabled: bool = Field(default=True, description="Enable PostgreSQL check")
-    timeout_seconds: int = Field(default=30, ge=1, le=300, description="Timeout in seconds")
+    timeout_seconds: int = Field(default=30, ge=1, le=300, description=TIMEOUT_DESCRIPTION)
     host: str = Field(default="localhost", description="PostgreSQL host")
     port: int = Field(default=5432, ge=1, le=65535, description="PostgreSQL port")
     database: str = Field(default="dagster", description="Database name")
@@ -92,7 +96,7 @@ class OTelCheckConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     enabled: bool = Field(default=False, description="Enable OTel check (optional)")
-    timeout_seconds: int = Field(default=10, ge=1, le=60, description="Timeout in seconds")
+    timeout_seconds: int = Field(default=10, ge=1, le=60, description=TIMEOUT_DESCRIPTION)
     endpoint: str = Field(default="", description="OTel collector endpoint")
 
 

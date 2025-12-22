@@ -87,7 +87,8 @@ class QualityDefectInjector:
         Returns:
             Table with NULLs injected at configured rate
         """
-        if self.config.null_rate == 0.0:
+        # Use math.isclose for float comparison (S1244)
+        if self.config.null_rate < 1e-9:
             return table
 
         # Reset RNG for reproducibility
@@ -125,7 +126,8 @@ class QualityDefectInjector:
         Returns:
             Table with duplicate rows added
         """
-        if self.config.duplicate_rate == 0.0:
+        # Use threshold comparison for float (S1244)
+        if self.config.duplicate_rate < 1e-9:
             return table
 
         # Reset RNG for reproducibility
@@ -158,7 +160,8 @@ class QualityDefectInjector:
         Returns:
             Table with some timestamps backdated
         """
-        if self.config.late_arrival_rate == 0.0:
+        # Use threshold comparison for float (S1244)
+        if self.config.late_arrival_rate < 1e-9:
             return table
 
         timestamp_col = self.config.timestamp_column
