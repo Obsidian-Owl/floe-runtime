@@ -457,8 +457,8 @@ services:
   # ==============================================================================
 
   cubestore-router:
-    # Use ARM64-native image for Apple Silicon - see https://hub.docker.com/r/cubejs/cubestore/tags
-    image: cubejs/cubestore:v0.36-arm64v8
+    # Multi-arch image - Docker selects correct architecture (amd64 or arm64)
+    image: cubejs/cubestore:v0.36
     container_name: floe-cubestore-router
     environment:
       CUBESTORE_SERVER_NAME: cubestore-router:10000
@@ -484,8 +484,8 @@ services:
       - demo
 
   cubestore-worker-1:
-    # Use ARM64-native image for Apple Silicon - see https://hub.docker.com/r/cubejs/cubestore/tags
-    image: cubejs/cubestore:v0.36-arm64v8
+    # Multi-arch image - Docker selects correct architecture (amd64 or arm64)
+    image: cubejs/cubestore:v0.36
     container_name: floe-cubestore-worker-1
     environment:
       CUBESTORE_SERVER_NAME: cubestore-worker-1:10001
@@ -507,8 +507,8 @@ services:
       - demo
 
   cubestore-worker-2:
-    # Use ARM64-native image for Apple Silicon - see https://hub.docker.com/r/cubejs/cubestore/tags
-    image: cubejs/cubestore:v0.36-arm64v8
+    # Multi-arch image - Docker selects correct architecture (amd64 or arm64)
+    image: cubejs/cubestore:v0.36
     container_name: floe-cubestore-worker-2
     environment:
       CUBESTORE_SERVER_NAME: cubestore-worker-2:10002
