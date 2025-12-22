@@ -20,6 +20,43 @@ from floe_core.preflight.models import CheckResult, CheckStatus
 
 logger = structlog.get_logger(__name__)
 
+# Localhost addresses - allow HTTP for local development
+LOCALHOST_ADDRESSES = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+def _is_localhost(host: str) -> bool:
+    """Check if host is a localhost address.
+
+    Args:
+        host: Hostname to check
+
+    Returns:
+        True if host is localhost, False otherwise
+    """
+    return host.lower() in LOCALHOST_ADDRESSES
+
+
+def _parse_endpoint(endpoint: str) -> tuple[str, bool]:
+    """Parse endpoint URL to extract host and detect insecure protocol.
+
+    S5332: Flag HTTP usage for non-localhost endpoints as security concern.
+
+    Args:
+        endpoint: Endpoint URL (may include http:// or https://)
+
+    Returns:
+        Tuple of (host, is_insecure) where is_insecure is True if HTTP
+        is used for a non-localhost host.
+    """
+    is_http = endpoint.startswith("http://")
+    # Strip protocol prefix
+    host = endpoint.replace("https://", "").replace("http://", "").split(":")[0]
+
+    # HTTP is only acceptable for localhost development
+    is_insecure = is_http and not _is_localhost(host)
+
+    return host, is_insecure
+
 
 class S3Check(BaseCheck):
     """Preflight check for S3 connectivity.
@@ -67,11 +104,13 @@ class S3Check(BaseCheck):
             CheckResult indicating S3 status.
         """
         # Build endpoint URL
+        is_insecure = False
         if self.endpoint == self.DEFAULT_ENDPOINT and self.region:
             host = f"s3.{self.region}.amazonaws.com"
         else:
-            # Custom endpoint - extract host
-            host = self.endpoint.replace("https://", "").replace("http://", "").split(":")[0]
+            # Custom endpoint - extract host and check security
+            # S5332: Detect insecure HTTP usage for non-localhost endpoints
+            host, is_insecure = _parse_endpoint(self.endpoint)
 
         details: dict[str, Any] = {
             "endpoint": self.endpoint,
@@ -79,6 +118,16 @@ class S3Check(BaseCheck):
             "bucket": self.bucket,
             "host": host,
         }
+
+        # S5332: Warn about insecure HTTP for production endpoints
+        if is_insecure:
+            logger.warning(
+                "S3 endpoint uses HTTP instead of HTTPS",
+                endpoint=self.endpoint,
+                host=host,
+                security_risk="data_in_transit_unencrypted",
+            )
+            details["security_warning"] = "HTTP endpoint detected - data in transit is unencrypted"
 
         # DNS and TCP connectivity check
         try:

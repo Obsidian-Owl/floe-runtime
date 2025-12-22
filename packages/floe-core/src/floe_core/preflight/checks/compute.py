@@ -21,6 +21,21 @@ from floe_core.preflight.models import CheckResult, CheckStatus
 
 logger = structlog.get_logger(__name__)
 
+# Localhost addresses - allow HTTP for local development
+LOCALHOST_ADDRESSES = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+def _is_localhost(host: str) -> bool:
+    """Check if host is a localhost address.
+
+    Args:
+        host: Hostname to check
+
+    Returns:
+        True if host is localhost, False otherwise
+    """
+    return host.lower() in LOCALHOST_ADDRESSES
+
 
 class TrinoCheck(BaseCheck):
     """Preflight check for Trino connectivity.
@@ -98,12 +113,19 @@ class TrinoCheck(BaseCheck):
                 details=details,
             )
 
-        # HTTP health check (optional - depends on trino package availability)
+        # HTTP(S) health check (optional - depends on trino package availability)
+        # S5332: Use HTTPS for production hosts, HTTP only for localhost
         try:
             import urllib.request
 
-            # URL is from validated configuration, not user input
-            url = f"http://{self.host}:{self.port}/v1/info"
+            # Use HTTPS for production, HTTP only for local development
+            protocol = "http" if _is_localhost(self.host) else "https"
+            url = f"{protocol}://{self.host}:{self.port}/v1/info"
+            details["protocol"] = protocol
+
+            if not _is_localhost(self.host):
+                logger.debug("Using HTTPS for production Trino health check", host=self.host)
+
             req = urllib.request.Request(url, method="GET")
             with urllib.request.urlopen(req, timeout=self.timeout_seconds) as response:  # nosec B310
                 if response.status == 200:
@@ -111,7 +133,7 @@ class TrinoCheck(BaseCheck):
                 else:
                     details["api_status"] = f"unhealthy (status {response.status})"
         except Exception:
-            # HTTP check is optional, TCP is sufficient
+            # HTTP(S) check is optional, TCP is sufficient
             details["api_status"] = "not_checked"
 
         return self._make_result(
