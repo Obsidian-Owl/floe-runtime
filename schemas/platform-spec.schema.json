@@ -412,5 +412,5 @@
   "title": "PlatformSpec",
   "type": "object",
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://floe.dev/schemas/platform-spec.v1.0.0.schema.json"
+  "$id": "https://floe.dev/schemas/platform-spec.schema.json"
 }
