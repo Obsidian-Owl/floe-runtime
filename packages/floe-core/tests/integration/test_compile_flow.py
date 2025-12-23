@@ -16,7 +16,6 @@ Covers:
 from __future__ import annotations
 
 import json
-import warnings
 from pathlib import Path
 
 import pytest
@@ -44,10 +43,25 @@ class TestFullCompileFlow:
         project_dir = tmp_path / "minimal-project"
         project_dir.mkdir()
 
+        # Create platform.yaml
+        platform_config = {
+            "version": "1.0.0",
+            "storage": {"default": {"bucket": "test-bucket"}},
+            "catalogs": {
+                "default": {
+                    "uri": "http://polaris:8181/api/catalog",
+                    "warehouse": "test-warehouse",
+                }
+            },
+            "compute": {"default": {"type": "duckdb"}},
+        }
+
+        (project_dir / "platform.yaml").write_text(yaml.dump(platform_config))
+
         floe_config = {
             "name": "minimal-project",
             "version": "1.0.0",
-            "compute": {"target": "duckdb"},
+            "compute": "default",
             "transforms": [{"type": "dbt", "path": "./dbt"}],
         }
 
@@ -60,7 +74,8 @@ class TestFullCompileFlow:
         # Verify output
         assert isinstance(artifacts, CompiledArtifacts)
         assert artifacts.version == "1.0.0"
-        assert artifacts.compute.target.value == "duckdb"
+        assert artifacts.resolved_profiles is not None
+        assert artifacts.resolved_profiles.compute.type.value == "duckdb"
         assert len(artifacts.transforms) == 1
         assert artifacts.transforms[0].type == "dbt"
 
@@ -95,17 +110,45 @@ class TestFullCompileFlow:
         project_dir = tmp_path / "full-project"
         project_dir.mkdir()
 
+        # Create platform.yaml with snowflake profile
+        # Note: scope is inside credentials, not at catalog level
+        platform_config = {
+            "version": "1.0.0",
+            "storage": {"default": {"bucket": "test-bucket"}},
+            "catalogs": {
+                "default": {
+                    "type": "polaris",
+                    "uri": "https://polaris.example.com/api/catalog",
+                    "warehouse": "my_warehouse",
+                    "credentials": {
+                        "mode": "oauth2",
+                        "client_id": "test-client",
+                        "client_secret": {"secret_ref": "polaris-secret"},
+                        "scope": "PRINCIPAL_ROLE:ALL",
+                    },
+                }
+            },
+            "compute": {
+                "snowflake": {
+                    "type": "snowflake",
+                    "properties": {
+                        "account": "xy12345.us-east-1",
+                        "warehouse": "COMPUTE_WH",
+                    },
+                    "credentials": {
+                        "mode": "static",
+                        "secret_ref": "snowflake-creds",
+                    },
+                }
+            },
+        }
+
+        (project_dir / "platform.yaml").write_text(yaml.dump(platform_config))
+
         floe_config = {
             "name": "full-project",
             "version": "2.0.0",
-            "compute": {
-                "target": "snowflake",
-                "connection_secret_ref": "snowflake-creds",
-                "properties": {
-                    "account": "xy12345.us-east-1",
-                    "warehouse": "COMPUTE_WH",
-                },
-            },
+            "compute": "snowflake",
             "transforms": [
                 {"type": "dbt", "path": "./dbt", "target": "prod"},
             ],
@@ -126,32 +169,26 @@ class TestFullCompileFlow:
                 "lineage": True,
                 "otlp_endpoint": "http://otel-collector:4317",
             },
-            "catalog": {
-                "type": "polaris",
-                "uri": "https://polaris.example.com/api/catalog",
-                "warehouse": "my_warehouse",
-                "scope": "PRINCIPAL_ROLE:ALL",
-            },
         }
 
         (project_dir / "floe.yaml").write_text(yaml.dump(floe_config))
 
-        # Compile (suppress PRINCIPAL_ROLE:ALL warning since we're testing that scope)
+        # Compile
         compiler = Compiler()
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message="scope='PRINCIPAL_ROLE:ALL'")
-            artifacts = compiler.compile(project_dir / "floe.yaml")
+        artifacts = compiler.compile(project_dir / "floe.yaml")
 
         # Verify all sections
-        assert artifacts.compute.target.value == "snowflake"
-        assert artifacts.compute.connection_secret_ref == "snowflake-creds"
+        assert artifacts.resolved_profiles is not None
+        assert artifacts.resolved_profiles.compute.type.value == "snowflake"
+        assert artifacts.resolved_profiles.compute.credentials.secret_ref == "snowflake-creds"
         assert artifacts.consumption.enabled is True
         assert artifacts.consumption.database_type == "snowflake"
         assert artifacts.governance.emit_lineage is True
         assert artifacts.observability.otlp_endpoint == "http://otel-collector:4317"
-        assert artifacts.catalog is not None
-        assert artifacts.catalog.type == "polaris"
-        assert artifacts.catalog.scope == "PRINCIPAL_ROLE:ALL"
+        assert artifacts.resolved_profiles.catalog is not None
+        assert artifacts.resolved_profiles.catalog.type.value == "polaris"
+        # Scope is now inside credentials
+        assert artifacts.resolved_profiles.catalog.credentials.scope == "PRINCIPAL_ROLE:ALL"
 
     @pytest.mark.requirement("006-FR-008")
     @pytest.mark.requirement("001-FR-018")
@@ -168,10 +205,25 @@ class TestFullCompileFlow:
         project_dir = tmp_path / "classified-project"
         project_dir.mkdir()
 
+        # Create platform.yaml
+        platform_config = {
+            "version": "1.0.0",
+            "storage": {"default": {"bucket": "test-bucket"}},
+            "catalogs": {
+                "default": {
+                    "uri": "http://polaris:8181/api/catalog",
+                    "warehouse": "test-warehouse",
+                }
+            },
+            "compute": {"default": {"type": "duckdb"}},
+        }
+
+        (project_dir / "platform.yaml").write_text(yaml.dump(platform_config))
+
         floe_config = {
             "name": "classified-project",
             "version": "1.0.0",
-            "compute": {"target": "duckdb"},
+            "compute": "default",
             "transforms": [{"type": "dbt", "path": "./dbt"}],
             "governance": {"classification_source": "dbt_meta"},
         }
@@ -285,10 +337,25 @@ class TestFullCompileFlow:
         project_dir = tmp_path / "serialize-project"
         project_dir.mkdir()
 
+        # Create platform.yaml
+        platform_config = {
+            "version": "1.0.0",
+            "storage": {"default": {"bucket": "test-bucket"}},
+            "catalogs": {
+                "default": {
+                    "uri": "http://polaris:8181/api/catalog",
+                    "warehouse": "test-warehouse",
+                }
+            },
+            "compute": {"default": {"type": "bigquery"}},
+        }
+
+        (project_dir / "platform.yaml").write_text(yaml.dump(platform_config))
+
         floe_config = {
             "name": "serialize-project",
             "version": "1.0.0",
-            "compute": {"target": "bigquery"},
+            "compute": "default",
             "transforms": [{"type": "dbt", "path": "./dbt"}],
         }
 
@@ -311,7 +378,9 @@ class TestFullCompileFlow:
 
         # Verify round-trip
         assert loaded.version == original.version
-        assert loaded.compute.target == original.compute.target
+        assert loaded.resolved_profiles is not None
+        assert original.resolved_profiles is not None
+        assert loaded.resolved_profiles.compute.type == original.resolved_profiles.compute.type
         assert loaded.metadata.source_hash == original.metadata.source_hash
 
     @pytest.mark.requirement("006-FR-008")
@@ -328,10 +397,25 @@ class TestFullCompileFlow:
         project_dir = tmp_path / "multi-transform"
         project_dir.mkdir()
 
+        # Create platform.yaml
+        platform_config = {
+            "version": "1.0.0",
+            "storage": {"default": {"bucket": "test-bucket"}},
+            "catalogs": {
+                "default": {
+                    "uri": "http://polaris:8181/api/catalog",
+                    "warehouse": "test-warehouse",
+                }
+            },
+            "compute": {"default": {"type": "duckdb"}},
+        }
+
+        (project_dir / "platform.yaml").write_text(yaml.dump(platform_config))
+
         floe_config = {
             "name": "multi-transform",
             "version": "1.0.0",
-            "compute": {"target": "duckdb"},
+            "compute": "default",
             "transforms": [
                 {"type": "dbt", "path": "./dbt/staging"},
                 {"type": "dbt", "path": "./dbt/marts", "target": "prod"},
@@ -371,10 +455,25 @@ class TestFullCompileFlow:
             project_dir = tmp_path / f"project-{target.value}"
             project_dir.mkdir()
 
+            # Create platform.yaml with profile for each target
+            platform_config = {
+                "version": "1.0.0",
+                "storage": {"default": {"bucket": "test-bucket"}},
+                "catalogs": {
+                    "default": {
+                        "uri": "http://polaris:8181/api/catalog",
+                        "warehouse": "test-warehouse",
+                    }
+                },
+                "compute": {"default": {"type": target.value}},
+            }
+
+            (project_dir / "platform.yaml").write_text(yaml.dump(platform_config))
+
             floe_config = {
                 "name": f"project-{target.value}",
                 "version": "1.0.0",
-                "compute": {"target": target.value},
+                "compute": "default",
                 "transforms": [{"type": "dbt", "path": "./dbt"}],
             }
 
@@ -383,7 +482,8 @@ class TestFullCompileFlow:
             compiler = Compiler()
             artifacts = compiler.compile(project_dir / "floe.yaml")
 
-            assert artifacts.compute.target == target
+            assert artifacts.resolved_profiles is not None
+            assert artifacts.resolved_profiles.compute.type == target
 
 
 class TestCompileFlowGracefulDegradation:
@@ -403,10 +503,25 @@ class TestCompileFlowGracefulDegradation:
         project_dir = tmp_path / "no-manifest"
         project_dir.mkdir()
 
+        # Create platform.yaml
+        platform_config = {
+            "version": "1.0.0",
+            "storage": {"default": {"bucket": "test-bucket"}},
+            "catalogs": {
+                "default": {
+                    "uri": "http://polaris:8181/api/catalog",
+                    "warehouse": "test-warehouse",
+                }
+            },
+            "compute": {"default": {"type": "duckdb"}},
+        }
+
+        (project_dir / "platform.yaml").write_text(yaml.dump(platform_config))
+
         floe_config = {
             "name": "no-manifest",
             "version": "1.0.0",
-            "compute": {"target": "duckdb"},
+            "compute": "default",
             "transforms": [{"type": "dbt", "path": "./dbt"}],
         }
 
@@ -438,10 +553,25 @@ class TestCompileFlowGracefulDegradation:
         project_dir = tmp_path / "empty-manifest"
         project_dir.mkdir()
 
+        # Create platform.yaml
+        platform_config = {
+            "version": "1.0.0",
+            "storage": {"default": {"bucket": "test-bucket"}},
+            "catalogs": {
+                "default": {
+                    "uri": "http://polaris:8181/api/catalog",
+                    "warehouse": "test-warehouse",
+                }
+            },
+            "compute": {"default": {"type": "duckdb"}},
+        }
+
+        (project_dir / "platform.yaml").write_text(yaml.dump(platform_config))
+
         floe_config = {
             "name": "empty-manifest",
             "version": "1.0.0",
-            "compute": {"target": "duckdb"},
+            "compute": "default",
             "transforms": [{"type": "dbt", "path": "./dbt"}],
         }
 
@@ -478,11 +608,26 @@ class TestCompileFlowGracefulDegradation:
         project_dir = tmp_path / "standalone"
         project_dir.mkdir()
 
+        # Create platform.yaml
+        platform_config = {
+            "version": "1.0.0",
+            "storage": {"default": {"bucket": "test-bucket"}},
+            "catalogs": {
+                "default": {
+                    "uri": "http://polaris:8181/api/catalog",
+                    "warehouse": "test-warehouse",
+                }
+            },
+            "compute": {"default": {"type": "duckdb"}},
+        }
+
+        (project_dir / "platform.yaml").write_text(yaml.dump(platform_config))
+
         # Minimal standalone config
         floe_config = {
             "name": "standalone",
             "version": "1.0.0",
-            "compute": {"target": "duckdb"},
+            "compute": "default",
             "transforms": [{"type": "dbt", "path": "./dbt"}],
         }
 
@@ -497,6 +642,7 @@ class TestCompileFlowGracefulDegradation:
         assert artifacts.lineage_namespace is None  # No SaaS namespace
 
         # All core functionality works
-        assert artifacts.compute.target.value == "duckdb"
+        assert artifacts.resolved_profiles is not None
+        assert artifacts.resolved_profiles.compute.type.value == "duckdb"
         assert artifacts.governance.classification_source == "dbt_meta"
         assert artifacts.observability.traces is True

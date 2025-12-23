@@ -121,11 +121,13 @@ class TestFloeSpecJsonSchemaExport:
         if not properties and "FloeSpec" in defs:
             properties = defs["FloeSpec"].get("properties", {})
 
-        # Required properties for FloeSpec
+        # Required properties for FloeSpec (Two-Tier Architecture)
         expected_properties = [
             "name",
             "version",
-            "compute",
+            "storage",  # Profile reference
+            "catalog",  # Profile reference
+            "compute",  # Profile reference
             "transforms",
             "consumption",
             "governance",
@@ -179,11 +181,10 @@ class TestCompiledArtifactsJsonSchemaExport:
         if not properties and "CompiledArtifacts" in defs:
             properties = defs["CompiledArtifacts"].get("properties", {})
 
-        # Contract fields required by CompiledArtifacts
+        # Contract fields required by CompiledArtifacts (Two-Tier Architecture)
         expected_fields = [
             "version",
             "metadata",
-            "compute",
             "transforms",
             "consumption",
             "governance",
@@ -194,6 +195,9 @@ class TestCompiledArtifactsJsonSchemaExport:
             "lineage_namespace",
             "environment_context",
             "column_classifications",
+            "compute",  # Legacy field (optional)
+            "catalog",  # Legacy field (optional)
+            "resolved_profiles",  # Two-Tier field
         ]
 
         for field in expected_fields:
@@ -358,20 +362,23 @@ class TestJsonSchemaDraft202012Compatibility:
         # Export schema
         schema = FloeSpec.model_json_schema()
 
-        # Create a valid instance
+        # Create a valid instance (Two-Tier Architecture)
         valid_data = {
             "name": "test-project",
             "version": "1.0.0",
-            "compute": {"target": "duckdb"},
+            # Profile references use defaults
         }
 
         # The schema should be usable - verify by loading with Pydantic
         # (We don't require jsonschema library, but the schema should be valid)
         spec = FloeSpec.model_validate(valid_data)
         assert spec.name == "test-project"
+        assert spec.compute == "default"
 
         # The JSON Schema should have the right structure for external validators
         assert "properties" in schema
         assert "name" in schema["properties"]
         assert "version" in schema["properties"]
         assert "compute" in schema["properties"]
+        assert "catalog" in schema["properties"]
+        assert "storage" in schema["properties"]

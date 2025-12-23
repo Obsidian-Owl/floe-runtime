@@ -36,7 +36,12 @@ class TestCompiledArtifactsContractStability:
         assert artifacts.version == "1.0.0"
 
     def test_contract_required_fields(self) -> None:
-        """Test CompiledArtifacts has required fields."""
+        """Test CompiledArtifacts has required fields.
+
+        In Two-Tier Architecture:
+        - compute is OPTIONAL (legacy field, use resolved_profiles)
+        - metadata and transforms remain required
+        """
         from floe_core.compiler import CompiledArtifacts
 
         schema = CompiledArtifacts.model_json_schema()
@@ -44,8 +49,8 @@ class TestCompiledArtifactsContractStability:
 
         # Core required fields
         assert "metadata" in required
-        assert "compute" in required
         assert "transforms" in required
+        # Note: compute is now optional (Two-Tier: use resolved_profiles instead)
 
     def test_contract_frozen_immutable(self, sample_compiled_artifacts: dict) -> None:
         """Test contract is frozen (immutable)."""
@@ -187,6 +192,7 @@ class TestCompiledArtifactsBackwardCompatibility:
         artifacts = CompiledArtifacts.model_validate(v1_payload)
 
         assert artifacts.version == "1.0.0"
+        assert artifacts.compute is not None
         assert artifacts.compute.target.value == "duckdb"
 
 
@@ -205,12 +211,14 @@ class TestCompiledArtifactsFieldTypes:
         assert isinstance(artifacts.metadata.source_hash, str)
 
     def test_compute_structure(self, sample_compiled_artifacts: dict) -> None:
-        """Test compute field structure."""
+        """Test compute field structure (legacy field, now optional)."""
         from floe_core.compiler import CompiledArtifacts
         from floe_core.schemas import ComputeConfig, ComputeTarget
 
         artifacts = CompiledArtifacts(**sample_compiled_artifacts)
 
+        # compute is optional in Two-Tier, but fixture provides it
+        assert artifacts.compute is not None
         assert isinstance(artifacts.compute, ComputeConfig)
         assert isinstance(artifacts.compute.target, ComputeTarget)
 
@@ -298,6 +306,9 @@ class TestCompiledArtifactsCrossLanguageContract:
 
         # Types should be preserved
         assert isinstance(loaded.version, type(original.version))
+        # compute is optional in Two-Tier, check before accessing
+        assert loaded.compute is not None
+        assert original.compute is not None
         assert isinstance(loaded.compute.target, type(original.compute.target))
         assert isinstance(loaded.metadata.compiled_at, type(original.metadata.compiled_at))
 

@@ -486,11 +486,26 @@ class TestDbtProjectAutoDetection:
             yaml.dump({"name": "test_project", "version": "1.0.0"})
         )
 
+        # Create platform.yaml with minimal profiles
+        platform_config = {
+            "version": "1.0.0",
+            "storage": {"default": {"bucket": "test-bucket"}},
+            "catalogs": {
+                "default": {
+                    "uri": "http://polaris:8181/api/catalog",
+                    "warehouse": "test-warehouse",
+                }
+            },
+            "compute": {"default": {"type": "duckdb"}},
+        }
+
+        (tmp_path / "platform.yaml").write_text(yaml.dump(platform_config))
+
         # Create floe.yaml pointing to dbt directory
         floe_config = {
             "name": "test-project",
             "version": "1.0.0",
-            "compute": {"target": "duckdb"},
+            "compute": "default",
             "transforms": [{"type": "dbt", "path": "./dbt"}],
         }
 
@@ -518,14 +533,29 @@ class TestDbtProjectAutoDetection:
             yaml.dump({"name": "test_project", "version": "1.0.0"})
         )
 
-        # Create subdirectory with floe.yaml
+        # Create subdirectory with floe.yaml and platform.yaml
         subdir = tmp_path / "config"
         subdir.mkdir()
+
+        # platform.yaml must be in same directory as floe.yaml (Two-Tier)
+        platform_config = {
+            "version": "1.0.0",
+            "storage": {"default": {"bucket": "test-bucket"}},
+            "catalogs": {
+                "default": {
+                    "uri": "http://polaris:8181/api/catalog",
+                    "warehouse": "test-warehouse",
+                }
+            },
+            "compute": {"default": {"type": "duckdb"}},
+        }
+
+        (subdir / "platform.yaml").write_text(yaml.dump(platform_config))
 
         floe_config = {
             "name": "test-project",
             "version": "1.0.0",
-            "compute": {"target": "duckdb"},
+            "compute": "default",
             "transforms": [{"type": "dbt", "path": ".."}],
         }
 
@@ -547,11 +577,26 @@ class TestDbtProjectAutoDetection:
         """
         from floe_core.compiler import Compiler
 
+        # Create platform.yaml
+        platform_config = {
+            "version": "1.0.0",
+            "storage": {"default": {"bucket": "test-bucket"}},
+            "catalogs": {
+                "default": {
+                    "uri": "http://polaris:8181/api/catalog",
+                    "warehouse": "test-warehouse",
+                }
+            },
+            "compute": {"default": {"type": "duckdb"}},
+        }
+
+        (tmp_path / "platform.yaml").write_text(yaml.dump(platform_config))
+
         # Create floe.yaml without dbt project
         floe_config = {
             "name": "test-project",
             "version": "1.0.0",
-            "compute": {"target": "duckdb"},
+            "compute": "default",
             "transforms": [{"type": "dbt", "path": "./nonexistent"}],
         }
 
@@ -577,10 +622,25 @@ class TestSourceHashCalculation:
         """
         from floe_core.compiler import Compiler
 
+        # Create platform.yaml
+        platform_config = {
+            "version": "1.0.0",
+            "storage": {"default": {"bucket": "test-bucket"}},
+            "catalogs": {
+                "default": {
+                    "uri": "http://polaris:8181/api/catalog",
+                    "warehouse": "test-warehouse",
+                }
+            },
+            "compute": {"default": {"type": "duckdb"}},
+        }
+
+        (tmp_path / "platform.yaml").write_text(yaml.dump(platform_config))
+
         floe_config = {
             "name": "test-project",
             "version": "1.0.0",
-            "compute": {"target": "duckdb"},
+            "compute": "default",
             "transforms": [{"type": "dbt", "path": "./dbt"}],
         }
 
@@ -602,11 +662,26 @@ class TestSourceHashCalculation:
         """
         from floe_core.compiler import Compiler
 
+        # Create platform.yaml
+        platform_config = {
+            "version": "1.0.0",
+            "storage": {"default": {"bucket": "test-bucket"}},
+            "catalogs": {
+                "default": {
+                    "uri": "http://polaris:8181/api/catalog",
+                    "warehouse": "test-warehouse",
+                }
+            },
+            "compute": {"default": {"type": "duckdb"}},
+        }
+
+        (tmp_path / "platform.yaml").write_text(yaml.dump(platform_config))
+
         floe_content = yaml.dump(
             {
                 "name": "test-project",
                 "version": "1.0.0",
-                "compute": {"target": "duckdb"},
+                "compute": "default",
                 "transforms": [{"type": "dbt", "path": "./dbt"}],
             }
         )
@@ -631,11 +706,26 @@ class TestSourceHashCalculation:
         """
         from floe_core.compiler import Compiler
 
+        # Create platform.yaml
+        platform_config = {
+            "version": "1.0.0",
+            "storage": {"default": {"bucket": "test-bucket"}},
+            "catalogs": {
+                "default": {
+                    "uri": "http://polaris:8181/api/catalog",
+                    "warehouse": "test-warehouse",
+                }
+            },
+            "compute": {"default": {"type": "duckdb"}},
+        }
+
+        (tmp_path / "platform.yaml").write_text(yaml.dump(platform_config))
+
         # Create initial floe.yaml
         floe_config_v1 = {
             "name": "test-project",
             "version": "1.0.0",
-            "compute": {"target": "duckdb"},
+            "compute": "default",
             "transforms": [{"type": "dbt", "path": "./dbt"}],
         }
 
@@ -649,7 +739,7 @@ class TestSourceHashCalculation:
         floe_config_v2 = {
             "name": "test-project-modified",  # Changed name
             "version": "2.0.0",  # Changed version
-            "compute": {"target": "duckdb"},
+            "compute": "default",
             "transforms": [{"type": "dbt", "path": "./dbt"}],
         }
 
@@ -670,10 +760,25 @@ class TestSourceHashCalculation:
         """
         from floe_core.compiler import Compiler
 
+        # Create platform.yaml
+        platform_config = {
+            "version": "1.0.0",
+            "storage": {"default": {"bucket": "test-bucket"}},
+            "catalogs": {
+                "default": {
+                    "uri": "http://polaris:8181/api/catalog",
+                    "warehouse": "test-warehouse",
+                }
+            },
+            "compute": {"default": {"type": "duckdb"}},
+        }
+
+        (tmp_path / "platform.yaml").write_text(yaml.dump(platform_config))
+
         floe_config = {
             "name": "test-project",
             "version": "1.0.0",
-            "compute": {"target": "duckdb"},
+            "compute": "default",
             "transforms": [{"type": "dbt", "path": "./dbt"}],
         }
 

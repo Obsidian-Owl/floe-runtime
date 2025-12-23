@@ -116,10 +116,25 @@ class TestObservabilityConfiguration:
         project_dir = tmp_path / "observability-project"
         project_dir.mkdir()
 
+        # Create platform.yaml (Two-Tier Architecture)
+        platform_config = {
+            "version": "1.0.0",
+            "storage": {"default": {"bucket": "test-bucket"}},
+            "catalogs": {
+                "default": {
+                    "uri": "http://polaris:8181/api/catalog",
+                    "warehouse": "test-warehouse",
+                }
+            },
+            "compute": {"default": {"type": "duckdb"}},
+        }
+
+        (project_dir / "platform.yaml").write_text(yaml.dump(platform_config))
+
         floe_config = {
             "name": "observability-test",
             "version": "1.0.0",
-            "compute": {"target": "duckdb"},
+            "compute": "default",
             "transforms": [{"type": "dbt", "path": "./dbt"}],
             "observability": {
                 "traces": True,

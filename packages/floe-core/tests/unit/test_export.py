@@ -40,21 +40,23 @@ class TestExportFloeSpecSchema:
         # Required fields
         assert "name" in props
         assert "version" in props
+        # Profile reference fields (Two-Tier Architecture)
+        assert "storage" in props
+        assert "catalog" in props
         assert "compute" in props
         # Optional fields
         assert "transforms" in props
         assert "consumption" in props
         assert "governance" in props
         assert "observability" in props
-        assert "catalog" in props
 
     def test_export_has_required_fields(self) -> None:
-        """Schema marks name, version, compute as required."""
+        """Schema marks name and version as required."""
         schema = export_floe_spec_schema()
         required = schema.get("required", [])
         assert "name" in required
         assert "version" in required
-        assert "compute" in required
+        # In Two-Tier Architecture, profile references have defaults
 
     def test_export_has_definitions(self) -> None:
         """Schema has $defs for nested models."""
@@ -62,7 +64,8 @@ class TestExportFloeSpecSchema:
         # Pydantic v2 uses $defs
         assert "$defs" in schema
         defs = schema["$defs"]
-        assert "ComputeConfig" in defs
+        # FloeSpec no longer has inline ComputeConfig/CatalogConfig
+        # It uses string profile references instead
         assert "TransformConfig" in defs
         assert "ConsumptionConfig" in defs
 
@@ -135,16 +138,15 @@ class TestSchemaFieldDescriptions:
         version_prop = schema["properties"]["version"]
         assert "description" in version_prop
 
-    def test_compute_config_fields_have_descriptions(self) -> None:
-        """ComputeConfig fields have descriptions."""
+    def test_profile_reference_fields_have_descriptions(self) -> None:
+        """Profile reference fields have descriptions."""
         schema = export_floe_spec_schema()
-        compute_def = schema["$defs"]["ComputeConfig"]
+        props = schema["properties"]
 
-        # target should have description
-        target_prop = compute_def["properties"]["target"]
-        # May be a $ref, check allOf/anyOf
-        if "$ref" not in target_prop:
-            assert "description" in target_prop
+        # In Two-Tier Architecture, compute/catalog/storage are string references
+        assert "description" in props["compute"]
+        assert "description" in props["catalog"]
+        assert "description" in props["storage"]
 
     def test_transform_config_fields_have_descriptions(self) -> None:
         """TransformConfig fields have descriptions."""
@@ -173,13 +175,12 @@ class TestSchemaFieldDescriptions:
         obs_def = schema["$defs"]["ObservabilityConfig"]
         assert "description" in obs_def["properties"]["traces"]
 
-    def test_catalog_config_fields_have_descriptions(self) -> None:
-        """CatalogConfig fields have descriptions."""
+    def test_catalog_field_has_description(self) -> None:
+        """Catalog field (profile reference) has description."""
         schema = export_floe_spec_schema()
-        catalog_def = schema["$defs"]["CatalogConfig"]
-        # 'type' is an enum field, may not have description in Pydantic output
-        # 'uri' should have description
-        assert "description" in catalog_def["properties"]["uri"]
+        props = schema["properties"]
+        # In Two-Tier Architecture, catalog is a string reference
+        assert "description" in props["catalog"]
 
 
 class TestExportCompiledArtifactsSchema:
@@ -203,9 +204,10 @@ class TestExportCompiledArtifactsSchema:
         # Required fields
         assert "version" in props
         assert "metadata" in props
-        assert "compute" in props
         assert "transforms" in props
-        # Optional fields
+        # Optional fields (Two-Tier Architecture)
+        assert "compute" in props  # Legacy field, now optional
+        assert "resolved_profiles" in props  # New Two-Tier field
         assert "consumption" in props
         assert "governance" in props
         assert "observability" in props
@@ -214,12 +216,12 @@ class TestExportCompiledArtifactsSchema:
         assert "column_classifications" in props
 
     def test_export_has_required_fields(self) -> None:
-        """Schema marks metadata, compute, transforms as required."""
+        """Schema marks metadata and transforms as required."""
         schema = export_compiled_artifacts_schema()
         required = schema.get("required", [])
         assert "metadata" in required
-        assert "compute" in required
         assert "transforms" in required
+        # compute is now optional (legacy field)
 
     def test_export_has_definitions(self) -> None:
         """Schema has $defs for nested models."""
@@ -227,7 +229,7 @@ class TestExportCompiledArtifactsSchema:
         assert "$defs" in schema
         defs = schema["$defs"]
         assert "ArtifactMetadata" in defs
-        assert "ComputeConfig" in defs
+        assert "ResolvedPlatformProfiles" in defs  # Two-Tier Architecture
 
     def test_export_to_file(self, tmp_path: Path) -> None:
         """Export writes valid JSON to file."""
@@ -288,12 +290,13 @@ class TestExtraForbidValidation:
         schema = export_floe_spec_schema()
         defs = schema["$defs"]
 
-        # Check key nested models
-        for model_name in ["ComputeConfig", "TransformConfig", "ConsumptionConfig"]:
-            model_def = defs[model_name]
-            assert model_def.get("additionalProperties") is False, (
-                f"{model_name} should have additionalProperties: false"
-            )
+        # Check key nested models (Two-Tier: no ComputeConfig in FloeSpec)
+        for model_name in ["TransformConfig", "ConsumptionConfig"]:
+            if model_name in defs:
+                model_def = defs[model_name]
+                assert model_def.get("additionalProperties") is False, (
+                    f"{model_name} should have additionalProperties: false"
+                )
 
 
 class TestSchemaValidation:
@@ -302,12 +305,10 @@ class TestSchemaValidation:
     def test_valid_floe_spec_passes_schema(self) -> None:
         """Valid FloeSpec instance passes schema validation."""
         # This tests that the schema is compatible with actual models
-        from floe_core.schemas import ComputeConfig, ComputeTarget
-
         spec = FloeSpec(
             name="test-project",
             version="1.0.0",
-            compute=ComputeConfig(target=ComputeTarget.duckdb),
+            compute="default",  # Two-Tier: string profile reference
         )
 
         # Serialize to dict
@@ -320,13 +321,14 @@ class TestSchemaValidation:
         assert "name" in spec_dict
         assert "version" in spec_dict
         assert "compute" in spec_dict
+        # In Two-Tier, compute is a string
+        assert isinstance(spec_dict["compute"], str)
 
     def test_valid_compiled_artifacts_passes_schema(self) -> None:
         """Valid CompiledArtifacts instance passes schema validation."""
         from datetime import datetime, timezone
 
         from floe_core.compiler import ArtifactMetadata, CompiledArtifacts
-        from floe_core.schemas import ComputeConfig, ComputeTarget
 
         artifacts = CompiledArtifacts(
             metadata=ArtifactMetadata(
@@ -334,7 +336,6 @@ class TestSchemaValidation:
                 floe_core_version="0.1.0",
                 source_hash="abc123",
             ),
-            compute=ComputeConfig(target=ComputeTarget.duckdb),
             transforms=[],
         )
 
@@ -346,5 +347,5 @@ class TestSchemaValidation:
 
         # Basic structural validation
         assert "metadata" in artifacts_dict
-        assert "compute" in artifacts_dict
         assert "transforms" in artifacts_dict
+        # compute is optional in Two-Tier Architecture

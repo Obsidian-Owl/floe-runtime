@@ -399,51 +399,49 @@ class TestNessieCatalogProperties:
 class TestMissingCatalogGracefulHandling:
     """T066: [US6] Unit tests for missing catalog graceful handling."""
 
-    def test_floe_spec_catalog_is_optional(self) -> None:
-        """FloeSpec should work without catalog configuration."""
-        from floe_core.schemas import ComputeConfig, ComputeTarget, FloeSpec
+    def test_floe_spec_catalog_uses_profile_reference(self) -> None:
+        """FloeSpec uses catalog profile reference, not inline config."""
+        from floe_core.schemas import FloeSpec
 
         spec = FloeSpec(
             name="test-project",
             version="1.0.0",
-            compute=ComputeConfig(target=ComputeTarget.duckdb),
+            catalog="default",
         )
-        assert spec.catalog is None
+        # In Two-Tier Architecture, catalog is a string reference
+        assert spec.catalog == "default"
 
-    def test_floe_spec_catalog_default_is_none(self) -> None:
-        """FloeSpec.catalog should default to None."""
-        from floe_core.schemas import ComputeConfig, ComputeTarget, FloeSpec
+    def test_floe_spec_catalog_custom_profile(self) -> None:
+        """FloeSpec can reference custom catalog profiles."""
+        from floe_core.schemas import FloeSpec
 
         spec = FloeSpec(
             name="test-project",
             version="1.0.0",
-            compute=ComputeConfig(target=ComputeTarget.duckdb),
-            catalog=None,
+            catalog="analytics",
         )
-        assert spec.catalog is None
+        assert spec.catalog == "analytics"
 
-    def test_floe_spec_with_catalog(self) -> None:
-        """FloeSpec should accept catalog configuration."""
-        from floe_core.schemas import CatalogConfig, ComputeConfig, ComputeTarget, FloeSpec
+    def test_floe_spec_catalog_profile_pattern_validation(self) -> None:
+        """FloeSpec catalog profile must match valid pattern."""
+        from pydantic import ValidationError
 
-        spec = FloeSpec(
-            name="test-project",
-            version="1.0.0",
-            compute=ComputeConfig(target=ComputeTarget.duckdb),
-            catalog=CatalogConfig(
-                type="polaris",
-                uri="http://polaris:8181/api/catalog",
-            ),
-        )
-        assert spec.catalog is not None
-        assert spec.catalog.type == "polaris"
+        from floe_core.schemas import FloeSpec
+
+        # Invalid profile name (starts with digit)
+        with pytest.raises(ValidationError) as exc_info:
+            FloeSpec(
+                name="test-project",
+                version="1.0.0",
+                catalog="123invalid",
+            )
+        assert "catalog" in str(exc_info.value)
 
     def test_compiled_artifacts_catalog_is_optional(self) -> None:
-        """CompiledArtifacts should work without catalog."""
+        """CompiledArtifacts catalog is optional (legacy field)."""
         from datetime import datetime, timezone
 
         from floe_core.compiler import ArtifactMetadata, CompiledArtifacts
-        from floe_core.schemas import ComputeConfig, ComputeTarget
 
         artifacts = CompiledArtifacts(
             metadata=ArtifactMetadata(
@@ -451,7 +449,6 @@ class TestMissingCatalogGracefulHandling:
                 floe_core_version="0.1.0",
                 source_hash="abc123",
             ),
-            compute=ComputeConfig(target=ComputeTarget.duckdb),
             transforms=[],
         )
         assert artifacts.catalog is None

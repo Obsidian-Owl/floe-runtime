@@ -1,9 +1,15 @@
 """Compiler class for floe-runtime.
 
 T044: [US2] Implement Compiler class with compile() method
+T037: [US2] Update Compiler to merge FloeSpec with resolved PlatformSpec
 
 This module implements the main Compiler class that transforms
-FloeSpec (floe.yaml) into CompiledArtifacts.
+FloeSpec (floe.yaml) + PlatformSpec (platform.yaml) into CompiledArtifacts.
+
+Two-Tier Architecture:
+- FloeSpec contains logical profile references (catalog: "default")
+- PlatformSpec contains concrete infrastructure configuration
+- Compiler resolves references and produces CompiledArtifacts
 """
 
 from __future__ import annotations
@@ -12,13 +18,22 @@ import hashlib
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 
 from floe_core.compiler.extractor import extract_column_classifications
-from floe_core.compiler.models import ArtifactMetadata, CompiledArtifacts
+from floe_core.compiler.models import (
+    ArtifactMetadata,
+    CompiledArtifacts,
+    ResolvedPlatformProfiles,
+)
+from floe_core.compiler.platform_resolver import PlatformResolver
+from floe_core.compiler.profile_resolver import ProfileResolver
 from floe_core.schemas import FloeSpec
+
+if TYPE_CHECKING:
+    from floe_core.schemas.platform_spec import PlatformSpec
 
 logger = logging.getLogger(__name__)
 
@@ -27,14 +42,21 @@ FLOE_CORE_VERSION = "0.1.0"
 
 
 class Compiler:
-    """Compile floe.yaml to CompiledArtifacts.
+    """Compile floe.yaml + platform.yaml to CompiledArtifacts.
 
-    The Compiler transforms a FloeSpec (parsed from floe.yaml) into
-    CompiledArtifacts, the immutable contract consumed by downstream
-    packages (floe-dagster, floe-dbt, floe-cube, floe-polaris).
+    The Compiler transforms a FloeSpec (parsed from floe.yaml) and PlatformSpec
+    (parsed from platform.yaml) into CompiledArtifacts, the immutable contract
+    consumed by downstream packages (floe-dagster, floe-dbt, floe-cube, floe-polaris).
+
+    Two-Tier Architecture:
+    - FloeSpec: Data engineer's view (transforms, governance, observability)
+    - PlatformSpec: Platform engineer's view (storage, catalog, compute profiles)
+    - Same floe.yaml works across dev/staging/prod environments
 
     Compilation includes:
     - Parsing and validating floe.yaml
+    - Loading and resolving platform.yaml
+    - Resolving profile references (catalog: "default" → CatalogProfile)
     - Computing source hash for caching
     - Detecting dbt projects
     - Extracting column classifications from dbt manifest
@@ -42,16 +64,34 @@ class Compiler:
 
     Example:
         >>> compiler = Compiler()
+        >>> # With auto-detected platform.yaml
         >>> artifacts = compiler.compile(Path("project/floe.yaml"))
-        >>> artifacts.compute.target
-        <ComputeTarget.duckdb: 'duckdb'>
+        >>>
+        >>> # With explicit platform.yaml
+        >>> platform = PlatformResolver(env="prod").load()
+        >>> artifacts = compiler.compile(Path("project/floe.yaml"), platform=platform)
     """
 
-    def compile(self, spec_path: Path | str) -> CompiledArtifacts:
+    def __init__(self, platform_env: str | None = None) -> None:
+        """Initialize the Compiler.
+
+        Args:
+            platform_env: Platform environment to use (e.g., "local", "dev", "prod").
+                If not specified, uses FLOE_PLATFORM_ENV environment variable.
+        """
+        self.platform_env = platform_env
+
+    def compile(
+        self,
+        spec_path: Path | str,
+        platform: PlatformSpec | None = None,
+    ) -> CompiledArtifacts:
         """Compile floe.yaml to CompiledArtifacts.
 
         Args:
             spec_path: Path to floe.yaml file.
+            platform: Optional pre-loaded PlatformSpec. If not provided,
+                will attempt to load from platform.yaml in standard locations.
 
         Returns:
             Immutable CompiledArtifacts ready for downstream consumption.
@@ -60,6 +100,7 @@ class Compiler:
             FileNotFoundError: If floe.yaml not found.
             yaml.YAMLError: If YAML is invalid.
             pydantic.ValidationError: If spec validation fails.
+            ProfileResolutionError: If profile references cannot be resolved.
 
         Example:
             >>> compiler = Compiler()
@@ -79,6 +120,13 @@ class Compiler:
 
         # Validate with FloeSpec
         spec = FloeSpec.model_validate(raw_data)
+
+        # Load platform configuration if not provided
+        if platform is None:
+            platform = self._load_platform(spec_path.parent)
+
+        # Resolve profile references
+        resolved_profiles = self._resolve_profiles(spec, platform)
 
         # Create metadata
         metadata = ArtifactMetadata(
@@ -118,15 +166,68 @@ class Compiler:
         # Build CompiledArtifacts
         return CompiledArtifacts(
             metadata=metadata,
-            compute=spec.compute,
             transforms=list(spec.transforms),
             consumption=spec.consumption,
             governance=spec.governance,
             observability=spec.observability,
-            catalog=spec.catalog,
+            resolved_profiles=resolved_profiles,
             dbt_project_path=dbt_project_path,
             dbt_manifest_path=dbt_manifest_path,
             column_classifications=column_classifications,
+        )
+
+    def _load_platform(self, project_dir: Path) -> PlatformSpec:
+        """Load platform configuration.
+
+        Searches for platform.yaml in standard locations:
+        1. platform/<env>/platform.yaml (env from FLOE_PLATFORM_ENV or self.platform_env)
+        2. .floe/platform.yaml
+        3. platform.yaml in project directory
+
+        Args:
+            project_dir: Project directory (parent of floe.yaml).
+
+        Returns:
+            Loaded PlatformSpec.
+
+        Raises:
+            PlatformNotFoundError: If platform.yaml not found.
+        """
+        resolver = PlatformResolver(
+            env=self.platform_env,
+            search_paths=(project_dir,),
+        )
+        return resolver.load()
+
+    def _resolve_profiles(
+        self,
+        spec: FloeSpec,
+        platform: PlatformSpec,
+    ) -> ResolvedPlatformProfiles:
+        """Resolve profile references from FloeSpec against PlatformSpec.
+
+        Args:
+            spec: FloeSpec with logical profile references.
+            platform: PlatformSpec with concrete profile configurations.
+
+        Returns:
+            ResolvedPlatformProfiles with concrete configurations.
+
+        Raises:
+            ProfileResolutionError: If profile reference not found.
+        """
+        resolver = ProfileResolver(platform)
+        profiles = resolver.resolve_all(
+            storage=spec.storage,
+            catalog=spec.catalog,
+            compute=spec.compute,
+        )
+
+        return ResolvedPlatformProfiles(
+            storage=profiles.storage,
+            catalog=profiles.catalog,
+            compute=profiles.compute,
+            platform_env=self.platform_env or "local",
         )
 
     def _compute_hash(self, content: str) -> str:

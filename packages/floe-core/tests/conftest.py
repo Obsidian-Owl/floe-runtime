@@ -41,7 +41,12 @@ def configure_structlog_for_tests() -> None:
 
 @pytest.fixture
 def sample_floe_yaml() -> dict[str, Any]:
-    """Return a minimal valid floe.yaml configuration.
+    """Return a minimal valid floe.yaml configuration (Two-Tier Architecture).
+
+    In Two-Tier Architecture:
+    - FloeSpec uses logical profile references (storage, catalog, compute)
+    - PlatformSpec contains actual infrastructure configuration
+    - Same floe.yaml works across dev/staging/prod
 
     Returns:
         Dictionary representing a valid floe.yaml structure.
@@ -49,9 +54,10 @@ def sample_floe_yaml() -> dict[str, Any]:
     return {
         "name": "test-project",
         "version": "1.0.0",
-        "compute": {
-            "target": "duckdb",
-        },
+        # Two-Tier: Use profile references (strings), not inline config
+        "storage": "default",
+        "catalog": "default",
+        "compute": "default",
         "transforms": [
             {
                 "type": "dbt",
@@ -65,20 +71,19 @@ def sample_floe_yaml() -> dict[str, Any]:
 def sample_floe_yaml_full() -> dict[str, Any]:
     """Return a comprehensive floe.yaml configuration with all optional fields.
 
+    In Two-Tier Architecture, floe.yaml uses profile references.
+    Infrastructure details are in platform.yaml (see sample_platform_yaml).
+
     Returns:
         Dictionary representing a full floe.yaml with all sections populated.
     """
     return {
         "name": "full-test-project",
         "version": "2.0.0",
-        "compute": {
-            "target": "snowflake",
-            "connection_secret_ref": "my-snowflake-secret",
-            "properties": {
-                "account": "xy12345.us-east-1",
-                "warehouse": "COMPUTE_WH",
-            },
-        },
+        # Two-Tier: Use profile references (strings)
+        "storage": "default",
+        "catalog": "analytics",  # Non-default profile
+        "compute": "snowflake",  # Non-default profile
         "transforms": [
             {
                 "type": "dbt",
@@ -104,10 +109,63 @@ def sample_floe_yaml_full() -> dict[str, Any]:
             "traces": True,
             "metrics": True,
         },
-        "catalog": {
-            "type": "polaris",
-            "uri": "https://polaris.example.com/api/catalog",
-            "warehouse": "my_warehouse",
+    }
+
+
+@pytest.fixture
+def sample_platform_yaml() -> dict[str, Any]:
+    """Return a valid platform.yaml configuration for Two-Tier Architecture.
+
+    Platform engineers configure infrastructure in platform.yaml.
+    Data engineers reference profiles by name in floe.yaml.
+
+    Returns:
+        Dictionary representing a valid platform.yaml structure.
+    """
+    return {
+        "version": "1.0.0",
+        "storage": {
+            "default": {
+                "type": "s3",
+                "bucket": "test-bucket",
+                "endpoint": "http://minio:9000",
+                "region": "us-east-1",
+                "path_style_access": True,
+            },
+        },
+        "catalogs": {
+            "default": {
+                "type": "polaris",
+                "uri": "http://polaris:8181/api/catalog",
+                "warehouse": "test-warehouse",
+                "namespace": "default",
+            },
+            "analytics": {
+                "type": "polaris",
+                "uri": "http://polaris:8181/api/catalog",
+                "warehouse": "analytics-warehouse",
+                "namespace": "analytics",
+            },
+        },
+        "compute": {
+            "default": {
+                "type": "duckdb",
+                "properties": {
+                    "path": ":memory:",
+                    "threads": 4,
+                },
+            },
+            "snowflake": {
+                "type": "snowflake",
+                "properties": {
+                    "account": "xy12345.us-east-1",
+                    "warehouse": "COMPUTE_WH",
+                },
+                "credentials": {
+                    "mode": "static",
+                    "secret_ref": "snowflake-credentials",
+                },
+            },
         },
     }
 
@@ -123,12 +181,21 @@ def fixtures_dir() -> Path:
 
 
 @pytest.fixture
-def tmp_floe_project(tmp_path: Path, sample_floe_yaml: dict[str, Any]) -> Path:
-    """Create a temporary floe project with floe.yaml.
+def tmp_floe_project(
+    tmp_path: Path,
+    sample_floe_yaml: dict[str, Any],
+    sample_platform_yaml: dict[str, Any],
+) -> Path:
+    """Create a temporary floe project with floe.yaml and platform.yaml.
+
+    Two-Tier Architecture requires both:
+    - floe.yaml: Data engineer's view (profile references)
+    - platform.yaml: Platform engineer's view (infrastructure config)
 
     Args:
         tmp_path: pytest's temporary path fixture.
         sample_floe_yaml: Sample floe.yaml content.
+        sample_platform_yaml: Sample platform.yaml content.
 
     Returns:
         Path to the temporary project directory.
@@ -138,7 +205,12 @@ def tmp_floe_project(tmp_path: Path, sample_floe_yaml: dict[str, Any]) -> Path:
     project_dir = tmp_path / "test-project"
     project_dir.mkdir()
 
+    # Create floe.yaml
     floe_yaml = project_dir / "floe.yaml"
     floe_yaml.write_text(yaml.dump(sample_floe_yaml))
+
+    # Create platform.yaml (Two-Tier Architecture)
+    platform_yaml = project_dir / "platform.yaml"
+    platform_yaml.write_text(yaml.dump(sample_platform_yaml))
 
     return project_dir

@@ -26,7 +26,7 @@ class TestCompiledArtifactsModel:
         assert CompiledArtifacts is not None
 
     def test_compiled_artifacts_required_fields(self) -> None:
-        """Test CompiledArtifacts requires metadata, compute, transforms."""
+        """Test CompiledArtifacts requires metadata and transforms."""
         from floe_core.compiler import CompiledArtifacts
 
         with pytest.raises(ValidationError) as exc_info:
@@ -35,13 +35,12 @@ class TestCompiledArtifactsModel:
         errors = exc_info.value.errors()
         field_names = {e["loc"][0] for e in errors}
         assert "metadata" in field_names
-        assert "compute" in field_names
         assert "transforms" in field_names
+        # compute is now optional (legacy field)
 
     def test_compiled_artifacts_valid_creation(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
     ) -> None:
         """Test CompiledArtifacts with valid fields."""
@@ -49,19 +48,16 @@ class TestCompiledArtifactsModel:
 
         artifacts = CompiledArtifacts(
             metadata=sample_artifact_metadata,
-            compute=sample_compute_config,
             transforms=[sample_transform_config],
         )
 
         assert artifacts.version == "1.0.0"  # Default version
         assert artifacts.metadata is not None
-        assert artifacts.compute is not None
         assert len(artifacts.transforms) == 1
 
     def test_compiled_artifacts_default_version(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
     ) -> None:
         """Test CompiledArtifacts has default version 1.0.0."""
@@ -69,7 +65,6 @@ class TestCompiledArtifactsModel:
 
         artifacts = CompiledArtifacts(
             metadata=sample_artifact_metadata,
-            compute=sample_compute_config,
             transforms=[sample_transform_config],
         )
 
@@ -78,7 +73,6 @@ class TestCompiledArtifactsModel:
     def test_compiled_artifacts_custom_version(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
     ) -> None:
         """Test CompiledArtifacts can have custom version."""
@@ -87,7 +81,6 @@ class TestCompiledArtifactsModel:
         artifacts = CompiledArtifacts(
             version="2.0.0",
             metadata=sample_artifact_metadata,
-            compute=sample_compute_config,
             transforms=[sample_transform_config],
         )
 
@@ -100,7 +93,6 @@ class TestCompiledArtifactsImmutability:
     def test_compiled_artifacts_frozen(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
     ) -> None:
         """Test CompiledArtifacts is immutable (frozen=True)."""
@@ -108,7 +100,6 @@ class TestCompiledArtifactsImmutability:
 
         artifacts = CompiledArtifacts(
             metadata=sample_artifact_metadata,
-            compute=sample_compute_config,
             transforms=[sample_transform_config],
         )
 
@@ -118,7 +109,6 @@ class TestCompiledArtifactsImmutability:
     def test_compiled_artifacts_extra_forbid(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
     ) -> None:
         """Test CompiledArtifacts rejects unknown fields."""
@@ -127,7 +117,6 @@ class TestCompiledArtifactsImmutability:
         with pytest.raises(ValidationError) as exc_info:
             CompiledArtifacts(
                 metadata=sample_artifact_metadata,
-                compute=sample_compute_config,
                 transforms=[sample_transform_config],
                 unknown_field="should_fail",
             )
@@ -137,7 +126,6 @@ class TestCompiledArtifactsImmutability:
     def test_compiled_artifacts_nested_configs_immutable(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
     ) -> None:
         """Test nested config models are also immutable."""
@@ -145,7 +133,6 @@ class TestCompiledArtifactsImmutability:
 
         artifacts = CompiledArtifacts(
             metadata=sample_artifact_metadata,
-            compute=sample_compute_config,
             transforms=[sample_transform_config],
         )
 
@@ -160,7 +147,6 @@ class TestCompiledArtifactsJSONRoundTrip:
     def test_compiled_artifacts_to_json(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
     ) -> None:
         """Test CompiledArtifacts can be serialized to JSON."""
@@ -168,7 +154,6 @@ class TestCompiledArtifactsJSONRoundTrip:
 
         artifacts = CompiledArtifacts(
             metadata=sample_artifact_metadata,
-            compute=sample_compute_config,
             transforms=[sample_transform_config],
         )
 
@@ -179,7 +164,6 @@ class TestCompiledArtifactsJSONRoundTrip:
     def test_compiled_artifacts_from_json(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
     ) -> None:
         """Test CompiledArtifacts can be deserialized from JSON."""
@@ -187,7 +171,6 @@ class TestCompiledArtifactsJSONRoundTrip:
 
         artifacts = CompiledArtifacts(
             metadata=sample_artifact_metadata,
-            compute=sample_compute_config,
             transforms=[sample_transform_config],
         )
 
@@ -200,7 +183,6 @@ class TestCompiledArtifactsJSONRoundTrip:
     def test_compiled_artifacts_json_round_trip(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
     ) -> None:
         """Test JSON round-trip preserves all data."""
@@ -208,7 +190,6 @@ class TestCompiledArtifactsJSONRoundTrip:
 
         original = CompiledArtifacts(
             metadata=sample_artifact_metadata,
-            compute=sample_compute_config,
             transforms=[sample_transform_config],
         )
 
@@ -222,7 +203,6 @@ class TestCompiledArtifactsJSONRoundTrip:
     def test_compiled_artifacts_json_includes_optional_fields(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
     ) -> None:
         """Test JSON serialization includes optional fields when set."""
@@ -230,7 +210,6 @@ class TestCompiledArtifactsJSONRoundTrip:
 
         artifacts = CompiledArtifacts(
             metadata=sample_artifact_metadata,
-            compute=sample_compute_config,
             transforms=[sample_transform_config],
             dbt_manifest_path="/path/to/manifest.json",
             dbt_project_path="/path/to/dbt",
@@ -247,15 +226,13 @@ class TestCompiledArtifactsOptionalFields:
     def test_compiled_artifacts_optional_catalog(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
     ) -> None:
-        """Test catalog is optional."""
+        """Test catalog is optional (legacy field)."""
         from floe_core.compiler import CompiledArtifacts
 
         artifacts = CompiledArtifacts(
             metadata=sample_artifact_metadata,
-            compute=sample_compute_config,
             transforms=[sample_transform_config],
         )
 
@@ -264,16 +241,14 @@ class TestCompiledArtifactsOptionalFields:
     def test_compiled_artifacts_with_catalog(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
         sample_catalog_config: dict,
     ) -> None:
-        """Test CompiledArtifacts with catalog config."""
+        """Test CompiledArtifacts with catalog config (legacy)."""
         from floe_core.compiler import CompiledArtifacts
 
         artifacts = CompiledArtifacts(
             metadata=sample_artifact_metadata,
-            compute=sample_compute_config,
             transforms=[sample_transform_config],
             catalog=sample_catalog_config,
         )
@@ -284,7 +259,6 @@ class TestCompiledArtifactsOptionalFields:
     def test_compiled_artifacts_optional_dbt_paths(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
     ) -> None:
         """Test dbt paths are optional."""
@@ -292,7 +266,6 @@ class TestCompiledArtifactsOptionalFields:
 
         artifacts = CompiledArtifacts(
             metadata=sample_artifact_metadata,
-            compute=sample_compute_config,
             transforms=[sample_transform_config],
         )
 
@@ -302,7 +275,6 @@ class TestCompiledArtifactsOptionalFields:
     def test_compiled_artifacts_dbt_profiles_path_default(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
     ) -> None:
         """Test dbt_profiles_path has default value."""
@@ -310,7 +282,6 @@ class TestCompiledArtifactsOptionalFields:
 
         artifacts = CompiledArtifacts(
             metadata=sample_artifact_metadata,
-            compute=sample_compute_config,
             transforms=[sample_transform_config],
         )
 
@@ -319,7 +290,6 @@ class TestCompiledArtifactsOptionalFields:
     def test_compiled_artifacts_optional_lineage_namespace(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
     ) -> None:
         """Test lineage_namespace is optional (SaaS enrichment)."""
@@ -327,7 +297,6 @@ class TestCompiledArtifactsOptionalFields:
 
         artifacts = CompiledArtifacts(
             metadata=sample_artifact_metadata,
-            compute=sample_compute_config,
             transforms=[sample_transform_config],
         )
 
@@ -336,7 +305,6 @@ class TestCompiledArtifactsOptionalFields:
     def test_compiled_artifacts_optional_environment_context(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
     ) -> None:
         """Test environment_context is optional (SaaS enrichment)."""
@@ -344,7 +312,6 @@ class TestCompiledArtifactsOptionalFields:
 
         artifacts = CompiledArtifacts(
             metadata=sample_artifact_metadata,
-            compute=sample_compute_config,
             transforms=[sample_transform_config],
         )
 
@@ -353,7 +320,6 @@ class TestCompiledArtifactsOptionalFields:
     def test_compiled_artifacts_with_environment_context(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
         sample_environment_context: dict,
     ) -> None:
@@ -362,7 +328,6 @@ class TestCompiledArtifactsOptionalFields:
 
         artifacts = CompiledArtifacts(
             metadata=sample_artifact_metadata,
-            compute=sample_compute_config,
             transforms=[sample_transform_config],
             environment_context=sample_environment_context,
         )
@@ -373,7 +338,6 @@ class TestCompiledArtifactsOptionalFields:
     def test_compiled_artifacts_optional_column_classifications(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
     ) -> None:
         """Test column_classifications is optional."""
@@ -381,7 +345,6 @@ class TestCompiledArtifactsOptionalFields:
 
         artifacts = CompiledArtifacts(
             metadata=sample_artifact_metadata,
-            compute=sample_compute_config,
             transforms=[sample_transform_config],
         )
 
@@ -394,7 +357,6 @@ class TestCompiledArtifactsWithClassifications:
     def test_compiled_artifacts_with_classifications(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
     ) -> None:
         """Test CompiledArtifacts with column classifications."""
@@ -413,7 +375,6 @@ class TestCompiledArtifactsWithClassifications:
 
         artifacts = CompiledArtifacts(
             metadata=sample_artifact_metadata,
-            compute=sample_compute_config,
             transforms=[sample_transform_config],
             column_classifications=classifications,
         )
@@ -637,7 +598,6 @@ class TestCompiledArtifactsWithResolvedProfiles:
     def test_compiled_artifacts_optional_resolved_profiles(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
     ) -> None:
         """Test resolved_profiles is optional for backward compatibility."""
@@ -645,7 +605,6 @@ class TestCompiledArtifactsWithResolvedProfiles:
 
         artifacts = CompiledArtifacts(
             metadata=sample_artifact_metadata,
-            compute=sample_compute_config,
             transforms=[sample_transform_config],
         )
 
@@ -654,7 +613,6 @@ class TestCompiledArtifactsWithResolvedProfiles:
     def test_compiled_artifacts_with_resolved_profiles(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
         sample_resolved_profiles: dict,
     ) -> None:
@@ -663,7 +621,6 @@ class TestCompiledArtifactsWithResolvedProfiles:
 
         artifacts = CompiledArtifacts(
             metadata=sample_artifact_metadata,
-            compute=sample_compute_config,
             transforms=[sample_transform_config],
             resolved_profiles=sample_resolved_profiles,
         )
@@ -676,7 +633,6 @@ class TestCompiledArtifactsWithResolvedProfiles:
     def test_compiled_artifacts_resolved_profiles_json_round_trip(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
         sample_resolved_profiles: dict,
     ) -> None:
@@ -685,7 +641,6 @@ class TestCompiledArtifactsWithResolvedProfiles:
 
         original = CompiledArtifacts(
             metadata=sample_artifact_metadata,
-            compute=sample_compute_config,
             transforms=[sample_transform_config],
             resolved_profiles=sample_resolved_profiles,
         )
@@ -700,7 +655,6 @@ class TestCompiledArtifactsWithResolvedProfiles:
     def test_compiled_artifacts_backward_compatibility(
         self,
         sample_artifact_metadata: dict,
-        sample_compute_config: dict,
         sample_transform_config: dict,
     ) -> None:
         """Test v1.0 artifacts (no resolved_profiles) still work."""
@@ -710,7 +664,6 @@ class TestCompiledArtifactsWithResolvedProfiles:
         v1_artifacts = CompiledArtifacts(
             version="1.0.0",
             metadata=sample_artifact_metadata,
-            compute=sample_compute_config,
             transforms=[sample_transform_config],
         )
 

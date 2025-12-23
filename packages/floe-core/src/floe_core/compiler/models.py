@@ -228,13 +228,15 @@ class CompiledArtifacts(BaseModel):
         ...,
         description="Compilation metadata",
     )
-    compute: ComputeConfig = Field(
-        ...,
-        description="Compute target configuration",
-    )
     transforms: list[TransformConfig] = Field(
         ...,
         description="List of transform configurations",
+    )
+
+    # Legacy compute field (deprecated: use resolved_profiles.compute)
+    compute: ComputeConfig | None = Field(
+        default=None,
+        description="Compute target configuration (legacy - use resolved_profiles.compute)",
     )
 
     # Configuration sections (with defaults)
