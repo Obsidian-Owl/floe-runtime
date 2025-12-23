@@ -119,10 +119,12 @@ User                floe-cli            floe-core           Filesystem
 | Rule | Description |
 |------|-------------|
 | Schema compliance | All fields match Pydantic schema |
-| Compute target valid | Target is a supported value |
+| Profile references valid | Referenced profiles exist in platform.yaml |
+| Zero secrets in floe.yaml | No credentials or endpoints in pipeline config |
 | Transform paths exist | Referenced directories exist |
 | No circular refs | Transform dependencies are acyclic |
-| Secret refs valid | Secret references follow naming convention |
+| Secret refs valid | Secret references follow K8s naming convention |
+| Credential modes valid | OAuth2 requires client_id, client_secret, scope |
 
 ### 3.3 Error Messages
 
@@ -137,54 +139,150 @@ $ floe validate
     Directory 'modells/' does not exist. Found 'models/'.
 ```
 
+**Profile resolution errors** (FR-038):
+
+```
+$ floe validate
+✗ Validation failed:
+
+  floe.yaml:3 - catalog: "analytics"
+    Profile 'analytics' not found in platform.catalogs.
+    Available profiles: [default, production]
+
+  platform.yaml:12 - catalogs.default.credentials.client_secret
+    Field 'client_secret' must use secret_ref, not plaintext value.
+    Use: client_secret: { secret_ref: "polaris-oauth" }
+```
+
+**Secret resolution errors** (at runtime, FR-039):
+
+```
+$ floe run
+✗ Secret resolution failed:
+
+  Secret 'polaris-oauth' not found.
+  Expected in environment variable: POLARIS_OAUTH
+  Or K8s secret mount: /var/run/secrets/polaris-oauth
+```
+
 ---
 
 ## 4. Compilation
 
-### 4.1 Sequence: `floe compile`
+### 4.1 Two-Tier Configuration Merge
+
+The compilation process merges `platform.yaml` (infrastructure) with `floe.yaml` (pipeline) to produce `CompiledArtifacts`. This is the core of the two-tier architecture ([ADR-0002](adr/0002-two-tier-config.md)).
 
 ```
-User              floe-cli         floe-core          floe-dbt         Filesystem
-  │                  │                 │                  │                 │
-  │  floe compile    │                 │                  │                 │
-  │─────────────────►│                 │                  │                 │
-  │                  │                 │                  │                 │
-  │                  │  Read floe.yaml │                  │                 │
-  │                  │───────────────────────────────────────────────────►│
-  │                  │◄───────────────────────────────────────────────────│
-  │                  │                 │                  │                 │
-  │                  │  Parse & validate                  │                 │
-  │                  │────────────────►│                  │                 │
-  │                  │                 │                  │                 │
-  │                  │                 │  FloeSpec        │                 │
-  │                  │◄────────────────│                  │                 │
-  │                  │                 │                  │                 │
-  │                  │  Compile spec   │                  │                 │
-  │                  │────────────────►│                  │                 │
-  │                  │                 │                  │                 │
-  │                  │                 │  Generate profiles                │
-  │                  │                 │─────────────────►│                 │
-  │                  │                 │                  │                 │
-  │                  │                 │  profiles.yml    │                 │
-  │                  │                 │◄─────────────────│                 │
-  │                  │                 │                  │                 │
-  │                  │                 │  Run dbt compile │                 │
-  │                  │                 │─────────────────►│                 │
-  │                  │                 │                  │                 │
-  │                  │                 │  manifest.json   │                 │
-  │                  │                 │◄─────────────────│                 │
-  │                  │                 │                  │                 │
-  │                  │  CompiledArtifacts                 │                 │
-  │                  │◄────────────────│                  │                 │
-  │                  │                 │                  │                 │
-  │                  │  Write .floe/artifacts.json        │                 │
-  │                  │───────────────────────────────────────────────────►│
-  │                  │                 │                  │                 │
-  │  ✓ Compiled      │                 │                  │                 │
-  │◄─────────────────│                 │                  │                 │
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     TWO-TIER CONFIGURATION MERGE                             │
+│                                                                              │
+│  ┌─────────────────────┐                    ┌─────────────────────┐         │
+│  │  platform.yaml      │                    │  floe.yaml          │         │
+│  │  (Platform Engineer)│                    │  (Data Engineer)    │         │
+│  ├─────────────────────┤                    ├─────────────────────┤         │
+│  │ storage:            │                    │ name: my-pipeline   │         │
+│  │   default:          │                    │ catalog: default    │         │
+│  │     type: s3        │                    │ storage: default    │         │
+│  │     bucket: data    │                    │ compute: default    │         │
+│  │ catalogs:           │  ───────────────►  │ transforms:         │         │
+│  │   default:          │  Profile           │   - type: dbt       │         │
+│  │     uri: polaris:81 │  Resolution        │     path: ./models  │         │
+│  │     credentials:    │  ───────────────►  │ observability:      │         │
+│  │       mode: oauth2  │                    │   traces: true      │         │
+│  │       secret_ref:.. │                    │   lineage: true     │         │
+│  └─────────────────────┘                    └─────────────────────┘         │
+│            │                                           │                     │
+│            └───────────────────┬───────────────────────┘                     │
+│                                │                                             │
+│                                ▼                                             │
+│            ┌───────────────────────────────────────┐                        │
+│            │           PlatformResolver            │                        │
+│            │  • Load platform config (local/registry)                       │
+│            │  • Validate secret_ref patterns       │                        │
+│            │  • Check profile references exist     │                        │
+│            └───────────────────┬───────────────────┘                        │
+│                                │                                             │
+│                                ▼                                             │
+│            ┌───────────────────────────────────────┐                        │
+│            │              Compiler                 │                        │
+│            │  • Resolve profile references         │                        │
+│            │  • Merge into CompiledArtifacts       │                        │
+│            │  • NO secrets resolved yet            │                        │
+│            └───────────────────┬───────────────────┘                        │
+│                                │                                             │
+│                                ▼                                             │
+│            ┌───────────────────────────────────────┐                        │
+│            │         CompiledArtifacts v2.0        │                        │
+│            ├───────────────────────────────────────┤                        │
+│            │ resolved_catalog:                     │                        │
+│            │   uri: "polaris:8181/api/catalog"     │                        │
+│            │   credentials:                        │                        │
+│            │     mode: oauth2                      │                        │
+│            │     client_secret:                    │                        │
+│            │       secret_ref: polaris-oauth       │ ◄── Still a reference │
+│            │ resolved_storage:                     │                        │
+│            │   type: s3                            │                        │
+│            │   bucket: data                        │                        │
+│            │ transforms: [...]                     │                        │
+│            │ platform_source: registry/v1.2.3     │                        │
+│            └───────────────────────────────────────┘                        │
+│                                │                                             │
+│                                ▼                                             │
+│            ┌───────────────────────────────────────┐                        │
+│            │       Runtime (Dagster/K8s Pod)       │                        │
+│            │  • Secret resolution happens HERE     │                        │
+│            │  • Reads from env vars or K8s secrets │                        │
+│            │  • Never persisted to disk            │                        │
+│            └───────────────────────────────────────┘                        │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.2 CompiledArtifacts Output
+**Key security principle**: Credentials are resolved at **runtime**, never at compile time. CompiledArtifacts contains `secret_ref` references, not actual secrets.
+
+### 4.2 Sequence: `floe compile`
+
+```
+User              floe-cli         PlatformResolver      Compiler         Filesystem
+  │                  │                   │                   │                 │
+  │  floe compile    │                   │                   │                 │
+  │─────────────────►│                   │                   │                 │
+  │                  │                   │                   │                 │
+  │                  │  Read floe.yaml   │                   │                 │
+  │                  │─────────────────────────────────────────────────────►│
+  │                  │◄─────────────────────────────────────────────────────│
+  │                  │                   │                   │                 │
+  │                  │  Load platform config (FLOE_PLATFORM_ENV)             │
+  │                  │──────────────────►│                   │                 │
+  │                  │                   │                   │                 │
+  │                  │                   │  Read platform/{env}/platform.yaml │
+  │                  │                   │─────────────────────────────────►│
+  │                  │                   │◄─────────────────────────────────│
+  │                  │                   │                   │                 │
+  │                  │  PlatformSpec     │                   │                 │
+  │                  │◄──────────────────│                   │                 │
+  │                  │                   │                   │                 │
+  │                  │  Compile(FloeSpec, PlatformSpec)      │                 │
+  │                  │─────────────────────────────────────►│                 │
+  │                  │                   │                   │                 │
+  │                  │                   │                   │  Resolve profile│
+  │                  │                   │                   │  references     │
+  │                  │                   │                   │                 │
+  │                  │                   │                   │  Validate       │
+  │                  │                   │                   │  secret_refs    │
+  │                  │                   │                   │                 │
+  │                  │  CompiledArtifacts                    │                 │
+  │                  │◄─────────────────────────────────────│                 │
+  │                  │                   │                   │                 │
+  │                  │  Write .floe/artifacts.json          │                 │
+  │                  │─────────────────────────────────────────────────────►│
+  │                  │                   │                   │                 │
+  │  ✓ Compiled      │                   │                   │                 │
+  │◄─────────────────│                   │                   │                 │
+```
+
+### 4.3 CompiledArtifacts Output
 
 ```json
 {

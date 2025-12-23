@@ -52,18 +52,69 @@ floe-runtime/
 
 ### 2.1 Purpose
 
-The foundation package that defines the `floe.yaml` schema, validates user configuration, and produces `CompiledArtifacts` for downstream consumers.
+The foundation package that defines schemas for both `floe.yaml` (pipeline) and `platform.yaml` (infrastructure), validates configuration, and produces `CompiledArtifacts` by merging both at compile time.
 
-### 2.2 Responsibilities
+### 2.2 Two-Tier Configuration Architecture
+
+floe-core implements the two-tier configuration architecture ([ADR-0002](adr/0002-two-tier-config.md)):
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     Platform Configuration Management                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Platform Team Repository                Data Team Repository               │
+│  ┌───────────────────────────┐           ┌───────────────────────────┐      │
+│  │  platform/                │           │  project/                 │      │
+│  │  ├── dev/platform.yaml    │           │  ├── floe.yaml           │      │
+│  │  ├── staging/platform.yaml│           │  ├── models/             │      │
+│  │  └── prod/platform.yaml   │           │  └── tests/              │      │
+│  └────────────┬──────────────┘           └────────────┬──────────────┘      │
+│               │                                       │                      │
+│               ▼                                       │                      │
+│  ┌───────────────────────────┐                       │                      │
+│  │   Artifact Registry       │                       │                      │
+│  │   (OCI/Helm-style)        │◄──────────────────────┘                      │
+│  │                           │   References by version                      │
+│  │   platform-config:v1.2.3  │   e.g., platform: registry/config:1.2.3     │
+│  └────────────┬──────────────┘                                              │
+│               │                                                              │
+│               ▼                                                              │
+│  ┌───────────────────────────────────────────────────────────────────┐      │
+│  │                    PlatformResolver                                │      │
+│  │  • Loads from local directory OR remote registry                  │      │
+│  │  • Resolves secret references at runtime                          │      │
+│  │  • Validates credential modes (static, oauth2, iam_role)          │      │
+│  └────────────────────────────────┬──────────────────────────────────┘      │
+│                                   │                                          │
+│                                   ▼                                          │
+│  ┌───────────────────────────────────────────────────────────────────┐      │
+│  │                         Compiler                                   │      │
+│  │  FloeSpec + PlatformSpec → CompiledArtifacts                      │      │
+│  └───────────────────────────────────────────────────────────────────┘      │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key separation benefits:**
+- **Security**: Platform.yaml managed in separate repository with different access controls
+- **Versioning**: Platform configs published to artifact registry with semantic versions
+- **Audit**: Changes to infrastructure require separate approval workflow
+- **Portability**: Same floe.yaml works with any platform config version
+
+### 2.3 Responsibilities
 
 | Responsibility | Description |
 |----------------|-------------|
-| Schema definition | Pydantic models for floe.yaml |
-| Validation | Validate user configuration against schema |
-| Compilation | Transform FloeSpec → CompiledArtifacts |
+| Schema definition | Pydantic models for floe.yaml AND platform.yaml |
+| PlatformSpec | Infrastructure configuration (storage, catalogs, compute, credentials) |
+| FloeSpec | Pipeline configuration (transforms, governance, observability) |
+| Profile resolution | Resolve profile references (e.g., `catalog: default`) to actual configs |
+| Credential validation | Ensure secrets use `secret_ref`, never plaintext |
+| Compilation | Merge FloeSpec + PlatformSpec → CompiledArtifacts |
 | JSON Schema | Generate JSON Schema for IDE support |
 
-### 2.3 Key Components
+### 2.4 Key Components
 
 ```python
 # floe_core/schemas/floe_spec.py
@@ -287,7 +338,7 @@ class Compiler:
         return classifications
 ```
 
-### 2.4 Public API
+### 2.5 Public API
 
 ```python
 from floe_core import (
@@ -308,7 +359,7 @@ artifacts = compiler.compile(Path("floe.yaml"))
 schema = FloeSpec.model_json_schema()
 ```
 
-### 2.5 JSON Schema Export
+### 2.6 JSON Schema Export
 
 floe-core exports JSON Schema for cross-repository validation. See [CompiledArtifacts Contract](../contracts/compiled-artifacts.md).
 
@@ -846,52 +897,131 @@ class CompactionManager:
 
 ### 7.1 Purpose
 
-Apache Polaris catalog client for Iceberg metadata management.
+Apache Polaris catalog client for Iceberg metadata management, with support for multiple credential modes and secret reference resolution.
 
 ### 7.2 Responsibilities
 
 | Responsibility | Description |
 |----------------|-------------|
-| Catalog connection | Connect to Polaris REST API |
+| Catalog connection | Connect to Polaris REST API with credential mode support |
+| Credential resolution | Resolve `secret_ref` from environment or K8s secrets |
+| OAuth2 authentication | Implement OAuth2 client credentials flow with token refresh |
 | Namespace management | Create/manage namespaces |
 | Table registration | Register tables in catalog |
-| Credential vending | Obtain storage credentials |
+| Credential vending | Obtain storage credentials (STS vending) |
 
-### 7.3 Implementation
+### 7.3 Credential Modes
+
+floe-polaris supports multiple credential modes as defined in `platform.yaml`:
+
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| `static` | Client ID/secret from `secret_ref` | Local development, simple deployments |
+| `oauth2` | OAuth2 client credentials flow | Production, automatic token refresh |
+| `iam_role` | AWS IAM role assumption | AWS deployments, no static credentials |
+| `service_account` | GCP/Azure workload identity | Cloud-native deployments |
+
+### 7.4 Implementation
+
+```python
+# floe_polaris/config.py
+from pydantic import BaseModel, Field, SecretStr
+from typing import Literal
+from enum import Enum
+
+class CredentialMode(str, Enum):
+    """Supported credential modes."""
+    STATIC = "static"
+    OAUTH2 = "oauth2"
+    IAM_ROLE = "iam_role"
+    SERVICE_ACCOUNT = "service_account"
+
+class SecretReference(BaseModel):
+    """Reference to a secret stored externally."""
+    secret_ref: str = Field(description="K8s secret name or env var name")
+
+    def resolve(self) -> str:
+        """Resolve secret from environment or K8s mount."""
+        import os
+        # 1. Check environment variable (uppercase, snake_case)
+        env_name = self.secret_ref.upper().replace("-", "_")
+        if value := os.environ.get(env_name):
+            return value
+        # 2. Check K8s secret mount
+        k8s_path = f"/var/run/secrets/{self.secret_ref}"
+        if os.path.exists(k8s_path):
+            with open(k8s_path) as f:
+                return f.read().strip()
+        raise ValueError(
+            f"Secret '{self.secret_ref}' not found. "
+            f"Expected in {env_name} env var or K8s secret."
+        )
+
+class CredentialConfig(BaseModel):
+    """Credential configuration with mode support."""
+    mode: CredentialMode = CredentialMode.STATIC
+    client_id: str | SecretReference | None = None
+    client_secret: SecretReference | None = None  # MUST use secret_ref
+    scope: str | None = None
+    role_arn: str | None = None  # For IAM role mode
+```
 
 ```python
 # floe_polaris/client.py
 from pyiceberg.catalog import load_catalog
-from pyiceberg.catalog.rest import RestCatalog
+from floe_polaris.config import CredentialConfig, CredentialMode
 
 class PolarisClient:
-    """Client for Apache Polaris catalog."""
+    """Client for Apache Polaris catalog with credential mode support."""
 
     def __init__(
         self,
         uri: str,
-        credential: str | None = None,
-        warehouse: str | None = None,
+        warehouse: str,
+        credentials: CredentialConfig,
     ):
-        self.catalog = load_catalog(
+        self.uri = uri
+        self.warehouse = warehouse
+        self.credentials = credentials
+        self._catalog = None
+
+    @property
+    def catalog(self):
+        """Lazy-load catalog with resolved credentials."""
+        if self._catalog is None:
+            self._catalog = self._create_catalog()
+        return self._catalog
+
+    def _create_catalog(self):
+        """Create PyIceberg catalog with appropriate credential mode."""
+        if self.credentials.mode == CredentialMode.OAUTH2:
+            return self._create_oauth2_catalog()
+        elif self.credentials.mode == CredentialMode.STATIC:
+            return self._create_static_catalog()
+        elif self.credentials.mode == CredentialMode.IAM_ROLE:
+            return self._create_iam_catalog()
+        else:
+            raise ValueError(f"Unsupported credential mode: {self.credentials.mode}")
+
+    def _create_oauth2_catalog(self):
+        """Create catalog with OAuth2 client credentials flow."""
+        client_id = self._resolve_client_id()
+        client_secret = self.credentials.client_secret.resolve()
+
+        return load_catalog(
             "polaris",
             type="rest",
-            uri=uri,
-            credential=credential,
-            warehouse=warehouse,
+            uri=self.uri,
+            warehouse=self.warehouse,
+            credential=f"{client_id}:{client_secret}",
+            scope=self.credentials.scope or "PRINCIPAL_ROLE:ALL",
         )
 
-    def create_namespace(self, namespace: str, properties: dict | None = None):
-        """Create a namespace."""
-        self.catalog.create_namespace(namespace, properties or {})
-
-    def list_namespaces(self) -> list[str]:
-        """List all namespaces."""
-        return [ns[0] for ns in self.catalog.list_namespaces()]
-
-    def namespace_exists(self, namespace: str) -> bool:
-        """Check if namespace exists."""
-        return namespace in self.list_namespaces()
+    def _resolve_client_id(self) -> str:
+        """Resolve client_id from string or SecretReference."""
+        if isinstance(self.credentials.client_id, SecretReference):
+            return self.credentials.client_id.resolve()
+        return self.credentials.client_id or ""
 ```
 
 ```python
@@ -900,16 +1030,17 @@ from floe_core import CompiledArtifacts
 from floe_polaris.client import PolarisClient
 
 def create_catalog_client(artifacts: CompiledArtifacts) -> PolarisClient:
-    """Create Polaris client from artifacts."""
-    catalog_config = artifacts.catalog
+    """Create Polaris client from resolved platform configuration."""
+    # catalog_config comes from resolved platform.yaml
+    catalog_config = artifacts.resolved_catalog
 
     if catalog_config.type != "polaris":
         raise ValueError(f"Expected polaris catalog, got {catalog_config.type}")
 
     return PolarisClient(
         uri=catalog_config.uri,
-        credential=catalog_config.credential,
         warehouse=catalog_config.warehouse,
+        credentials=catalog_config.credentials,
     )
 ```
 
