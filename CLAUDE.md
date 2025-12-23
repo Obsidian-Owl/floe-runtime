@@ -76,3 +76,10 @@ Task(docker-log-analyser, "Analyse polaris container for startup errors")
 | S108 (MAJOR) | No empty code blocks |
 
 @.claude/rules/sonarqube-quality.md for full guidance
+
+## Active Technologies
+- Python 3.10+ (compatible with Dagster 1.6+, dbt-core 1.7+) + Pydantic v2, pydantic-settings, PyYAML, Click (CLI), Dagster, dbt-core (009-two-tier-config)
+- Iceberg tables via Polaris REST catalog; S3-compatible backends (MinIO, AWS S3, LocalStack) (009-two-tier-config)
+
+## Recent Changes
+- 009-two-tier-config: Added Python 3.10+ (compatible with Dagster 1.6+, dbt-core 1.7+) + Pydantic v2, pydantic-settings, PyYAML, Click (CLI), Dagster, dbt-core
