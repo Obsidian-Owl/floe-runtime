@@ -138,6 +138,7 @@ def _create_polaris_catalog() -> Any:
         s3_secret_access_key=s3_secret,  # Already SecretStr
         s3_region=polaris_config.s3_region,
         s3_path_style_access=polaris_config.s3_path_style_access,
+        access_delegation=polaris_config.access_delegation,
     )
 
     return create_catalog(catalog_config)
@@ -251,10 +252,10 @@ def bronze_customers(context: AssetExecutionContext) -> Dict[str, Any]:
 
         # Create table if not exists, then overwrite
         manager.create_table_if_not_exists(
-            "default.bronze_customers",
+            "demo.bronze_customers",
             customers.schema,
         )
-        snapshot = manager.overwrite("default.bronze_customers", customers)
+        snapshot = manager.overwrite("demo.bronze_customers", customers)
 
         if span:
             span.set_attribute("iceberg.snapshot_id", snapshot.snapshot_id)
@@ -263,13 +264,13 @@ def bronze_customers(context: AssetExecutionContext) -> Dict[str, Any]:
         result = {
             "rows": customers.num_rows,
             "snapshot_id": snapshot.snapshot_id,
-            "table": "default.bronze_customers",
+            "table": "demo.bronze_customers",
         }
 
         _emit_lineage_complete(
             run_id,
             job_name,
-            outputs=[("iceberg://demo", "default.bronze_customers")],
+            outputs=[("iceberg://demo", "demo.bronze_customers")],
         )
 
         context.log.info("bronze_customers completed: %s", result)
@@ -329,10 +330,10 @@ def bronze_products(context: AssetExecutionContext) -> Dict[str, Any]:
         manager = IcebergTableManager(catalog)
 
         manager.create_table_if_not_exists(
-            "default.bronze_products",
+            "demo.bronze_products",
             products.schema,
         )
-        snapshot = manager.overwrite("default.bronze_products", products)
+        snapshot = manager.overwrite("demo.bronze_products", products)
 
         if span:
             span.set_attribute("iceberg.snapshot_id", snapshot.snapshot_id)
@@ -341,13 +342,13 @@ def bronze_products(context: AssetExecutionContext) -> Dict[str, Any]:
         result = {
             "rows": products.num_rows,
             "snapshot_id": snapshot.snapshot_id,
-            "table": "default.bronze_products",
+            "table": "demo.bronze_products",
         }
 
         _emit_lineage_complete(
             run_id,
             job_name,
-            outputs=[("iceberg://demo", "default.bronze_products")],
+            outputs=[("iceberg://demo", "demo.bronze_products")],
         )
 
         context.log.info("bronze_products completed: %s", result)
@@ -410,10 +411,10 @@ def bronze_orders(context: AssetExecutionContext) -> Dict[str, Any]:
         manager = IcebergTableManager(catalog)
 
         manager.create_table_if_not_exists(
-            "default.bronze_orders",
+            "demo.bronze_orders",
             orders.schema,
         )
-        snapshot = manager.overwrite("default.bronze_orders", orders)
+        snapshot = manager.overwrite("demo.bronze_orders", orders)
 
         if span:
             span.set_attribute("iceberg.snapshot_id", snapshot.snapshot_id)
@@ -422,13 +423,13 @@ def bronze_orders(context: AssetExecutionContext) -> Dict[str, Any]:
         result = {
             "rows": orders.num_rows,
             "snapshot_id": snapshot.snapshot_id,
-            "table": "default.bronze_orders",
+            "table": "demo.bronze_orders",
         }
 
         _emit_lineage_complete(
             run_id,
             job_name,
-            outputs=[("iceberg://demo", "default.bronze_orders")],
+            outputs=[("iceberg://demo", "demo.bronze_orders")],
         )
 
         context.log.info("bronze_orders completed: %s", result)
@@ -497,10 +498,10 @@ def bronze_order_items(context: AssetExecutionContext) -> Dict[str, Any]:
         manager = IcebergTableManager(catalog)
 
         manager.create_table_if_not_exists(
-            "default.bronze_order_items",
+            "demo.bronze_order_items",
             order_items.schema,
         )
-        snapshot = manager.overwrite("default.bronze_order_items", order_items)
+        snapshot = manager.overwrite("demo.bronze_order_items", order_items)
 
         if span:
             span.set_attribute("iceberg.snapshot_id", snapshot.snapshot_id)
@@ -509,13 +510,13 @@ def bronze_order_items(context: AssetExecutionContext) -> Dict[str, Any]:
         result = {
             "rows": order_items.num_rows,
             "snapshot_id": snapshot.snapshot_id,
-            "table": "default.bronze_order_items",
+            "table": "demo.bronze_order_items",
         }
 
         _emit_lineage_complete(
             run_id,
             job_name,
-            outputs=[("iceberg://demo", "default.bronze_order_items")],
+            outputs=[("iceberg://demo", "demo.bronze_order_items")],
         )
 
         context.log.info("bronze_order_items completed: %s", result)

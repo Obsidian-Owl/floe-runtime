@@ -1,7 +1,6 @@
 ---
 name: dagster-orchestration
-description: Research-driven Dagster orchestration development. Injects research steps for software-defined assets, resources, IO managers, schedules, and sensors. Use when building data orchestration, pipeline execution, or asset management.
-allowed-tools: Read, Grep, Glob, Bash, WebSearch
+description: ALWAYS USE when working with Dagster assets, resources, IO managers, schedules, or sensors. MUST be loaded before creating @asset decorators, ConfigurableResource classes, or orchestration code. Provides SDK research steps and integration patterns.
 ---
 
 # Dagster Orchestration Development (Research-Driven)

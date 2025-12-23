@@ -1,7 +1,7 @@
 # floe-runtime Makefile
 # Provides consistent commands that mirror CI exactly
 
-.PHONY: check lint typecheck security test test-unit test-contract test-integration test-helm helm-lint format install hooks docker-up docker-down docker-logs deploy-local-infra deploy-local-dagster deploy-local-cube deploy-local-full undeploy-local port-forward-all help
+.PHONY: check lint typecheck security test test-unit test-contract test-integration test-helm helm-lint format install hooks docker-up docker-down docker-logs deploy-local-infra deploy-local-dagster deploy-local-cube deploy-local-full undeploy-local port-forward-all port-forward-stop demo-status demo-logs help
 
 # Default target
 help:
@@ -33,7 +33,13 @@ help:
 	@echo "  make deploy-local-cube    - Deploy Cube semantic layer"
 	@echo "  make deploy-local-full    - Deploy complete stack (infra + dagster + cube)"
 	@echo "  make undeploy-local       - Remove all local Kubernetes deployments"
-	@echo "  make port-forward-all     - Start all port-forwards in background"
+	@echo ""
+	@echo "Demo Operations:"
+	@echo "  make port-forward-all     - Start all port-forwards (admin UIs)"
+	@echo "  make port-forward-stop    - Stop all port-forwards"
+	@echo "  make demo-status          - Show status of all deployed services"
+	@echo "  make demo-logs            - Show logs from floe-demo user deployment"
+	@echo "  make demo-logs-all        - Show logs from all Dagster components"
 	@echo ""
 	@echo "Setup:"
 	@echo "  make install         - Install dependencies"
@@ -165,7 +171,7 @@ deploy-local-infra:
 	@echo "✅ Infrastructure deployed!"
 	@echo ""
 	@echo "Waiting for Polaris initialization..."
-	@kubectl wait --for=condition=complete job/floe-infra-floe-infrastructure-polaris-init \
+	@kubectl wait --for=condition=complete job/floe-infra-polaris-init \
 		-n $(FLOE_NAMESPACE) --timeout=120s || true
 	@echo "✅ Polaris initialized!"
 
@@ -241,22 +247,68 @@ undeploy-local:
 port-forward-all:
 	@echo "⎈ Starting port-forwards for all services..."
 	@echo ""
+	@echo "Killing any existing port-forwards..."
+	@-pkill -f 'kubectl port-forward' 2>/dev/null || true
+	@sleep 1
+	@echo ""
 	@echo "Starting port-forwards in background (logs in /tmp/port-forward-*.log)..."
-	@kubectl port-forward svc/floe-dagster-webserver 3000:80 -n $(FLOE_NAMESPACE) > /tmp/port-forward-dagster.log 2>&1 &
-	@kubectl port-forward svc/floe-cube 4000:4000 -n $(FLOE_NAMESPACE) > /tmp/port-forward-cube.log 2>&1 &
-	@kubectl port-forward svc/floe-cube 15432:15432 -n $(FLOE_NAMESPACE) > /tmp/port-forward-cube-sql.log 2>&1 &
-	@kubectl port-forward svc/floe-infra-jaeger 16686:16686 -n $(FLOE_NAMESPACE) > /tmp/port-forward-jaeger.log 2>&1 &
+	@kubectl port-forward svc/floe-dagster-dagster-webserver 3000:80 -n $(FLOE_NAMESPACE) > /tmp/port-forward-dagster.log 2>&1 &
+	@kubectl port-forward svc/floe-infra-jaeger-query 16686:16686 -n $(FLOE_NAMESPACE) > /tmp/port-forward-jaeger.log 2>&1 &
+	@kubectl port-forward svc/floe-infra-marquez 5000:5000 -n $(FLOE_NAMESPACE) > /tmp/port-forward-marquez.log 2>&1 &
+	@kubectl port-forward svc/floe-infra-marquez-web 3001:3001 -n $(FLOE_NAMESPACE) > /tmp/port-forward-marquez-web.log 2>&1 &
 	@kubectl port-forward svc/floe-infra-minio-console 9001:9001 -n $(FLOE_NAMESPACE) > /tmp/port-forward-minio.log 2>&1 &
+	@kubectl port-forward svc/floe-infra-polaris 8181:8181 -n $(FLOE_NAMESPACE) > /tmp/port-forward-polaris.log 2>&1 &
 	@sleep 2
 	@echo ""
 	@echo "✅ Port-forwards started!"
 	@echo ""
-	@echo "Services available at:"
+	@echo "Admin UIs available at:"
 	@echo "  Dagster UI:      http://localhost:3000"
-	@echo "  Cube API:        http://localhost:4000"
-	@echo "  Cube SQL:        localhost:15432 (user: cube, password: cube_password)"
-	@echo "  Jaeger UI:       http://localhost:16686"
-	@echo "  MinIO Console:   http://localhost:9001 (user: minioadmin, password: minioadmin)"
+	@echo "  Jaeger UI:       http://localhost:16686  (tracing)"
+	@echo "  Marquez Web UI:  http://localhost:3001   (lineage)"
+	@echo "  Marquez API:     http://localhost:5000   (lineage API)"
+	@echo "  MinIO Console:   http://localhost:9001   (storage - user: minioadmin)"
+	@echo "  Polaris API:     http://localhost:8181   (catalog - API only, no UI)"
 	@echo ""
 	@echo "To stop all port-forwards:"
-	@echo "  pkill -f 'kubectl port-forward'"
+	@echo "  make port-forward-stop"
+
+# Stop all port-forwards
+port-forward-stop:
+	@echo "⎈ Stopping all port-forwards..."
+	@-pkill -f 'kubectl port-forward' 2>/dev/null || true
+	@echo "✅ Port-forwards stopped!"
+
+# Show status of all deployed services
+demo-status:
+	@echo "⎈ Floe Demo Status"
+	@echo "=================="
+	@echo ""
+	@echo "Pods:"
+	@kubectl get pods -n $(FLOE_NAMESPACE) 2>/dev/null || echo "  Namespace $(FLOE_NAMESPACE) not found"
+	@echo ""
+	@echo "Services:"
+	@kubectl get svc -n $(FLOE_NAMESPACE) 2>/dev/null || true
+	@echo ""
+	@echo "Jobs:"
+	@kubectl get jobs -n $(FLOE_NAMESPACE) 2>/dev/null || true
+
+# Show logs from demo user deployment (tail)
+demo-logs:
+	@echo "⎈ Floe Demo Logs (floe-demo user deployment)"
+	@echo "============================================="
+	@kubectl logs -l deployment=floe-demo -n $(FLOE_NAMESPACE) --tail=50 2>/dev/null || echo "No floe-demo pods found"
+
+# Show logs from all dagster components
+demo-logs-all:
+	@echo "⎈ All Dagster Logs"
+	@echo "=================="
+	@echo ""
+	@echo "--- Webserver ---"
+	@kubectl logs -l component=dagster-webserver -n $(FLOE_NAMESPACE) --tail=20 2>/dev/null || true
+	@echo ""
+	@echo "--- Daemon ---"
+	@kubectl logs -l component=dagster-daemon -n $(FLOE_NAMESPACE) --tail=20 2>/dev/null || true
+	@echo ""
+	@echo "--- User Deployment (floe-demo) ---"
+	@kubectl logs -l deployment=floe-demo -n $(FLOE_NAMESPACE) --tail=20 2>/dev/null || true

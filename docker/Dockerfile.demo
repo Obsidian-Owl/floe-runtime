@@ -1,0 +1,113 @@
+# Floe Demo User Deployment Image
+# For Dagster user-deployments (gRPC code server)
+#
+# Build:
+#   docker build -t ghcr.io/obsidian-owl/floe-demo:latest -f docker/Dockerfile.demo .
+#
+# Push:
+#   docker push ghcr.io/obsidian-owl/floe-demo:latest
+#
+# Run locally (for testing):
+#   docker run -p 3030:3030 ghcr.io/obsidian-owl/floe-demo:latest
+#
+# Based on uv best practices:
+#   - https://docs.astral.sh/uv/guides/integration/docker/
+#   - https://hynek.me/articles/docker-uv/
+#
+# Covers: 007-FR-001 (Kubernetes deployment)
+# Covers: 008-US1 (Deploy complete stack to Kubernetes)
+
+# =============================================================================
+# Stage 1: Builder - Install dependencies with uv
+# =============================================================================
+FROM ghcr.io/astral-sh/uv:0.5-python3.10-bookworm-slim AS builder
+
+WORKDIR /app
+
+# Enable bytecode compilation for faster startup
+ENV UV_COMPILE_BYTECODE=1
+# Use copy mode for portability (not hardlinks)
+ENV UV_LINK_MODE=copy
+# Build venv directly in /app (will be copied to runtime)
+ENV UV_PROJECT_ENVIRONMENT=/app/.venv
+
+# Install build dependencies (git needed for some packages)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Layer 1: Copy only lockfile and root pyproject.toml first
+# This layer changes rarely (only when dependencies change)
+COPY uv.lock pyproject.toml ./
+
+# Layer 2: Copy all workspace member pyproject.toml files
+# uv needs these to resolve workspace dependencies
+COPY packages/floe-core/pyproject.toml packages/floe-core/
+COPY packages/floe-cli/pyproject.toml packages/floe-cli/
+COPY packages/floe-dagster/pyproject.toml packages/floe-dagster/
+COPY packages/floe-dbt/pyproject.toml packages/floe-dbt/
+COPY packages/floe-iceberg/pyproject.toml packages/floe-iceberg/
+COPY packages/floe-polaris/pyproject.toml packages/floe-polaris/
+COPY packages/floe-cube/pyproject.toml packages/floe-cube/
+COPY packages/floe-synthetic/pyproject.toml packages/floe-synthetic/
+
+# Layer 3: Copy full workspace source code
+# (uv needs source to resolve workspace dependencies)
+COPY packages/ ./packages/
+COPY demo/ ./demo/
+
+# Layer 4: Install all workspace packages and their dependencies
+# --all-packages: Install all workspace members
+# --locked: Verify lockfile matches
+# --no-dev: Production only
+# --no-editable: Install packages properly (not as editable links)
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev --no-editable --all-packages
+
+# =============================================================================
+# Stage 2: Runtime - Minimal production image
+# =============================================================================
+FROM python:3.10-slim-bookworm AS runtime
+
+WORKDIR /app
+
+# Install only runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user (UID 1000 for Kubernetes compatibility)
+RUN useradd -m -u 1000 dagster
+
+# Copy the pre-built virtual environment from builder
+COPY --from=builder /app/.venv /app/.venv
+
+# Copy demo code (needed for module imports)
+# The packages are installed in .venv, but demo is a namespace package
+COPY --from=builder /app/demo /app/demo
+
+# Set environment variables
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
+
+# Set ownership
+RUN chown -R dagster:dagster /app
+
+# Switch to non-root user
+USER dagster
+
+# Expose gRPC port for Dagster user deployment
+EXPOSE 3030
+
+# Health check for gRPC server
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD python -c "import socket; s=socket.socket(); s.connect(('localhost', 3030)); s.close()" || exit 1
+
+# Default command: Dagster gRPC code server
+# Serves the demo.orchestration.definitions module
+# NOTE: Using CMD instead of ENTRYPOINT so K8s Run Launcher can override
+# the command when executing pipeline runs (dagster api execute_run ...)
+CMD ["dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "3030", "-m", "demo.orchestration.definitions"]

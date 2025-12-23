@@ -1,7 +1,6 @@
 ---
 name: pyiceberg-storage
 description: Research-driven PyIceberg development. Injects research steps for Iceberg table operations, ACID transactions, catalog integration, and schema evolution. Use when working with Iceberg table storage, time-travel queries, or data lake operations.
-allowed-tools: Read, Grep, Glob, Bash, WebSearch
 ---
 
 # PyIceberg Storage Development (Research-Driven)

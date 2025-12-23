@@ -1,7 +1,6 @@
 ---
 name: cube-semantic-layer
 description: Research-driven Cube semantic layer development. Injects research steps for data modeling, dbt integration, metrics, dimensions, REST API, GraphQL API, and SQL API (Postgres wire protocol). Use when building semantic layer, consumption APIs, metrics layer, Cube integration tests, or working with Cube MEASURE() syntax and psycopg2 connections.
-allowed-tools: Read, Grep, Glob, Bash, WebSearch
 ---
 
 # Cube Semantic Layer Development (Research-Driven)

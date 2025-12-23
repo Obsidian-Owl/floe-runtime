@@ -2,7 +2,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "floe-infrastructure.fullname" . }}-polaris-init
+  name: {{ .Release.Name }}-polaris-init
   labels:
     {{- include "floe-infrastructure.labels" . | nindent 4 }}
     app.kubernetes.io/component: polaris-init
@@ -21,7 +21,7 @@ spec:
     spec:
       restartPolicy: Never
       initContainers:
-        # Wait for Polaris to be ready
+        # Wait for Polaris to be ready using Quarkus management health endpoint
         - name: wait-for-polaris
           image: busybox:1.36
           command:
@@ -29,7 +29,7 @@ spec:
             - -c
             - |
               echo "Waiting for Polaris to be ready..."
-              until wget -q --spider http://{{ include "floe-infrastructure.fullname" . }}-polaris:8181/api/catalog/v1/config; do
+              until wget -q --spider http://{{ .Release.Name }}-polaris:8182/q/health/ready; do
                 echo "Polaris not ready, waiting..."
                 sleep 5
               done
@@ -46,28 +46,65 @@ spec:
               import sys
               import urllib.request
               import urllib.error
+              import urllib.parse
 
               POLARIS_URI = os.environ["POLARIS_URI"]
               CATALOG_NAME = os.environ["CATALOG_NAME"]
               NAMESPACES = os.environ["NAMESPACES"].split(",")
               STORAGE_LOCATION = os.environ["STORAGE_LOCATION"]
               MINIO_ENDPOINT = os.environ["MINIO_ENDPOINT"]
+              CLIENT_ID = os.environ["POLARIS_CLIENT_ID"]
+              CLIENT_SECRET = os.environ["POLARIS_CLIENT_SECRET"]
 
-              def api_request(method, path, data=None):
+              def get_oauth_token():
+                  """Get OAuth2 token from Polaris."""
+                  url = f"{POLARIS_URI}/api/catalog/v1/oauth/tokens"
+                  data = urllib.parse.urlencode({
+                      "grant_type": "client_credentials",
+                      "client_id": CLIENT_ID,
+                      "client_secret": CLIENT_SECRET,
+                      "scope": "PRINCIPAL_ROLE:ALL"
+                  }).encode()
+                  req = urllib.request.Request(url, data=data, method="POST")
+                  req.add_header("Content-Type", "application/x-www-form-urlencoded")
+                  try:
+                      with urllib.request.urlopen(req, timeout=30) as resp:
+                          result = json.loads(resp.read().decode())
+                          return result.get("access_token")
+                  except urllib.error.HTTPError as e:
+                      print(f"Failed to get OAuth token: {e.code} - {e.reason}")
+                      return None
+
+              def api_request(method, path, data=None, token=None):
                   """Make API request to Polaris."""
                   url = f"{POLARIS_URI}{path}"
                   headers = {"Content-Type": "application/json"}
+                  if token:
+                      headers["Authorization"] = f"Bearer {token}"
                   body = json.dumps(data).encode() if data else None
                   req = urllib.request.Request(url, data=body, headers=headers, method=method)
                   try:
                       with urllib.request.urlopen(req, timeout=30) as resp:
-                          return resp.status, json.loads(resp.read().decode())
+                          content = resp.read().decode()
+                          # Handle empty responses (204 No Content or empty body)
+                          if not content or content.strip() == "":
+                              return resp.status, {}
+                          return resp.status, json.loads(content)
                   except urllib.error.HTTPError as e:
                       return e.code, {"error": e.reason}
                   except Exception as e:
                       return 500, {"error": str(e)}
 
               print(f"Initializing Polaris catalog: {CATALOG_NAME}")
+              print(f"Using credentials: {CLIENT_ID}")
+
+              # Get OAuth2 token
+              print("Obtaining OAuth2 token...")
+              token = get_oauth_token()
+              if not token:
+                  print("ERROR: Failed to obtain OAuth2 token")
+                  sys.exit(1)
+              print("  Token acquired successfully")
 
               # 1. Create catalog
               print(f"Creating catalog: {CATALOG_NAME}")
@@ -88,7 +125,7 @@ spec:
                           }
                       }
                   }
-              })
+              }, token)
               if status == 201:
                   print(f"  Created catalog: {CATALOG_NAME}")
               elif status == 409:
@@ -96,14 +133,39 @@ spec:
               else:
                   print(f"  Failed to create catalog: {status} - {resp}")
 
-              # 2. Create namespaces
+              # 2. Create namespaces (parent namespaces first, then children)
+              # Extract all unique parent namespaces that need to be created first
+              parents = set()
+              for ns in NAMESPACES:
+                  parts = ns.strip().split(".")
+                  if len(parts) > 1:
+                      parents.add(parts[0])  # e.g., "demo" from "demo.bronze"
+
+              # Create parent namespaces first
+              for parent in sorted(parents):
+                  print(f"Creating parent namespace: {parent}")
+                  status, resp = api_request("POST", f"/api/catalog/v1/{CATALOG_NAME}/namespaces", {
+                      "namespace": [parent],
+                      "properties": {}
+                  }, token)
+                  if status == 200:
+                      print(f"  Created parent namespace: {parent}")
+                  elif status == 409:
+                      print(f"  Parent namespace already exists: {parent}")
+                  else:
+                      print(f"  Failed to create parent namespace: {status} - {resp}")
+
+              # Create child namespaces
               for ns in NAMESPACES:
                   ns_parts = ns.strip().split(".")
+                  # Skip if this is a parent-only namespace (already created above)
+                  if len(ns_parts) == 1 and ns_parts[0] in parents:
+                      continue
                   print(f"Creating namespace: {ns}")
                   status, resp = api_request("POST", f"/api/catalog/v1/{CATALOG_NAME}/namespaces", {
                       "namespace": ns_parts,
                       "properties": {}
-                  })
+                  }, token)
                   if status == 200:
                       print(f"  Created namespace: {ns}")
                   elif status == 409:
@@ -111,28 +173,77 @@ spec:
                   else:
                       print(f"  Failed to create namespace: {status} - {resp}")
 
-              # 3. Create principal for DuckDB access
-              print("Creating OAuth2 principal for DuckDB access")
-              status, resp = api_request("POST", "/api/management/v1/principals", {
-                  "principal": {
-                      "name": "demo_client",
-                      "type": "SERVICE"
+              # 3. Create a catalog role with full table privileges
+              catalog_role_name = "demo_data_admin"
+              print(f"Creating catalog role: {catalog_role_name}")
+              status, resp = api_request("POST", f"/api/management/v1/catalogs/{CATALOG_NAME}/catalog-roles", {
+                  "catalogRole": {
+                      "name": catalog_role_name
                   }
-              })
+              }, token)
               if status == 201:
-                  print(f"  Created principal: demo_client")
-                  if "credentials" in resp:
-                      print(f"  Client ID: {resp['credentials'].get('clientId', 'N/A')}")
+                  print(f"  Created catalog role: {catalog_role_name}")
               elif status == 409:
-                  print(f"  Principal already exists: demo_client")
+                  print(f"  Catalog role already exists: {catalog_role_name}")
               else:
-                  print(f"  Failed to create principal: {status} - {resp}")
+                  print(f"  Failed to create catalog role: {status} - {resp}")
+
+              # 4. Grant privileges to the catalog role on the catalog
+              # These privileges allow table creation and data writes
+              privileges = [
+                  "CATALOG_MANAGE_CONTENT",  # Create/drop tables and namespaces
+                  "TABLE_CREATE",
+                  "TABLE_DROP",
+                  "TABLE_READ_DATA",
+                  "TABLE_WRITE_DATA",
+                  "TABLE_LIST",
+                  "NAMESPACE_CREATE",
+                  "NAMESPACE_DROP",
+                  "NAMESPACE_LIST",
+                  "VIEW_CREATE",
+                  "VIEW_DROP",
+                  "VIEW_LIST"
+              ]
+              for priv in privileges:
+                  print(f"  Granting {priv} on catalog to {catalog_role_name}")
+                  status, resp = api_request("PUT",
+                      f"/api/management/v1/catalogs/{CATALOG_NAME}/catalog-roles/{catalog_role_name}/grants",
+                      {
+                          "grant": {
+                              "type": "catalog",
+                              "privilege": priv
+                          }
+                      }, token)
+                  if status in [200, 201]:
+                      print(f"    Granted {priv}")
+                  elif status == 409:
+                      print(f"    Grant already exists: {priv}")
+                  else:
+                      print(f"    Failed to grant {priv}: {status} - {resp}")
+
+              # 5. Assign the catalog role to the principal role "service_admin"
+              # The demo_client principal has service_admin role by default
+              principal_role = "service_admin"
+              print(f"Assigning catalog role {catalog_role_name} to principal role {principal_role}")
+              status, resp = api_request("PUT",
+                  f"/api/management/v1/principal-roles/{principal_role}/catalog-roles/{CATALOG_NAME}",
+                  {
+                      "catalogRole": {
+                          "name": catalog_role_name
+                      }
+                  }, token)
+              if status in [200, 201]:
+                  print(f"  Assigned {catalog_role_name} to {principal_role}")
+              elif status == 409:
+                  print(f"  Assignment already exists")
+              else:
+                  print(f"  Failed to assign catalog role: {status} - {resp}")
 
               print("Polaris initialization complete!")
               sys.exit(0)
           env:
             - name: POLARIS_URI
-              value: "http://{{ include "floe-infrastructure.fullname" . }}-polaris:8181"
+              value: "http://{{ .Release.Name }}-polaris:8181"
             - name: CATALOG_NAME
               value: {{ .Values.polarisInit.catalogName | quote }}
             - name: NAMESPACES
@@ -141,6 +252,10 @@ spec:
               value: {{ .Values.polarisInit.storageLocation | quote }}
             - name: MINIO_ENDPOINT
               value: {{ include "floe-infrastructure.minio.endpoint" . | quote }}
+            - name: POLARIS_CLIENT_ID
+              value: {{ .Values.polarisInit.oauthClientId | default "demo_client" | quote }}
+            - name: POLARIS_CLIENT_SECRET
+              value: {{ .Values.polarisInit.oauthClientSecret | default "demo_secret" | quote }}
           resources:
             requests:
               cpu: 50m

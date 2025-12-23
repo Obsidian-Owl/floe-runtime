@@ -138,13 +138,21 @@ class PolarisCatalog:
                 f"{self.config.client_id}:{self.config.client_secret.get_secret_value()}"
             )
             properties["scope"] = self.config.scope
+            # PyIceberg defaults to {uri}/v1/oauth/tokens
+            # When uri includes /api/catalog (e.g., http://polaris:8181/api/catalog),
+            # the OAuth endpoint is correctly resolved as /api/catalog/v1/oauth/tokens
+            # Only set explicit endpoint if uri doesn't include /api/catalog path
+            if "/api/catalog" not in self.config.uri:
+                properties["oauth2-server-uri"] = f"{self.config.uri}/api/catalog/v1/oauth/tokens"
 
         # Bearer token authentication
         elif self.config.token:
             properties["token"] = self.config.token.get_secret_value()
 
-        # Access delegation mode
-        properties["header.X-Iceberg-Access-Delegation"] = self.config.access_delegation
+        # Access delegation mode - only set if non-empty
+        # Empty string disables credential vending (used for MinIO/LocalStack)
+        if self.config.access_delegation:
+            properties["header.X-Iceberg-Access-Delegation"] = self.config.access_delegation
 
         # S3 FileIO properties (for S3-compatible storage like LocalStack/MinIO)
         # These override any server-side configuration from the REST catalog

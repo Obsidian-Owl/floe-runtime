@@ -1,7 +1,6 @@
 ---
 name: dbt-transformations
-description: Research-driven dbt Core development. Injects research steps for models, tests, snapshots, seeds, macros, and programmatic invocation. Use when building SQL transformations, data quality tests, or dbt project configuration.
-allowed-tools: Read, Grep, Glob, Bash, WebSearch
+description: ALWAYS USE when working with dbt models, SQL transformations, tests, snapshots, or macros. MUST be loaded before editing any .sql files, dbt_project.yml, or profiles.yml. Enforces dbt owns SQL principle - never parse SQL in Python.
 ---
 
 # dbt Core Development (Research-Driven)

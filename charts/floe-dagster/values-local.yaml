@@ -26,7 +26,7 @@ dagster:
     env:
       # Polaris (Iceberg REST catalog) connection
       - name: POLARIS_URI
-        value: "http://floe-infra-floe-infrastructure-polaris:8181"
+        value: "http://floe-infra-polaris:8181/api/catalog"
       - name: POLARIS_CATALOG
         value: "demo_catalog"
       # MinIO (S3-compatible storage) connection
@@ -45,10 +45,10 @@ dagster:
       - name: JAEGER_ENDPOINT
         value: "http://floe-infra-jaeger-collector:14268/api/traces"
       - name: MARQUEZ_URL
-        value: "http://floe-infra-floe-infrastructure-marquez:5000"
+        value: "http://floe-infra-marquez:5000"
 
   # User deployments configuration
-  # Uses floe demo code with DuckDB + Polaris integration
+  # Image: ghcr.io/obsidian-owl/floe-demo:latest
   dagster-user-deployments:
     enabled: true
     enableSubchart: true
@@ -57,17 +57,22 @@ dagster:
         image:
           repository: "ghcr.io/obsidian-owl/floe-demo"
           tag: "latest"
-          pullPolicy: IfNotPresent
-        dagsterApiGrpcArgs:
-          - "--module-name"
-          - "demo.orchestration.definitions"
+          pullPolicy: IfNotPresent  # Cache locally to avoid repeated downloads
+        # Note: Don't specify dagsterApiGrpcArgs - the Dockerfile ENTRYPOINT
+        # already includes the full command: dagster api grpc -h 0.0.0.0 -p 3030 -m demo.orchestration.definitions
         port: 3030
         env:
-          # Inherit global env vars
+          # Polaris (Iceberg REST catalog) connection
           - name: POLARIS_URI
-            value: "http://floe-infra-floe-infrastructure-polaris:8181"
-          - name: POLARIS_CATALOG
+            value: "http://floe-infra-polaris:8181/api/catalog"
+          - name: POLARIS_WAREHOUSE
             value: "demo_catalog"
+          # Polaris OAuth2 credentials (must match polarisInit values in floe-infrastructure)
+          - name: POLARIS_CLIENT_ID
+            value: "demo_client"
+          - name: POLARIS_CLIENT_SECRET
+            value: "demo_secret_k8s"
+          # MinIO (S3-compatible storage) connection
           - name: AWS_ENDPOINT_URL
             value: "http://floe-infra-minio:9000"
           - name: AWS_ACCESS_KEY_ID
@@ -76,26 +81,26 @@ dagster:
             value: "minioadmin"
           - name: AWS_REGION
             value: "us-east-1"
+          # Observability endpoints
+          - name: OTEL_EXPORTER_OTLP_ENDPOINT
+            value: "http://floe-infra-jaeger-collector:4317"
+          - name: OTEL_SERVICE_NAME
+            value: "floe-demo"
+          - name: OPENLINEAGE_URL
+            value: "http://floe-infra-marquez:5000"
+          - name: OPENLINEAGE_NAMESPACE
+            value: "demo"
 
   # PostgreSQL for Dagster metadata
-  # For local testing, disable persistence to avoid PVC provisioning issues
-  # Docker Desktop's hostpath provisioner doesn't work reliably
+  # DISABLED: Use floe-infra-postgresql (shared infrastructure PostgreSQL)
+  # This avoids PVC provisioning issues on Docker Desktop
   postgresql:
-    enabled: true
-    primary:
-      persistence:
-        enabled: false  # Use emptyDir for local testing
-      # Reduce startup time with healthchecks
-      readinessProbe:
-        initialDelaySeconds: 5
-        periodSeconds: 5
-        timeoutSeconds: 3
-        failureThreshold: 6
-      livenessProbe:
-        initialDelaySeconds: 30
-        periodSeconds: 10
-        timeoutSeconds: 5
-        failureThreshold: 6
+    enabled: false  # Don't deploy separate PostgreSQL
+    # Point to infrastructure PostgreSQL
+    postgresqlHost: "floe-infra-postgresql"
+    postgresqlUsername: "postgres"
+    postgresqlPassword: "floe-postgres"
+    postgresqlDatabase: "dagster"
 
   # Minimal resource configuration for local testing
   dagsterWebserver:
@@ -117,6 +122,19 @@ dagster:
       limits:
         cpu: 500m
         memory: 512Mi
+    # Fast run monitoring for local development
+    # Default pollIntervalSeconds=120 causes 2+ min delays in failure detection
+    runMonitoring:
+      enabled: true
+      startTimeoutSeconds: 60     # Faster timeout for runs failing to start (default: 300)
+      pollIntervalSeconds: 10     # Check run status every 10s (default: 120)
+    # Faster sensor evaluation for local dev
+    sensors:
+      useThreads: true
+      numWorkers: 2
+    schedules:
+      useThreads: true
+      numWorkers: 2
 
   # Use K8s run launcher for proper orchestration
   runLauncher:

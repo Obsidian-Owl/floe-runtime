@@ -1,7 +1,6 @@
 ---
 name: polaris-catalog
 description: Research-driven Apache Polaris catalog management. Injects research steps for catalog operations, namespaces, principals, roles, and access control. Use when working with Iceberg catalog management, metadata organization, or access governance.
-allowed-tools: Read, Grep, Glob, Bash, WebSearch
 ---
 
 # Apache Polaris Catalog Management (Research-Driven)

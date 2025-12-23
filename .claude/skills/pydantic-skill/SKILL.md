@@ -1,7 +1,6 @@
 ---
 name: pydantic-schemas
-description: Research-driven Pydantic v2 schema development. Injects research steps, validation requirements, and SDK verification. Use when working with data models, configuration, validation, or API contracts.
-allowed-tools: Read, Grep, Glob, Bash, WebSearch
+description: ALWAYS USE when working with Pydantic models, BaseModel, Field, validators, or data contracts. MUST be loaded before creating any Pydantic schemas, configuration classes, or API contracts. Provides v2 syntax validation and SDK research steps.
 ---
 
 # Pydantic Schema Development (Research-Driven)

@@ -14,6 +14,22 @@ Each skill follows the **progressive disclosure** pattern - injecting context on
 
 ## Available Skills
 
+### Infrastructure & Deployment
+
+#### [helm-k8s-deployment](helm-k8s-skill/SKILL.md)
+**Use when**: Working with Helm charts, K8s deployments, debugging pods, or analysing container logs
+
+**Capabilities**:
+- Context-efficient log analysis (never dumps full logs)
+- Helm chart validation and templating
+- K8s debugging with targeted extraction
+- Subagent delegation for deep analysis
+
+**Key Resources**:
+- [SKILL.md](helm-k8s-skill/SKILL.md) - Context-preserving K8s debugging
+
+---
+
 ### Data Validation & Type Safety
 
 #### [pydantic-schemas](pydantic-skill/SKILL.md)

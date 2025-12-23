@@ -1,0 +1,206 @@
+# JSON Schema for floe-infrastructure Helm values
+# This defines the contract for the values.yaml file
+#
+# Feature: 008-kubernetes-demo
+# Date: 2025-12-22
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://floe-runtime.dev/schemas/floe-infrastructure-values.json
+title: Floe Infrastructure Helm Values
+description: Configuration schema for the floe-infrastructure Helm chart
+type: object
+
+properties:
+  global:
+    type: object
+    description: Global settings shared across subcharts
+    properties:
+      namespace:
+        type: string
+        default: floe
+        description: Kubernetes namespace for all resources
+      storageClass:
+        type: string
+        default: ""
+        description: Storage class for persistent volumes (empty = default)
+
+  postgresql:
+    type: object
+    description: PostgreSQL configuration (Bitnami subchart)
+    properties:
+      enabled:
+        type: boolean
+        default: true
+      primary:
+        type: object
+        properties:
+          persistence:
+            type: object
+            properties:
+              enabled:
+                type: boolean
+                default: false
+                description: Use emptyDir for Docker Desktop compatibility
+          resources:
+            $ref: "#/$defs/resources"
+      auth:
+        type: object
+        properties:
+          database:
+            type: string
+            default: floe
+          username:
+            type: string
+            default: floe
+          existingSecret:
+            type: string
+            description: Name of existing secret with postgresql-password key
+
+  minio:
+    type: object
+    description: MinIO S3-compatible storage
+    properties:
+      enabled:
+        type: boolean
+        default: true
+      mode:
+        type: string
+        enum: [standalone, distributed]
+        default: standalone
+      persistence:
+        type: object
+        properties:
+          enabled:
+            type: boolean
+            default: false
+            description: Use emptyDir for Docker Desktop compatibility
+      buckets:
+        type: array
+        items:
+          type: object
+          properties:
+            name:
+              type: string
+            policy:
+              type: string
+              enum: [none, download, upload, public]
+        default:
+          - name: iceberg-data
+            policy: none
+          - name: cube-store
+            policy: none
+      resources:
+        $ref: "#/$defs/resources"
+
+  polaris:
+    type: object
+    description: Apache Polaris Iceberg catalog
+    properties:
+      enabled:
+        type: boolean
+        default: true
+      image:
+        type: object
+        properties:
+          repository:
+            type: string
+            default: apache/polaris
+          tag:
+            type: string
+            default: latest
+      persistence:
+        type: object
+        properties:
+          enabled:
+            type: boolean
+            default: false
+      init:
+        type: object
+        description: Polaris initialization configuration
+        properties:
+          enabled:
+            type: boolean
+            default: true
+          catalog:
+            type: string
+            default: demo_catalog
+          namespaces:
+            type: array
+            items:
+              type: string
+            default:
+              - demo.bronze
+              - demo.silver
+              - demo.gold
+          storage:
+            type: object
+            properties:
+              type:
+                type: string
+                enum: [S3, GCS, AZURE]
+                default: S3
+              location:
+                type: string
+                default: s3://iceberg-data/
+      resources:
+        $ref: "#/$defs/resources"
+
+  jaeger:
+    type: object
+    description: Jaeger distributed tracing
+    properties:
+      enabled:
+        type: boolean
+        default: true
+      allInOne:
+        type: object
+        properties:
+          enabled:
+            type: boolean
+            default: true
+            description: Use all-in-one deployment for demo
+      resources:
+        $ref: "#/$defs/resources"
+
+  marquez:
+    type: object
+    description: Marquez data lineage
+    properties:
+      enabled:
+        type: boolean
+        default: true
+      resources:
+        $ref: "#/$defs/resources"
+
+$defs:
+  resources:
+    type: object
+    description: Kubernetes resource requests and limits
+    properties:
+      requests:
+        type: object
+        properties:
+          cpu:
+            type: string
+            default: 100m
+          memory:
+            type: string
+            default: 256Mi
+      limits:
+        type: object
+        properties:
+          cpu:
+            type: string
+            default: 500m
+          memory:
+            type: string
+            default: 512Mi
+
+required: []
+
+# Validation dependencies
+dependentRequired:
+  polaris:
+    - postgresql  # Polaris requires PostgreSQL for metadata
+  marquez:
+    - postgresql  # Marquez requires PostgreSQL for metadata

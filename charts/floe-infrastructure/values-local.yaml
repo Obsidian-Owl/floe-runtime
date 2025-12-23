@@ -5,6 +5,8 @@
 # PostgreSQL - minimal resources, no persistence
 postgresql:
   enabled: true
+  image:
+    tag: latest  # Use latest tag for compatibility
   auth:
     postgresPassword: "floe-postgres"
     database: "dagster"
@@ -59,7 +61,7 @@ polaris:
   enabled: true
   image:
     repository: apache/polaris
-    tag: "0.9.0"
+    tag: "latest"
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
@@ -69,6 +71,15 @@ polaris:
     limits:
       cpu: 500m
       memory: 512Mi
+  # Fast health checks for local dev
+  livenessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    failureThreshold: 3
 
 # Jaeger - all-in-one with memory storage
 jaeger:
@@ -94,6 +105,8 @@ jaeger:
     enabled: false
 
 # Marquez - minimal resources
+# Note: Marquez requires its own PostgreSQL database. The postgres-init job
+# creates the marquez database automatically before Marquez starts.
 marquez:
   enabled: true
   image:
@@ -108,8 +121,12 @@ marquez:
     limits:
       cpu: 500m
       memory: 512Mi
+  # Web UI for lineage visualization
+  web:
+    enabled: true
 
 # Polaris initialization for demo
+# Note: These credentials are used for both bootstrap and init
 polarisInit:
   enabled: true
   catalogName: "demo_catalog"
@@ -119,3 +136,4 @@ polarisInit:
     - "demo.gold"
   storageLocation: "s3://iceberg-data/"
   oauthClientId: "demo_client"
+  oauthClientSecret: "demo_secret_k8s"

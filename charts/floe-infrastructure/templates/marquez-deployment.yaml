@@ -1,0 +1,162 @@
+{{- if .Values.marquez.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-marquez-config
+  labels:
+    {{- include "floe-infrastructure.labels" . | nindent 4 }}
+    app.kubernetes.io/component: marquez
+data:
+  marquez.yml: |
+    server:
+      applicationConnectors:
+        - type: http
+          port: ${MARQUEZ_PORT:-5000}
+      adminConnectors:
+        - type: http
+          port: ${MARQUEZ_ADMIN_PORT:-5001}
+
+    db:
+      driverClass: org.postgresql.Driver
+      url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${MARQUEZ_DB}
+      user: ${MARQUEZ_USER}
+      password: ${MARQUEZ_PASSWORD}
+
+    migrateOnStartup: true
+
+    logging:
+      level: INFO
+      appenders:
+        - type: console
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-marquez
+  labels:
+    {{- include "floe-infrastructure.labels" . | nindent 4 }}
+    app.kubernetes.io/component: marquez
+spec:
+  replicas: {{ .Values.marquez.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "floe-infrastructure.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: marquez
+  template:
+    metadata:
+      labels:
+        {{- include "floe-infrastructure.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: marquez
+    spec:
+      initContainers:
+        # Wait for PostgreSQL and create marquez database if it doesn't exist
+        - name: init-marquez-db
+          image: bitnami/postgresql:latest
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              echo "Waiting for PostgreSQL to be ready..."
+              until PGPASSWORD="${POSTGRES_PASSWORD}" psql -h "${POSTGRES_HOST}" -U postgres -c "SELECT 1" 2>/dev/null; do
+                echo "PostgreSQL not ready, waiting..."
+                sleep 5
+              done
+              echo "PostgreSQL is ready!"
+
+              echo "Checking if marquez database exists..."
+              if ! PGPASSWORD="${POSTGRES_PASSWORD}" psql -h "${POSTGRES_HOST}" -U postgres -lqt | cut -d \| -f 1 | grep -qw marquez; then
+                echo "Creating marquez database..."
+                PGPASSWORD="${POSTGRES_PASSWORD}" psql -h "${POSTGRES_HOST}" -U postgres -c "CREATE DATABASE marquez"
+                echo "marquez database created!"
+              else
+                echo "marquez database already exists"
+              fi
+          env:
+            - name: POSTGRES_HOST
+              value: {{ .Release.Name }}-postgresql
+            - name: POSTGRES_PASSWORD
+              value: {{ .Values.postgresql.auth.postgresPassword | quote }}
+      containers:
+        - name: marquez
+          image: "{{ .Values.marquez.image.repository }}:{{ .Values.marquez.image.tag }}"
+          imagePullPolicy: {{ .Values.marquez.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: http
+              containerPort: 5000
+              protocol: TCP
+            - name: admin
+              containerPort: 5001
+              protocol: TCP
+          env:
+            # Use custom config file instead of built-in dev config
+            - name: MARQUEZ_CONFIG
+              value: "/etc/marquez/marquez.yml"
+            - name: MARQUEZ_PORT
+              value: "5000"
+            - name: MARQUEZ_ADMIN_PORT
+              value: "5001"
+            # PostgreSQL connection
+            - name: POSTGRES_HOST
+              value: {{ .Release.Name }}-postgresql
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_USER
+              value: "postgres"
+            - name: POSTGRES_PASSWORD
+              value: {{ .Values.postgresql.auth.postgresPassword | quote }}
+            # Marquez-specific database settings
+            - name: MARQUEZ_DB
+              value: "marquez"
+            - name: MARQUEZ_USER
+              value: "postgres"
+            - name: MARQUEZ_PASSWORD
+              value: {{ .Values.postgresql.auth.postgresPassword | quote }}
+          volumeMounts:
+            - name: marquez-config
+              mountPath: /etc/marquez
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /api/v1/namespaces
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /api/v1/namespaces
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.marquez.resources | nindent 12 }}
+      volumes:
+        - name: marquez-config
+          configMap:
+            name: {{ .Release.Name }}-marquez-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-marquez
+  labels:
+    {{- include "floe-infrastructure.labels" . | nindent 4 }}
+    app.kubernetes.io/component: marquez
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5000
+      targetPort: http
+      protocol: TCP
+      name: http
+    - port: 5001
+      targetPort: admin
+      protocol: TCP
+      name: admin
+  selector:
+    {{- include "floe-infrastructure.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: marquez
+{{- end }}

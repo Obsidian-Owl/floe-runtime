@@ -71,7 +71,9 @@
     "🔒 Security: Never commit secrets or use eval()/exec()",
     "📝 Type Safety: Use Pydantic for ALL data validation",
     "🎯 Standalone-First: Every feature must work without SaaS",
-    "✅ Quality: Maintain > 80% test coverage"
+    "✅ Quality: Maintain > 80% test coverage",
+    "🚀 Context: Use /project:logs or spawn docker-log-analyser for debugging",
+    "📚 Skills: Invoke skills from .claude/skills/ for component work"
   ],
   "attribution": {
     "commit": "🤖 Generated with Claude Code\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>",

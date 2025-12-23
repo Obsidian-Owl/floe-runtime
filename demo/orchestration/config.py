@@ -103,6 +103,10 @@ class DemoPolarisConfig(BaseModel):
         default=True,
         description="Use path-style S3 access (required for LocalStack)",
     )
+    access_delegation: str = Field(
+        default="",
+        description="Iceberg access delegation mode (empty string disables vending for MinIO)",
+    )
 
 
 # =============================================================================
