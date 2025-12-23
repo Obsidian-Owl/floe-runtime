@@ -23,8 +23,31 @@ packages/
 └── floe-polaris/    # Catalog (Polaris REST)
 
 charts/              # Helm charts for K8s deployment
+platform/            # Environment-specific platform.yaml files
 testing/docker/      # Docker Compose test infrastructure
 ```
+
+## Two-Tier Configuration Architecture
+
+Floe uses a two-tier configuration model:
+
+| File | Audience | Contains |
+|------|----------|----------|
+| `floe.yaml` | Data Engineers | Pipelines: transforms, governance, logical profile references |
+| `platform.yaml` | Platform Engineers | Infrastructure: storage, catalogs, compute, credentials |
+
+**Data engineers never see credentials or infrastructure details.**
+
+```yaml
+# floe.yaml (Data Engineer) - same file works across all environments
+name: customer-analytics
+version: "1.0.0"
+storage: default      # Logical reference
+catalog: default      # Logical reference
+compute: default      # Logical reference
+```
+
+See [docs/platform-config.md](docs/platform-config.md) and [docs/pipeline-config.md](docs/pipeline-config.md).
 
 ## Core Standards (Summary)
 
@@ -33,6 +56,7 @@ testing/docker/      # Docker Compose test infrastructure
 - **>80% test coverage** required
 - **Never** use `eval()`, `exec()`, or log secrets
 - **Standalone-first**: No SaaS dependencies
+- **Zero secrets in code**: All credentials via secret references
 
 @.claude/CLAUDE.md for full development standards
 
@@ -77,9 +101,8 @@ Task(docker-log-analyser, "Analyse polaris container for startup errors")
 
 @.claude/rules/sonarqube-quality.md for full guidance
 
-## Active Technologies
-- Python 3.10+ (compatible with Dagster 1.6+, dbt-core 1.7+) + Pydantic v2, pydantic-settings, PyYAML, Click (CLI), Dagster, dbt-core (009-two-tier-config)
-- Iceberg tables via Polaris REST catalog; S3-compatible backends (MinIO, AWS S3, LocalStack) (009-two-tier-config)
+## Documentation
 
-## Recent Changes
-- 009-two-tier-config: Added Python 3.10+ (compatible with Dagster 1.6+, dbt-core 1.7+) + Pydantic v2, pydantic-settings, PyYAML, Click (CLI), Dagster, dbt-core
+- [Platform Configuration Guide](docs/platform-config.md) - For platform engineers
+- [Pipeline Configuration Guide](docs/pipeline-config.md) - For data engineers
+- [Security Architecture](docs/security.md) - Credential flows and access control

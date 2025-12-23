@@ -1,6 +1,6 @@
 # floe-runtime
 
-**Open-source data execution layer** - Define your data pipeline in a single `floe.yaml` file, and floe-runtime handles orchestration, transformation, storage, and observability.
+**Open-source data execution layer** - Define your data pipeline in `floe.yaml`, let platform engineers configure infrastructure in `platform.yaml`. Same pipeline definition works across all environments.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
@@ -46,32 +46,70 @@ floe-runtime/
 │   ├── floe-iceberg/    # Iceberg table management
 │   ├── floe-polaris/    # Polaris catalog client
 │   └── floe-cube/       # Cube semantic layer
+├── platform/            # Environment-specific platform.yaml files
 ├── docs/                # Architecture documentation
-└── charts/              # Helm charts (coming soon)
+└── charts/              # Helm charts for K8s deployment
 ```
 
-## Example floe.yaml
+## Two-Tier Configuration
+
+Floe separates concerns between data engineers and platform engineers:
+
+### floe.yaml (Data Engineer)
 
 ```yaml
+# Same file works across dev, staging, prod
 name: customer-analytics
-version: "1.0"
+version: "1.0.0"
 
-compute:
-  target: duckdb  # or snowflake, bigquery, postgres, databricks
+# Logical profile references - resolved at deploy time
+storage: default
+catalog: default
+compute: default
 
 transforms:
   - type: dbt
-    path: models/
+    path: ./dbt
 
-consumption:
-  enabled: true
-  cube:
-    port: 4000
+governance:
+  classification_source: dbt_meta
 
 observability:
   traces: true
   lineage: true
 ```
+
+### platform.yaml (Platform Engineer)
+
+```yaml
+# Environment-specific infrastructure
+version: "1.0.0"
+
+storage:
+  default:
+    type: s3
+    endpoint: "http://minio:9000"
+    bucket: iceberg-data
+
+catalogs:
+  default:
+    type: polaris
+    uri: "http://polaris:8181/api/catalog"
+    credentials:
+      mode: oauth2
+      client_secret:
+        secret_ref: polaris-oauth-secret  # K8s secret reference
+
+compute:
+  default:
+    type: duckdb
+```
+
+**Key benefits:**
+- Data engineers focus on pipeline logic, not infrastructure
+- Same `floe.yaml` deploys to any environment
+- Zero credentials in pipeline code
+- Platform team controls infrastructure changes
 
 ## Philosophy
 
@@ -109,6 +147,12 @@ uv run isort .
 
 ## Documentation
 
+**Configuration Guides:**
+- [Pipeline Configuration](docs/pipeline-config.md) - For data engineers
+- [Platform Configuration](docs/platform-config.md) - For platform engineers
+- [Security Architecture](docs/security.md) - Credential flows and access control
+
+**Architecture:**
 - [Architecture Overview](docs/00-overview.md)
 - [Building Blocks](docs/04-building-blocks.md)
 - [Solution Strategy](docs/03-solution-strategy.md)
