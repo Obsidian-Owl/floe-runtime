@@ -125,10 +125,93 @@ schema = Model.model_json_schema()  # NOT .schema()
 
 ## Contract-Based Architecture
 
-### CompiledArtifacts: Primary Contract
+### Two-Tier Configuration Contracts
+
+The two-tier architecture uses three primary contracts:
 
 ```python
 from pydantic import BaseModel, ConfigDict, Field
+from enum import Enum
+from typing import Any
+
+# ============================================================
+# PLATFORM TIER (Platform Engineer's Domain)
+# ============================================================
+
+class CredentialMode(str, Enum):
+    """Supported credential modes."""
+    STATIC = "static"           # K8s secret or env var
+    OAUTH2 = "oauth2"           # OAuth2 client credentials
+    IAM_ROLE = "iam_role"       # AWS IAM role assumption
+    SERVICE_ACCOUNT = "service_account"  # GCP/Azure workload identity
+
+class SecretReference(BaseModel):
+    """Reference to external secret (K8s or env var)."""
+    secret_ref: str = Field(
+        description="K8s secret name or env var name",
+        pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,252}$"
+    )
+
+    def resolve(self) -> str:
+        """Resolve secret at runtime (NOT at compile time)."""
+        import os
+        env_name = self.secret_ref.upper().replace("-", "_")
+        if value := os.environ.get(env_name):
+            return value
+        k8s_path = f"/var/run/secrets/{self.secret_ref}"
+        if os.path.exists(k8s_path):
+            with open(k8s_path) as f:
+                return f.read().strip()
+        raise ValueError(f"Secret '{self.secret_ref}' not found")
+
+class CredentialConfig(BaseModel):
+    """Credential configuration - secrets MUST use secret_ref."""
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    mode: CredentialMode = CredentialMode.STATIC
+    client_id: str | SecretReference | None = None
+    client_secret: SecretReference | None = None  # MUST be secret_ref
+    scope: str | None = None
+    role_arn: str | None = None
+
+class CatalogProfile(BaseModel):
+    """Catalog profile in platform.yaml."""
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    type: str = Field(default="polaris")
+    uri: str | SecretReference  # Can also be secret-referenced
+    warehouse: str
+    credentials: CredentialConfig
+
+class PlatformSpec(BaseModel):
+    """Platform configuration - platform.yaml schema."""
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    version: str = Field(default="1.0.0")
+    storage: dict[str, Any]  # StorageProfile dict
+    catalogs: dict[str, CatalogProfile]
+    compute: dict[str, Any]  # ComputeProfile dict
+
+# ============================================================
+# PIPELINE TIER (Data Engineer's Domain)
+# ============================================================
+
+class FloeSpec(BaseModel):
+    """Pipeline configuration - floe.yaml schema."""
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    name: str = Field(description="Pipeline name")
+    version: str = Field(default="1.0.0")
+    # Profile references ONLY - no infrastructure details
+    catalog: str = Field(default="default")
+    storage: str = Field(default="default")
+    compute: str = Field(default="default")
+    transforms: list[Any]  # TransformConfig list
+    observability: Any | None = None
+
+# ============================================================
+# COMPILED OUTPUT (Result of merge)
+# ============================================================
 
 class CompiledArtifacts(BaseModel):
     """
@@ -144,15 +227,25 @@ class CompiledArtifacts(BaseModel):
         extra="forbid",  # Reject unknown fields - strict contract
     )
 
-    version: str = Field(default="1.0.0")
-    metadata: ArtifactMetadata
-    compute: ComputeConfig
-    transforms: list[TransformConfig]
+    version: str = Field(default="2.0.0")  # v2 for two-tier
+    metadata: Any  # ArtifactMetadata
+    # RESOLVED profiles from platform.yaml
+    resolved_catalog: CatalogProfile
+    resolved_storage: Any  # StorageProfile
+    resolved_compute: Any  # ComputeProfile
+    # Pipeline configuration from floe.yaml
+    transforms: list[Any]
+    observability: Any | None = None
+    # Provenance tracking
+    platform_source: str | None = None  # e.g., "registry/v1.2.3"
+    platform_version: str | None = None
 
     def export_json_schema(self) -> dict[str, Any]:
         """Export JSON Schema for contract validation."""
         return self.model_json_schema()
 ```
+
+**Key principle**: Credentials are resolved at **runtime**, not compile time. CompiledArtifacts contains `secret_ref` references, not actual secret values.
 
 ### Backward Compatibility
 
