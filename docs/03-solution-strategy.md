@@ -10,6 +10,7 @@ This document describes the fundamental technology decisions and approaches for 
 
 | Component | Technology | Rationale |
 |-----------|------------|-----------|
+| **Configuration** | **Two-Tier (platform.yaml + floe.yaml)** | **Persona separation, zero secrets in code** |
 | CLI | Python + Click | Native to data engineering ecosystem |
 | Schema | Pydantic | Type-safe validation, JSON Schema generation |
 | Orchestration | Dagster | Asset-centric, OpenLineage native |
@@ -22,6 +23,40 @@ This document describes the fundamental technology decisions and approaches for 
 | Lineage | OpenLineage | Industry standard for data lineage |
 | Packaging | PyPI + Containers | Hybrid distribution strategy |
 | Deployment | Helm | Kubernetes-native |
+
+### 1.2 Two-Tier Configuration ([ADR-0002](adr/0002-two-tier-config.md))
+
+The fundamental configuration strategy separates infrastructure from pipeline logic:
+
+| Tier | File | Owner | Contents |
+|------|------|-------|----------|
+| **Platform** | `platform.yaml` | Platform Engineer | Endpoints, credentials, storage, catalogs |
+| **Pipeline** | `floe.yaml` | Data Engineer | Transforms, governance, observability flags |
+
+**Key principles:**
+- **Zero secrets in code** — floe.yaml contains only logical profile references
+- **Environment portability** — Same floe.yaml works across dev/staging/prod
+- **Persona separation** — Platform engineers own infrastructure; Data engineers own pipelines
+- **Secret references** — Credentials stored in K8s secrets, referenced by name only
+
+```yaml
+# floe.yaml - Data Engineer (portable across all environments)
+name: customer-analytics
+storage: default       # Logical reference
+catalog: default       # Resolved at deploy time
+compute: default       # No infrastructure details
+```
+
+```yaml
+# platform.yaml - Platform Engineer (environment-specific)
+catalogs:
+  default:
+    uri: "http://polaris:8181/api/catalog"
+    credentials:
+      mode: oauth2
+      client_secret:
+        secret_ref: polaris-oauth-secret  # K8s secret name
+```
 
 ---
 
@@ -65,50 +100,68 @@ Use **Python** for all floe-runtime packages.
 
 Use **Pydantic models** as the source of truth for all schemas, with **JSON Schema** generated for validation and documentation.
 
-### 3.2 Implementation
+### 3.2 Core Schemas
+
+Two primary schemas define the two-tier configuration:
+
+| Schema | Purpose | Owner |
+|--------|---------|-------|
+| `PlatformSpec` | Infrastructure configuration (storage, catalogs, compute, credentials) | Platform Engineer |
+| `FloeSpec` | Pipeline configuration (transforms, governance, observability) | Data Engineer |
+| `CompiledArtifacts` | Merged output for runtime execution | Compiler |
+
+### 3.3 Implementation
 
 ```python
-from pydantic import BaseModel, Field
-from typing import Literal, Optional
-from enum import Enum
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Optional
 
-class ComputeTarget(str, Enum):
-    DUCKDB = "duckdb"
-    SNOWFLAKE = "snowflake"
-    BIGQUERY = "bigquery"
-    POSTGRES = "postgres"
+# Platform Engineer's domain
+class CatalogProfile(BaseModel):
+    """Catalog configuration with credentials."""
+    type: str = Field(default="polaris")
+    uri: str = Field(description="Catalog REST API endpoint")
+    credentials: CredentialConfig  # Secret references only
 
-class ComputeConfig(BaseModel):
-    """Compute target configuration."""
-    target: ComputeTarget = Field(
-        description="The compute engine for SQL execution"
-    )
-    connection_secret_ref: Optional[str] = Field(
-        default=None,
-        description="Reference to connection credentials secret"
-    )
+class PlatformSpec(BaseModel):
+    """Infrastructure configuration - platform.yaml schema."""
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
+    version: str = Field(default="1.0.0")
+    storage: dict[str, StorageProfile]
+    catalogs: dict[str, CatalogProfile]
+    compute: dict[str, ComputeProfile]
+
+# Data Engineer's domain
 class FloeSpec(BaseModel):
-    """Root schema for floe.yaml."""
+    """Pipeline configuration - floe.yaml schema."""
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
     name: str = Field(description="Pipeline name")
     version: str = Field(description="Schema version")
-    compute: ComputeConfig
-    # ... more fields
+    # Profile references (resolved at compile time)
+    storage: str = Field(default="default")
+    catalog: str = Field(default="default")
+    compute: str = Field(default="default")
+    transforms: list[TransformConfig]
 ```
 
-### 3.3 Generated Artifacts
+### 3.4 Generated Artifacts
 
 ```
 floe-core/
 ├── schemas/
-│   ├── floe_spec.py          # Pydantic models (source of truth)
-│   ├── compiled_artifacts.py # Output contract
+│   ├── platform_spec.py      # PlatformSpec (infrastructure)
+│   ├── floe_spec.py          # FloeSpec (pipeline)
+│   ├── credential_config.py  # CredentialConfig (secrets)
+│   ├── compiled_artifacts.py # Merged output contract
 │   └── generated/
-│       ├── floe.schema.json  # For IDE support, validation
+│       ├── platform.schema.json  # For IDE support
+│       ├── floe.schema.json      # For IDE support
 │       └── artifacts.schema.json
 ```
 
-### 3.4 Rationale
+### 3.5 Rationale
 
 | Factor | Analysis |
 |--------|----------|
@@ -315,19 +368,25 @@ Use **Apache Polaris** as the default Iceberg catalog.
 
 ### 7.4 Integration Pattern
 
+Catalog configuration comes from `platform.yaml`, resolved at compile time:
+
 ```python
 from pyiceberg.catalog import load_catalog
+from floe_core.compiler import PlatformResolver
 
 def get_catalog(artifacts: CompiledArtifacts) -> Catalog:
-    """Load Iceberg catalog based on configuration."""
-    catalog_config = artifacts.catalog
+    """Load Iceberg catalog from resolved platform configuration."""
+    # catalog_config is the resolved CatalogProfile from platform.yaml
+    catalog_config = artifacts.resolved_catalog
 
     if catalog_config.type == "polaris":
+        # Credentials are resolved from secret_ref at runtime
+        credential = catalog_config.credentials.resolve()
         return load_catalog(
             "polaris",
             type="rest",
             uri=catalog_config.uri,
-            credential=catalog_config.credential,
+            credential=credential,  # OAuth2 token from secret
         )
     elif catalog_config.type == "glue":
         return load_catalog("glue", type="glue")

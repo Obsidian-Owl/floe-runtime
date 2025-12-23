@@ -19,23 +19,47 @@ floe-runtime is an **open-source data pipeline execution framework** that integr
 
 ### The Core Promise
 
-Define your data pipeline in a single `floe.yaml` file, and floe-runtime handles the complexity of orchestrating multiple tools, managing dependencies, and providing observability.
+Define your data pipeline in `floe.yaml`, and let platform engineers configure infrastructure in `platform.yaml`. The same pipeline works across all environments—dev, staging, production—without modification.
+
+**Two-Tier Configuration** ([ADR-0002](adr/0002-two-tier-config.md)):
 
 ```yaml
-# floe.yaml - Your entire pipeline definition
+# floe.yaml - Data Engineer (pipeline logic only)
 name: customer-analytics
-version: "1.0"
+version: "1.0.0"
 
-compute:
-  target: duckdb  # or snowflake, bigquery, postgres, spark
+# Logical references - resolved at deploy time
+storage: default
+catalog: default
+compute: default
 
 transforms:
   - type: dbt
-    path: models/
+    path: ./dbt
 
 observability:
   traces: true
   lineage: true
+```
+
+```yaml
+# platform.yaml - Platform Engineer (infrastructure)
+version: "1.0.0"
+
+storage:
+  default:
+    type: s3
+    endpoint: "http://minio:9000"
+    bucket: iceberg-data
+
+catalogs:
+  default:
+    type: polaris
+    uri: "http://polaris:8181/api/catalog"
+    credentials:
+      mode: oauth2
+      client_secret:
+        secret_ref: polaris-oauth-secret  # K8s secret reference
 ```
 
 ---
@@ -132,15 +156,19 @@ We believe in:
 
 ### 6.1 Core Principles
 
-1. **dbt owns SQL** — Floe never parses, transpiles, or validates SQL. dbt handles all SQL operations.
+1. **Two-tier configuration** — Pipeline logic (`floe.yaml`) is separated from infrastructure (`platform.yaml`). Data engineers focus on data; platform engineers own infrastructure.
 
-2. **Target agnostic** — Users choose their compute target. DuckDB for development, Snowflake for production—Floe doesn't prescribe.
+2. **Zero secrets in code** — Credentials never appear in `floe.yaml`. Only logical profile references. Secrets are managed via K8s secrets and resolved at runtime.
 
-3. **Observability first** — Every operation emits traces, metrics, and lineage. Built-in, not bolted-on.
+3. **dbt owns SQL** — Floe never parses, transpiles, or validates SQL. dbt handles all SQL operations.
 
-4. **Standard formats** — Iceberg for storage, OpenLineage for lineage, OTel for observability. No proprietary formats.
+4. **Target agnostic** — Users choose their compute target. DuckDB for development, Snowflake for production—Floe doesn't prescribe.
 
-5. **Explicit over implicit** — Configuration is declarative. No magic, no hidden behavior.
+5. **Observability first** — Every operation emits traces, metrics, and lineage. Built-in, not bolted-on.
+
+6. **Standard formats** — Iceberg for storage, OpenLineage for lineage, OTel for observability. No proprietary formats.
+
+7. **Explicit over implicit** — Configuration is declarative. No magic, no hidden behavior.
 
 ### 6.2 Design Guidelines
 
