@@ -95,6 +95,36 @@ class TestPolarisCatalogInit:
         assert call_kwargs["scope"] == TEST_SCOPE
 
     @patch("floe_polaris.client.RestCatalog")
+    def test_oauth2_token_refresh_enabled_by_default(
+        self, mock_rest_catalog_cls: MagicMock, oauth_config: PolarisCatalogConfig
+    ) -> None:
+        """Test token-refresh-enabled is passed to PyIceberg by default.
+
+        PyIceberg's RestCatalog handles OAuth2 token refresh automatically
+        when this property is set to 'true'.
+        """
+        _catalog = PolarisCatalog(oauth_config)  # noqa: F841
+
+        call_kwargs = mock_rest_catalog_cls.call_args.kwargs
+        assert call_kwargs.get("token-refresh-enabled") == "true"
+
+    @patch("floe_polaris.client.RestCatalog")
+    def test_oauth2_token_refresh_disabled(self, mock_rest_catalog_cls: MagicMock) -> None:
+        """Test token-refresh-enabled is not passed when disabled."""
+        config = PolarisCatalogConfig(
+            uri="http://localhost:8181/api/catalog",
+            warehouse="test_warehouse",
+            client_id="test_client",
+            client_secret="test_secret",
+            scope=TEST_SCOPE,
+            token_refresh_enabled=False,
+        )
+        _catalog = PolarisCatalog(config)  # noqa: F841
+
+        call_kwargs = mock_rest_catalog_cls.call_args.kwargs
+        assert "token-refresh-enabled" not in call_kwargs
+
+    @patch("floe_polaris.client.RestCatalog")
     def test_token_initialization(
         self, mock_rest_catalog_cls: MagicMock, token_config: PolarisCatalogConfig
     ) -> None:

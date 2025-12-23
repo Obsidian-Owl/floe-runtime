@@ -42,8 +42,14 @@ class PolarisCatalog:
     - Configurable retry policies with exponential backoff
     - Structured logging via structlog
     - OpenTelemetry span tracing
-    - Automatic token refresh
+    - Automatic OAuth2 token refresh (via PyIceberg's built-in mechanism)
     - Circuit breaker for cascading failure prevention
+
+    Token Refresh:
+        When token_refresh_enabled=True (default), PyIceberg's RestCatalog
+        automatically refreshes OAuth2 tokens before they expire. This uses
+        the standard OAuth2 client credentials flow with the configured
+        client_id and client_secret.
 
     Attributes:
         config: Catalog configuration.
@@ -138,6 +144,12 @@ class PolarisCatalog:
                 f"{self.config.client_id}:{self.config.client_secret.get_secret_value()}"
             )
             properties["scope"] = self.config.scope
+
+            # Enable PyIceberg's built-in token refresh mechanism
+            # PyIceberg will automatically refresh tokens before expiry
+            if self.config.token_refresh_enabled:
+                properties["token-refresh-enabled"] = "true"
+
             # PyIceberg defaults to {uri}/v1/oauth/tokens
             # When uri includes /api/catalog (e.g., http://polaris:8181/api/catalog),
             # the OAuth endpoint is correctly resolved as /api/catalog/v1/oauth/tokens
@@ -235,7 +247,12 @@ class PolarisCatalog:
             return self._catalog
 
     def _should_refresh_token(self) -> bool:
-        """Check if token should be refreshed.
+        """Check if token should be refreshed manually.
+
+        Note:
+            PyIceberg's RestCatalog handles token refresh automatically when
+            token-refresh-enabled=true. This method is for fallback scenarios
+            where manual refresh tracking is needed.
 
         Returns:
             True if token should be refreshed (within 5 minutes of expiry).
@@ -246,9 +263,13 @@ class PolarisCatalog:
         return time.time() > (self._token_expiry - 300)
 
     def _refresh_token(self) -> None:
-        """Refresh the authentication token.
+        """Force refresh the authentication token.
 
-        This reconnects to the catalog to obtain a fresh token.
+        Note:
+            PyIceberg's RestCatalog handles token refresh automatically when
+            token-refresh-enabled=true. This method forces a reconnection
+            which obtains a fresh token for scenarios where automatic refresh
+            fails or immediate refresh is needed.
         """
         self._logger.debug("token_refresh_started")
         self._catalog = None
