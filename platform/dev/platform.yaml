@@ -1,0 +1,71 @@
+# Development Environment Platform Configuration
+#
+# Environment: dev
+# Purpose: Shared development environment (AWS dev account, Polaris dev instance)
+#
+# Usage:
+#   export FLOE_PLATFORM_ENV=dev
+#   floe validate
+#   floe compile
+#
+# Required secrets (via K8s secrets or environment variables):
+#   polaris-oauth-dev     - OAuth2 credentials for Polaris dev instance
+#   aws-dev-role-arn      - AWS IAM role ARN for S3 access (if using IAM role)
+
+version: "1.0.0"
+
+storage:
+  default:
+    type: s3
+    endpoint: ""  # Empty = AWS S3
+    region: us-east-1
+    bucket: floe-dev-data
+    path_style_access: false
+    credentials:
+      mode: iam_role
+      role_arn: "arn:aws:iam::123456789012:role/FloeDevRole"
+
+catalogs:
+  default:
+    type: polaris
+    uri: "https://polaris-dev.internal.example.com/api/catalog"
+    warehouse: dev_catalog
+    namespace: development
+    credentials:
+      mode: oauth2
+      client_id: "floe-dev-service"
+      client_secret:
+        secret_ref: polaris-oauth-dev
+      scope: "PRINCIPAL_ROLE:DATA_ENGINEER"
+    access_delegation: vended-credentials
+    token_refresh_enabled: true
+
+compute:
+  default:
+    type: duckdb
+    properties:
+      path: ":memory:"
+      threads: 8
+    credentials:
+      mode: static
+
+  snowflake:
+    type: snowflake
+    properties:
+      account: "acme-dev.us-east-1"
+      warehouse: DEV_WH
+      database: DEV_DB
+      schema: ANALYTICS
+    credentials:
+      mode: static
+      secret_ref: snowflake-dev-credentials
+
+observability:
+  traces: true
+  metrics: true
+  lineage: true
+  otlp_endpoint: "https://otel-collector.internal.example.com:4317"
+  lineage_endpoint: "https://marquez-dev.internal.example.com:5000"
+  attributes:
+    service.name: floe-dev
+    deployment.environment: development

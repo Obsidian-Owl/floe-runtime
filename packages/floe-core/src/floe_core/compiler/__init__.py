@@ -5,7 +5,8 @@ This module exports the Compiler class, resolution utilities, and output models:
 - PlatformResolver: Load platform.yaml from file or environment
 - ProfileResolver: Resolve logical profile references to concrete configs
 - SecretResolver: Validate and resolve secret references
-- CompiledArtifacts: Output contract model
+- CompiledArtifacts: Output contract model (v2.0 with resolved_profiles)
+- ResolvedPlatformProfiles: Resolved platform profiles container
 - ArtifactMetadata: Compilation metadata model
 - EnvironmentContext: Optional SaaS context model
 - extract_column_classifications: Classification extraction function
@@ -19,6 +20,7 @@ from floe_core.compiler.models import (
     ArtifactMetadata,
     CompiledArtifacts,
     EnvironmentContext,
+    ResolvedPlatformProfiles,
 )
 from floe_core.compiler.platform_resolver import (
     DEFAULT_PLATFORM_ENV,
@@ -65,6 +67,7 @@ __all__: list[str] = [
     "validate_platform_secrets",
     # Output models
     "CompiledArtifacts",
+    "ResolvedPlatformProfiles",
     "ArtifactMetadata",
     "EnvironmentContext",
     # Extraction function

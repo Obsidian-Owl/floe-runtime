@@ -1,0 +1,110 @@
+# Production Environment Platform Configuration
+#
+# Environment: prod
+# Purpose: Production environment with enterprise security controls
+#
+# Usage:
+#   export FLOE_PLATFORM_ENV=prod
+#   floe validate
+#   floe compile
+#
+# Security Requirements:
+#   - All credentials via IAM roles or K8s secrets
+#   - OAuth2 scope limited to DATA_ENGINEER (no ALL access)
+#   - TLS enabled for all endpoints
+#   - Vended credentials for S3 access
+#
+# Required secrets (via K8s secrets):
+#   polaris-oauth-prod    - OAuth2 credentials for Polaris production instance
+#   snowflake-prod        - Snowflake service account credentials
+
+version: "1.0.0"
+
+storage:
+  default:
+    type: s3
+    endpoint: ""  # AWS S3
+    region: us-east-1
+    bucket: floe-prod-data-lake
+    path_style_access: false
+    credentials:
+      mode: iam_role
+      role_arn: "arn:aws:iam::987654321098:role/FloeProdDataLakeRole"
+
+  archive:
+    type: s3
+    endpoint: ""
+    region: us-east-1
+    bucket: floe-prod-archive
+    path_style_access: false
+    credentials:
+      mode: iam_role
+      role_arn: "arn:aws:iam::987654321098:role/FloeProdArchiveRole"
+
+catalogs:
+  default:
+    type: polaris
+    uri: "https://polaris.prod.example.com/api/catalog"
+    warehouse: prod_catalog
+    namespace: production
+    credentials:
+      mode: oauth2
+      client_id: "floe-prod-service"
+      client_secret:
+        secret_ref: polaris-oauth-prod
+      scope: "PRINCIPAL_ROLE:DATA_ENGINEER"
+    access_delegation: vended-credentials
+    token_refresh_enabled: true
+    properties:
+      # Production hardening
+      rest.auth-type: oauth2
+      rest.oauth2.client-id: "floe-prod-service"
+
+  analytics:
+    type: polaris
+    uri: "https://polaris.prod.example.com/api/catalog"
+    warehouse: analytics_catalog
+    namespace: analytics
+    credentials:
+      mode: oauth2
+      client_id: "floe-analytics-service"
+      client_secret:
+        secret_ref: polaris-analytics-oauth-prod
+      scope: "PRINCIPAL_ROLE:DATA_ANALYST"
+    access_delegation: vended-credentials
+    token_refresh_enabled: true
+
+compute:
+  default:
+    type: snowflake
+    properties:
+      account: "acme-prod.us-east-1"
+      warehouse: PROD_WH
+      database: PROD_DB
+      schema: ANALYTICS
+      role: DATA_ENGINEER
+    credentials:
+      mode: static
+      secret_ref: snowflake-prod
+
+  reporting:
+    type: snowflake
+    properties:
+      account: "acme-prod.us-east-1"
+      warehouse: REPORTING_WH
+      database: PROD_DB
+      schema: REPORTS
+      role: REPORTING_SERVICE
+    credentials:
+      mode: static
+      secret_ref: snowflake-reporting-prod
+
+observability:
+  traces: true
+  metrics: true
+  lineage: true
+  otlp_endpoint: "https://otel-collector.prod.example.com:4317"
+  lineage_endpoint: "https://marquez.prod.example.com:5000"
+  attributes:
+    service.name: floe-production
+    deployment.environment: production

@@ -1,0 +1,62 @@
+# Local Development Platform Configuration
+#
+# Environment: local
+# Purpose: Local development with Docker Compose (MinIO, Polaris, LocalStack)
+#
+# Usage:
+#   export FLOE_PLATFORM_ENV=local
+#   floe validate
+#   floe compile
+#
+# Required environment variables:
+#   POLARIS_CLIENT_ID      - OAuth2 client ID for Polaris
+#   POLARIS_CLIENT_SECRET  - OAuth2 client secret for Polaris
+#   MINIO_ACCESS_KEY       - MinIO access key (or from minio-credentials secret)
+#   MINIO_SECRET_KEY       - MinIO secret key (or from minio-credentials secret)
+
+version: "1.0.0"
+
+storage:
+  default:
+    type: s3
+    endpoint: "http://minio:9000"
+    region: us-east-1
+    bucket: iceberg-data
+    path_style_access: true
+    credentials:
+      mode: static
+      secret_ref: minio-credentials
+
+catalogs:
+  default:
+    type: polaris
+    uri: "http://polaris:8181/api/catalog"
+    warehouse: demo
+    namespace: default
+    credentials:
+      mode: oauth2
+      client_id: "root"
+      client_secret:
+        secret_ref: polaris-client-secret
+      scope: "PRINCIPAL_ROLE:ALL"
+    access_delegation: vended-credentials
+    token_refresh_enabled: true
+
+compute:
+  default:
+    type: duckdb
+    properties:
+      path: ":memory:"
+      threads: 4
+    credentials:
+      mode: static
+
+observability:
+  traces: true
+  metrics: true
+  lineage: true
+  otlp_endpoint: "http://jaeger:4317"
+  lineage_endpoint: "http://marquez:5000"
+  attributes:
+    service.name: floe-local
+    deployment.environment: local

@@ -3,6 +3,7 @@
 T040: [US2] Implement ArtifactMetadata model
 T041: [US2] Implement EnvironmentContext optional model
 T042: [US2] Implement CompiledArtifacts contract model
+T024: [US2] Update CompiledArtifacts v2.0 with resolved platform profiles
 
 This module defines the output contract models produced by the Compiler.
 """
@@ -17,11 +18,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from floe_core.schemas import (
     CatalogConfig,
+    CatalogProfile,
     ColumnClassification,
     ComputeConfig,
+    ComputeProfile,
     ConsumptionConfig,
     GovernanceConfig,
     ObservabilityConfig,
+    StorageProfile,
     TransformConfig,
 )
 
@@ -123,6 +127,49 @@ class EnvironmentContext(BaseModel):
     )
 
 
+class ResolvedPlatformProfiles(BaseModel):
+    """Resolved platform profiles from platform.yaml.
+
+    Contains concrete profile configurations resolved from logical names
+    in floe.yaml. This is part of the Two-Tier Configuration architecture
+    where platform engineers configure infrastructure and data engineers
+    reference profiles by logical name.
+
+    Attributes:
+        storage: Resolved storage profile (S3-compatible backend).
+        catalog: Resolved catalog profile (Iceberg REST catalog).
+        compute: Resolved compute profile (engine configuration).
+        platform_env: Platform environment used for resolution.
+
+    Example:
+        >>> profiles = ResolvedPlatformProfiles(
+        ...     storage=storage_profile,
+        ...     catalog=catalog_profile,
+        ...     compute=compute_profile,
+        ...     platform_env="local"
+        ... )
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    storage: StorageProfile = Field(
+        ...,
+        description="Resolved storage profile (S3-compatible backend)",
+    )
+    catalog: CatalogProfile = Field(
+        ...,
+        description="Resolved catalog profile (Iceberg REST catalog)",
+    )
+    compute: ComputeProfile = Field(
+        ...,
+        description="Resolved compute profile (engine configuration)",
+    )
+    platform_env: str = Field(
+        default="local",
+        description="Platform environment used for resolution",
+    )
+
+
 class CompiledArtifacts(BaseModel):
     """Immutable output contract from compilation.
 
@@ -135,6 +182,13 @@ class CompiledArtifacts(BaseModel):
     - 3-version backward compatibility maintained
     - JSON Schema exported for cross-language validation
 
+    Two-Tier Configuration (v2.0):
+    - resolved_profiles contains concrete platform profiles resolved from
+      logical names in floe.yaml (e.g., catalog: "default" → CatalogProfile)
+    - Platform engineers configure platform.yaml with infrastructure details
+    - Data engineers reference profiles by logical name in floe.yaml
+    - Same floe.yaml works across dev/staging/prod environments
+
     Attributes:
         version: Contract version (semver). Default "1.0.0".
         metadata: Compilation metadata.
@@ -143,7 +197,8 @@ class CompiledArtifacts(BaseModel):
         consumption: Cube semantic layer configuration.
         governance: Data governance configuration.
         observability: Observability configuration.
-        catalog: Optional Iceberg catalog configuration.
+        catalog: Optional Iceberg catalog configuration (legacy).
+        resolved_profiles: Resolved platform profiles from platform.yaml.
         dbt_manifest_path: Path to dbt manifest.json (if available).
         dbt_project_path: Path to dbt project directory (if detected).
         dbt_profiles_path: Path to profiles directory. Default ".floe/profiles".
@@ -155,7 +210,8 @@ class CompiledArtifacts(BaseModel):
         >>> artifacts = CompiledArtifacts(
         ...     metadata=metadata,
         ...     compute=compute_config,
-        ...     transforms=[transform_config]
+        ...     transforms=[transform_config],
+        ...     resolved_profiles=resolved_profiles
         ... )
     """
 
@@ -195,10 +251,16 @@ class CompiledArtifacts(BaseModel):
         description="Observability configuration",
     )
 
-    # Optional configurations
+    # Optional configurations (legacy)
     catalog: CatalogConfig | None = Field(
         default=None,
-        description="Iceberg catalog configuration",
+        description="Iceberg catalog configuration (legacy - use resolved_profiles)",
+    )
+
+    # Two-Tier Configuration: Resolved platform profiles
+    resolved_profiles: ResolvedPlatformProfiles | None = Field(
+        default=None,
+        description="Resolved platform profiles from platform.yaml",
     )
 
     # dbt integration paths

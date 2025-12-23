@@ -2,6 +2,7 @@
 
 T034: [US2] Unit tests for CompiledArtifacts immutability
 T035: [US2] Unit tests for CompiledArtifacts JSON round-trip
+T024: [US2] Unit tests for ResolvedPlatformProfiles and CompiledArtifacts v2.0
 
 Tests the output contract model that downstream packages consume.
 """
@@ -472,3 +473,252 @@ def sample_environment_context() -> dict:
         "environment_type": "production",
         "governance_category": "production",
     }
+
+
+@pytest.fixture
+def sample_storage_profile() -> dict:
+    """Return sample StorageProfile as dict."""
+    return {
+        "bucket": "my-data-bucket",
+        "region": "us-east-1",
+    }
+
+
+@pytest.fixture
+def sample_catalog_profile() -> dict:
+    """Return sample CatalogProfile as dict."""
+    return {
+        "uri": "http://polaris:8181/api/catalog",
+        "warehouse": "demo_warehouse",
+    }
+
+
+@pytest.fixture
+def sample_compute_profile() -> dict:
+    """Return sample ComputeProfile as dict."""
+    return {}
+
+
+@pytest.fixture
+def sample_resolved_profiles(
+    sample_storage_profile: dict,
+    sample_catalog_profile: dict,
+    sample_compute_profile: dict,
+) -> dict:
+    """Return sample ResolvedPlatformProfiles as dict."""
+    return {
+        "storage": sample_storage_profile,
+        "catalog": sample_catalog_profile,
+        "compute": sample_compute_profile,
+        "platform_env": "local",
+    }
+
+
+class TestResolvedPlatformProfilesModel:
+    """T024: Tests for ResolvedPlatformProfiles model."""
+
+    def test_resolved_platform_profiles_import(self) -> None:
+        """Test ResolvedPlatformProfiles can be imported from compiler package."""
+        from floe_core.compiler import ResolvedPlatformProfiles
+
+        assert ResolvedPlatformProfiles is not None
+
+    def test_resolved_platform_profiles_required_fields(self) -> None:
+        """Test ResolvedPlatformProfiles requires storage, catalog, compute."""
+        from floe_core.compiler import ResolvedPlatformProfiles
+
+        with pytest.raises(ValidationError) as exc_info:
+            ResolvedPlatformProfiles()  # type: ignore[call-arg]
+
+        errors = exc_info.value.errors()
+        field_names = {e["loc"][0] for e in errors}
+        assert "storage" in field_names
+        assert "catalog" in field_names
+        assert "compute" in field_names
+
+    def test_resolved_platform_profiles_valid_creation(
+        self,
+        sample_resolved_profiles: dict,
+    ) -> None:
+        """Test ResolvedPlatformProfiles with valid fields."""
+        from floe_core.compiler import ResolvedPlatformProfiles
+
+        profiles = ResolvedPlatformProfiles(**sample_resolved_profiles)
+
+        assert profiles.storage is not None
+        assert profiles.catalog is not None
+        assert profiles.compute is not None
+        assert profiles.platform_env == "local"
+
+    def test_resolved_platform_profiles_default_env(
+        self,
+        sample_storage_profile: dict,
+        sample_catalog_profile: dict,
+        sample_compute_profile: dict,
+    ) -> None:
+        """Test ResolvedPlatformProfiles has default platform_env."""
+        from floe_core.compiler import ResolvedPlatformProfiles
+
+        profiles = ResolvedPlatformProfiles(
+            storage=sample_storage_profile,
+            catalog=sample_catalog_profile,
+            compute=sample_compute_profile,
+        )
+
+        assert profiles.platform_env == "local"
+
+    def test_resolved_platform_profiles_custom_env(
+        self,
+        sample_storage_profile: dict,
+        sample_catalog_profile: dict,
+        sample_compute_profile: dict,
+    ) -> None:
+        """Test ResolvedPlatformProfiles with custom platform_env."""
+        from floe_core.compiler import ResolvedPlatformProfiles
+
+        profiles = ResolvedPlatformProfiles(
+            storage=sample_storage_profile,
+            catalog=sample_catalog_profile,
+            compute=sample_compute_profile,
+            platform_env="production",
+        )
+
+        assert profiles.platform_env == "production"
+
+    def test_resolved_platform_profiles_immutable(
+        self,
+        sample_resolved_profiles: dict,
+    ) -> None:
+        """Test ResolvedPlatformProfiles is frozen (immutable)."""
+        from floe_core.compiler import ResolvedPlatformProfiles
+
+        profiles = ResolvedPlatformProfiles(**sample_resolved_profiles)
+
+        with pytest.raises(ValidationError):
+            profiles.platform_env = "production"  # type: ignore[misc]
+
+    def test_resolved_platform_profiles_extra_forbid(
+        self,
+        sample_storage_profile: dict,
+        sample_catalog_profile: dict,
+        sample_compute_profile: dict,
+    ) -> None:
+        """Test ResolvedPlatformProfiles rejects unknown fields."""
+        from floe_core.compiler import ResolvedPlatformProfiles
+
+        with pytest.raises(ValidationError) as exc_info:
+            ResolvedPlatformProfiles(
+                storage=sample_storage_profile,
+                catalog=sample_catalog_profile,
+                compute=sample_compute_profile,
+                unknown_field="should_fail",
+            )
+
+        assert "extra_forbidden" in str(exc_info.value)
+
+    def test_resolved_platform_profiles_json_round_trip(
+        self,
+        sample_resolved_profiles: dict,
+    ) -> None:
+        """Test JSON round-trip preserves all data."""
+        from floe_core.compiler import ResolvedPlatformProfiles
+
+        original = ResolvedPlatformProfiles(**sample_resolved_profiles)
+
+        json_str = original.model_dump_json()
+        loaded = ResolvedPlatformProfiles.model_validate_json(json_str)
+
+        assert original.model_dump() == loaded.model_dump()
+
+
+class TestCompiledArtifactsWithResolvedProfiles:
+    """T024: Tests for CompiledArtifacts v2.0 with resolved_profiles."""
+
+    def test_compiled_artifacts_optional_resolved_profiles(
+        self,
+        sample_artifact_metadata: dict,
+        sample_compute_config: dict,
+        sample_transform_config: dict,
+    ) -> None:
+        """Test resolved_profiles is optional for backward compatibility."""
+        from floe_core.compiler import CompiledArtifacts
+
+        artifacts = CompiledArtifacts(
+            metadata=sample_artifact_metadata,
+            compute=sample_compute_config,
+            transforms=[sample_transform_config],
+        )
+
+        assert artifacts.resolved_profiles is None
+
+    def test_compiled_artifacts_with_resolved_profiles(
+        self,
+        sample_artifact_metadata: dict,
+        sample_compute_config: dict,
+        sample_transform_config: dict,
+        sample_resolved_profiles: dict,
+    ) -> None:
+        """Test CompiledArtifacts with resolved_profiles."""
+        from floe_core.compiler import CompiledArtifacts
+
+        artifacts = CompiledArtifacts(
+            metadata=sample_artifact_metadata,
+            compute=sample_compute_config,
+            transforms=[sample_transform_config],
+            resolved_profiles=sample_resolved_profiles,
+        )
+
+        assert artifacts.resolved_profiles is not None
+        assert artifacts.resolved_profiles.platform_env == "local"
+        assert artifacts.resolved_profiles.storage.bucket == "my-data-bucket"
+        assert artifacts.resolved_profiles.catalog.uri == "http://polaris:8181/api/catalog"
+
+    def test_compiled_artifacts_resolved_profiles_json_round_trip(
+        self,
+        sample_artifact_metadata: dict,
+        sample_compute_config: dict,
+        sample_transform_config: dict,
+        sample_resolved_profiles: dict,
+    ) -> None:
+        """Test JSON round-trip with resolved_profiles."""
+        from floe_core.compiler import CompiledArtifacts
+
+        original = CompiledArtifacts(
+            metadata=sample_artifact_metadata,
+            compute=sample_compute_config,
+            transforms=[sample_transform_config],
+            resolved_profiles=sample_resolved_profiles,
+        )
+
+        json_str = original.model_dump_json()
+        loaded = CompiledArtifacts.model_validate_json(json_str)
+
+        assert original.model_dump() == loaded.model_dump()
+        assert loaded.resolved_profiles is not None
+        assert loaded.resolved_profiles.platform_env == "local"
+
+    def test_compiled_artifacts_backward_compatibility(
+        self,
+        sample_artifact_metadata: dict,
+        sample_compute_config: dict,
+        sample_transform_config: dict,
+    ) -> None:
+        """Test v1.0 artifacts (no resolved_profiles) still work."""
+        from floe_core.compiler import CompiledArtifacts
+
+        # Create artifacts without resolved_profiles (v1.0 style)
+        v1_artifacts = CompiledArtifacts(
+            version="1.0.0",
+            metadata=sample_artifact_metadata,
+            compute=sample_compute_config,
+            transforms=[sample_transform_config],
+        )
+
+        # v1.0 artifacts should work and have None resolved_profiles
+        assert v1_artifacts.version == "1.0.0"
+        assert v1_artifacts.resolved_profiles is None
+
+        # JSON round-trip should work
+        json_str = v1_artifacts.model_dump_json()
+        loaded = CompiledArtifacts.model_validate_json(json_str)
+        assert loaded.resolved_profiles is None
