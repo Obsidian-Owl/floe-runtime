@@ -13,6 +13,8 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from floe_core.errors import ProfileNotFoundError
+
 if TYPE_CHECKING:
     from floe_core.schemas.catalog_profile import CatalogProfile
     from floe_core.schemas.compute_profile import ComputeProfile
@@ -26,36 +28,6 @@ DEFAULT_PROFILE_NAME = "default"
 
 # Profile type identifiers
 PROFILE_TYPES = frozenset({"storage", "catalog", "compute"})
-
-
-class ProfileResolutionError(Exception):
-    """Raised when profile resolution fails.
-
-    Attributes:
-        profile_type: The type of profile that failed to resolve.
-        profile_name: The name of the profile that was requested.
-        available: List of available profile names.
-    """
-
-    def __init__(
-        self,
-        message: str,
-        profile_type: str | None = None,
-        profile_name: str | None = None,
-        available: list[str] | None = None,
-    ) -> None:
-        """Initialize ProfileResolutionError.
-
-        Args:
-            message: Error message.
-            profile_type: Type of profile (storage, catalog, compute).
-            profile_name: Requested profile name.
-            available: List of available profile names.
-        """
-        super().__init__(message)
-        self.profile_type = profile_type
-        self.profile_name = profile_name
-        self.available = available or []
 
 
 @dataclass(frozen=True)
@@ -126,7 +98,7 @@ class ProfileResolver:
             Resolved StorageProfile.
 
         Raises:
-            ProfileResolutionError: If profile not found.
+            ProfileNotFoundError: If profile not found.
 
         Example:
             >>> storage = resolver.resolve_storage("production")
@@ -139,12 +111,10 @@ class ProfileResolver:
             return profile
         except KeyError as e:
             available = list(self.platform.storage.keys())
-            raise ProfileResolutionError(
-                f"Storage profile '{profile_name}' not found. "
-                f"Available: {', '.join(available) or 'none'}",
+            raise ProfileNotFoundError(
                 profile_type="storage",
                 profile_name=profile_name,
-                available=available,
+                available_profiles=available,
             ) from e
 
     def resolve_catalog(self, name: str | None = None) -> CatalogProfile:
@@ -157,7 +127,7 @@ class ProfileResolver:
             Resolved CatalogProfile.
 
         Raises:
-            ProfileResolutionError: If profile not found.
+            ProfileNotFoundError: If profile not found.
 
         Example:
             >>> catalog = resolver.resolve_catalog("production")
@@ -170,12 +140,10 @@ class ProfileResolver:
             return profile
         except KeyError as e:
             available = list(self.platform.catalogs.keys())
-            raise ProfileResolutionError(
-                f"Catalog profile '{profile_name}' not found. "
-                f"Available: {', '.join(available) or 'none'}",
+            raise ProfileNotFoundError(
                 profile_type="catalog",
                 profile_name=profile_name,
-                available=available,
+                available_profiles=available,
             ) from e
 
     def resolve_compute(self, name: str | None = None) -> ComputeProfile:
@@ -188,7 +156,7 @@ class ProfileResolver:
             Resolved ComputeProfile.
 
         Raises:
-            ProfileResolutionError: If profile not found.
+            ProfileNotFoundError: If profile not found.
 
         Example:
             >>> compute = resolver.resolve_compute("snowflake")
@@ -201,12 +169,10 @@ class ProfileResolver:
             return profile
         except KeyError as e:
             available = list(self.platform.compute.keys())
-            raise ProfileResolutionError(
-                f"Compute profile '{profile_name}' not found. "
-                f"Available: {', '.join(available) or 'none'}",
+            raise ProfileNotFoundError(
                 profile_type="compute",
                 profile_name=profile_name,
-                available=available,
+                available_profiles=available,
             ) from e
 
     def resolve_all(
@@ -226,7 +192,7 @@ class ProfileResolver:
             ResolvedProfiles containing all resolved configurations.
 
         Raises:
-            ProfileResolutionError: If any profile not found.
+            ProfileNotFoundError: If any profile not found.
 
         Example:
             >>> profiles = resolver.resolve_all(

@@ -15,10 +15,10 @@ import pytest
 from floe_core.compiler.profile_resolver import (
     DEFAULT_PROFILE_NAME,
     PROFILE_TYPES,
-    ProfileResolutionError,
     ProfileResolver,
     ResolvedProfiles,
 )
+from floe_core.errors import ProfileNotFoundError
 from floe_core.schemas.catalog_profile import CatalogProfile
 from floe_core.schemas.compute_profile import ComputeProfile
 from floe_core.schemas.platform_spec import PlatformSpec
@@ -40,33 +40,39 @@ class TestProfileResolverConstants:
         assert "compute" in PROFILE_TYPES
 
 
-class TestProfileResolutionError:
-    """Tests for ProfileResolutionError exception."""
+class TestProfileNotFoundError:
+    """Tests for ProfileNotFoundError exception."""
 
     def test_exception_can_be_raised(self) -> None:
         """Verify exception can be raised and caught."""
-        with pytest.raises(ProfileResolutionError):
-            raise ProfileResolutionError("Test error")
+        with pytest.raises(ProfileNotFoundError):
+            raise ProfileNotFoundError(
+                profile_type="storage",
+                profile_name="test",
+                available_profiles=["default"],
+            )
 
     def test_exception_message(self) -> None:
-        """Verify exception message is preserved."""
-        try:
-            raise ProfileResolutionError("Profile 'foo' not found")
-        except ProfileResolutionError as e:
-            assert "foo" in str(e)
+        """Verify exception message contains profile info."""
+        error = ProfileNotFoundError(
+            profile_type="storage",
+            profile_name="foo",
+            available_profiles=["default"],
+        )
+        assert "foo" in str(error)
+        assert "Storage" in str(error)
 
     def test_exception_attributes(self) -> None:
         """Verify exception preserves metadata."""
-        error = ProfileResolutionError(
-            "Storage profile 'prod' not found",
+        error = ProfileNotFoundError(
             profile_type="storage",
             profile_name="prod",
-            available=["default", "dev"],
+            available_profiles=["default", "dev"],
         )
         assert error.profile_type == "storage"
         assert error.profile_name == "prod"
-        assert "default" in error.available
-        assert "dev" in error.available
+        assert "default" in error.available_profiles
+        assert "dev" in error.available_profiles
 
 
 @pytest.fixture
@@ -129,11 +135,11 @@ class TestStorageProfileResolution:
     def test_resolve_storage_not_found(self, platform_with_profiles: PlatformSpec) -> None:
         """Missing storage profile raises error."""
         resolver = ProfileResolver(platform_with_profiles)
-        with pytest.raises(ProfileResolutionError) as exc_info:
+        with pytest.raises(ProfileNotFoundError) as exc_info:
             resolver.resolve_storage("nonexistent")
         assert "nonexistent" in str(exc_info.value)
         assert exc_info.value.profile_type == "storage"
-        assert "default" in exc_info.value.available
+        assert "default" in exc_info.value.available_profiles
 
 
 class TestCatalogProfileResolution:
@@ -154,7 +160,7 @@ class TestCatalogProfileResolution:
     def test_resolve_catalog_not_found(self, platform_with_profiles: PlatformSpec) -> None:
         """Missing catalog profile raises error."""
         resolver = ProfileResolver(platform_with_profiles)
-        with pytest.raises(ProfileResolutionError) as exc_info:
+        with pytest.raises(ProfileNotFoundError) as exc_info:
             resolver.resolve_catalog("nonexistent")
         assert exc_info.value.profile_type == "catalog"
 
@@ -177,7 +183,7 @@ class TestComputeProfileResolution:
     def test_resolve_compute_not_found(self, platform_with_profiles: PlatformSpec) -> None:
         """Missing compute profile raises error."""
         resolver = ProfileResolver(platform_with_profiles)
-        with pytest.raises(ProfileResolutionError) as exc_info:
+        with pytest.raises(ProfileNotFoundError) as exc_info:
             resolver.resolve_compute("nonexistent")
         assert exc_info.value.profile_type == "compute"
 
@@ -277,7 +283,7 @@ class TestEmptyPlatform:
         platform = PlatformSpec()
         resolver = ProfileResolver(platform)
 
-        with pytest.raises(ProfileResolutionError) as exc_info:
+        with pytest.raises(ProfileNotFoundError) as exc_info:
             resolver.resolve_storage()
         assert "none" in str(exc_info.value).lower()
 

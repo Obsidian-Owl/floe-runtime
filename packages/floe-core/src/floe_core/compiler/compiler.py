@@ -100,7 +100,7 @@ class Compiler:
             FileNotFoundError: If floe.yaml not found.
             yaml.YAMLError: If YAML is invalid.
             pydantic.ValidationError: If spec validation fails.
-            ProfileResolutionError: If profile references cannot be resolved.
+            ProfileNotFoundError: If profile references cannot be resolved.
 
         Example:
             >>> compiler = Compiler()
@@ -220,7 +220,7 @@ class Compiler:
             ResolvedPlatformProfiles with concrete configurations.
 
         Raises:
-            ProfileResolutionError: If profile reference not found.
+            ProfileNotFoundError: If profile reference not found.
         """
         resolver = ProfileResolver(platform)
         profiles = resolver.resolve_all(

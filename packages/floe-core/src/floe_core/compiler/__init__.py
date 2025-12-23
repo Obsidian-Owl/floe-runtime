@@ -34,7 +34,6 @@ from floe_core.compiler.platform_resolver import (
 from floe_core.compiler.profile_resolver import (
     DEFAULT_PROFILE_NAME,
     PROFILE_TYPES,
-    ProfileResolutionError,
     ProfileResolver,
     ResolvedProfiles,
 )
@@ -43,6 +42,7 @@ from floe_core.compiler.secret_resolver import (
     SecretValidationResult,
     validate_platform_secrets,
 )
+from floe_core.errors import ProfileNotFoundError
 
 __all__: list[str] = [
     # Compiler class
@@ -57,7 +57,7 @@ __all__: list[str] = [
     "PLATFORM_SEARCH_PATHS",
     # Profile resolution
     "ProfileResolver",
-    "ProfileResolutionError",
+    "ProfileNotFoundError",
     "ResolvedProfiles",
     "DEFAULT_PROFILE_NAME",
     "PROFILE_TYPES",

@@ -25,7 +25,10 @@ from floe_core.compiler import (
 # Error types
 from floe_core.errors import (
     CompilationError,
+    ConfigurationError,
     FloeError,
+    ProfileNotFoundError,
+    SecretResolutionError,
     ValidationError,
 )
 
@@ -62,6 +65,9 @@ __all__ = [
     "FloeError",
     "ValidationError",
     "CompilationError",
+    "ConfigurationError",
+    "ProfileNotFoundError",
+    "SecretResolutionError",
     # JSON Schema exports
     "export_floe_spec_schema",
     "export_compiled_artifacts_schema",

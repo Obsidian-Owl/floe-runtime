@@ -11,7 +11,14 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from floe_core.errors import CompilationError, FloeError, ValidationError
+from floe_core.errors import (
+    CompilationError,
+    ConfigurationError,
+    FloeError,
+    ProfileNotFoundError,
+    SecretResolutionError,
+    ValidationError,
+)
 
 if TYPE_CHECKING:
     from _pytest.logging import LogCaptureFixture
@@ -216,3 +223,219 @@ class TestSecurityCompliance:
         captured = capsys.readouterr()
         assert "KeyError" in captured.out
         assert "/path/to/config.yaml" in captured.out
+
+
+class TestConfigurationError:
+    """Tests for ConfigurationError exception."""
+
+    def test_configuration_error_inherits_from_floe_error(self) -> None:
+        """ConfigurationError should inherit from FloeError."""
+        error = ConfigurationError("Invalid YAML")
+        assert isinstance(error, FloeError)
+        assert isinstance(error, Exception)
+
+    def test_configuration_error_with_no_context(self) -> None:
+        """ConfigurationError without context should show plain message."""
+        error = ConfigurationError("Invalid YAML syntax")
+        assert error.user_message == "Invalid YAML syntax"
+        assert str(error) == "Invalid YAML syntax"
+
+    def test_configuration_error_with_file_path(self) -> None:
+        """ConfigurationError with file_path should include it in message."""
+        error = ConfigurationError("Invalid YAML", file_path="platform.yaml")
+        assert "platform.yaml" in error.user_message
+        assert "in platform.yaml" in str(error)
+        assert error.file_path == "platform.yaml"
+
+    def test_configuration_error_with_line_number(self) -> None:
+        """ConfigurationError with line_number should include it in message."""
+        error = ConfigurationError(
+            "Invalid value",
+            file_path="platform.yaml",
+            line_number=42,
+        )
+        assert "line 42" in str(error)
+        assert error.line_number == 42
+
+    def test_configuration_error_with_field_path(self) -> None:
+        """ConfigurationError with field_path should include it in message."""
+        error = ConfigurationError(
+            "Invalid URI",
+            file_path="platform.yaml",
+            field_path="catalogs.default.uri",
+        )
+        assert "catalogs.default.uri" in str(error)
+        assert error.field_path == "catalogs.default.uri"
+
+    def test_configuration_error_with_all_context(self) -> None:
+        """ConfigurationError with all context should show complete message."""
+        error = ConfigurationError(
+            "Invalid URI format",
+            file_path="platform.yaml",
+            field_path="catalogs.default.uri",
+            line_number=15,
+            internal_details="Expected http:// or https://, got: ftp://",
+        )
+
+        message = str(error)
+        assert "Invalid URI format" in message
+        assert "platform.yaml" in message
+        assert "line 15" in message
+        assert "catalogs.default.uri" in message
+        # Internal details not in user message
+        assert "ftp://" not in error.user_message
+
+    def test_configuration_error_attributes(self) -> None:
+        """ConfigurationError should store all attributes."""
+        error = ConfigurationError(
+            "Test",
+            file_path="test.yaml",
+            field_path="foo.bar",
+            line_number=10,
+        )
+        assert error.file_path == "test.yaml"
+        assert error.field_path == "foo.bar"
+        assert error.line_number == 10
+
+
+class TestProfileNotFoundError:
+    """Tests for ProfileNotFoundError exception."""
+
+    def test_profile_not_found_inherits_from_floe_error(self) -> None:
+        """ProfileNotFoundError should inherit from FloeError."""
+        error = ProfileNotFoundError(
+            profile_type="catalog",
+            profile_name="production",
+            available_profiles=["default"],
+        )
+        assert isinstance(error, FloeError)
+
+    def test_profile_not_found_message_format(self) -> None:
+        """ProfileNotFoundError should format message with available profiles."""
+        error = ProfileNotFoundError(
+            profile_type="catalog",
+            profile_name="production",
+            available_profiles=["default", "staging"],
+        )
+
+        message = str(error)
+        assert "Catalog profile 'production' not found" in message
+        assert "Available: default, staging" in message
+
+    def test_profile_not_found_empty_available(self) -> None:
+        """ProfileNotFoundError with no available profiles should show 'none'."""
+        error = ProfileNotFoundError(
+            profile_type="storage",
+            profile_name="s3",
+            available_profiles=[],
+        )
+
+        message = str(error)
+        assert "Storage profile 's3' not found" in message
+        assert "Available: none" in message
+
+    def test_profile_not_found_attributes(self) -> None:
+        """ProfileNotFoundError should store all attributes."""
+        error = ProfileNotFoundError(
+            profile_type="compute",
+            profile_name="snowflake",
+            available_profiles=["duckdb", "default"],
+        )
+
+        assert error.profile_type == "compute"
+        assert error.profile_name == "snowflake"
+        assert error.available_profiles == ["duckdb", "default"]
+
+    def test_profile_not_found_capitalizes_type(self) -> None:
+        """ProfileNotFoundError should capitalize the profile type."""
+        error = ProfileNotFoundError(
+            profile_type="storage",
+            profile_name="test",
+            available_profiles=[],
+        )
+
+        assert str(error).startswith("Storage")
+
+
+class TestSecretResolutionError:
+    """Tests for SecretResolutionError exception."""
+
+    def test_secret_resolution_inherits_from_floe_error(self) -> None:
+        """SecretResolutionError should inherit from FloeError."""
+        error = SecretResolutionError(
+            secret_ref="polaris-oauth-secret",
+            expected_env_var="POLARIS_OAUTH_SECRET",
+            expected_k8s_path="/var/run/secrets/polaris-oauth-secret",
+        )
+        assert isinstance(error, FloeError)
+
+    def test_secret_resolution_message_format(self) -> None:
+        """SecretResolutionError should format message with expected locations."""
+        error = SecretResolutionError(
+            secret_ref="polaris-oauth-secret",
+            expected_env_var="POLARIS_OAUTH_SECRET",
+            expected_k8s_path="/var/run/secrets/polaris-oauth-secret",
+        )
+
+        message = str(error)
+        assert "Secret 'polaris-oauth-secret' not found" in message
+        assert "POLARIS_OAUTH_SECRET" in message
+        assert "/var/run/secrets/polaris-oauth-secret" in message
+
+    def test_secret_resolution_attributes(self) -> None:
+        """SecretResolutionError should store all attributes."""
+        error = SecretResolutionError(
+            secret_ref="my-secret",
+            expected_env_var="MY_SECRET",
+            expected_k8s_path="/var/run/secrets/my-secret",
+        )
+
+        assert error.secret_ref == "my-secret"
+        assert error.expected_env_var == "MY_SECRET"
+        assert error.expected_k8s_path == "/var/run/secrets/my-secret"
+
+    def test_secret_resolution_with_internal_details(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """SecretResolutionError should log internal details."""
+        error = SecretResolutionError(
+            secret_ref="db-password",
+            expected_env_var="DB_PASSWORD",
+            expected_k8s_path="/var/run/secrets/db-password",
+            internal_details="Checked env vars: PATH, HOME, USER",
+        )
+
+        # User message should not contain internal details
+        assert "Checked env vars" not in error.user_message
+
+        # Internal details should be logged
+        captured = capsys.readouterr()
+        assert "Checked env vars" in captured.out
+
+
+class TestNewExceptionHierarchy:
+    """Tests for the extended exception hierarchy."""
+
+    def test_new_errors_are_floe_errors(self) -> None:
+        """All new error types should be FloeError subclasses."""
+        assert issubclass(ConfigurationError, FloeError)
+        assert issubclass(ProfileNotFoundError, FloeError)
+        assert issubclass(SecretResolutionError, FloeError)
+
+    def test_new_errors_are_distinct(self) -> None:
+        """New error types should not inherit from each other."""
+        assert not issubclass(ConfigurationError, ProfileNotFoundError)
+        assert not issubclass(ProfileNotFoundError, SecretResolutionError)
+        assert not issubclass(SecretResolutionError, ConfigurationError)
+
+    def test_catch_all_with_floe_error(self) -> None:
+        """FloeError should catch all new subclasses."""
+        errors_to_test = [
+            ConfigurationError("Config error"),
+            ProfileNotFoundError("catalog", "prod", ["default"]),
+            SecretResolutionError("secret", "SECRET", "/path"),
+        ]
+
+        for error in errors_to_test:
+            with pytest.raises(FloeError):
+                raise error
