@@ -2,6 +2,7 @@
 
 T030: [US1] Implement FloeSpec root model with from_yaml()
 T035: [US2] Add profile reference fields for Two-Tier Architecture
+T046: [US3] Add validation to reject any credentials in floe.yaml
 
 This module defines the FloeSpec root configuration model
 that represents a complete floe.yaml definition.
@@ -10,6 +11,9 @@ In the Two-Tier Architecture:
 - FloeSpec uses logical profile references (e.g., catalog: "default")
 - PlatformSpec defines the actual infrastructure configuration
 - Profile references are resolved at compile/deploy time
+
+Security: Uses Yelp's detect-secrets library to prevent accidental
+credential exposure in floe.yaml files.
 """
 
 from __future__ import annotations
@@ -24,6 +28,7 @@ from floe_core.schemas.consumption import ConsumptionConfig
 from floe_core.schemas.governance import GovernanceConfig
 from floe_core.schemas.observability import ObservabilityConfig
 from floe_core.schemas.transforms import TransformConfig
+from floe_core.security import CredentialDetectedError, detect_credentials_in_string
 
 # Default profile name for profile references
 DEFAULT_PROFILE_NAME = "default"
@@ -115,6 +120,9 @@ class FloeSpec(BaseModel):
     def from_yaml(cls, path: str | Path) -> FloeSpec:
         """Load and validate FloeSpec from a YAML file.
 
+        Performs credential scanning using detect-secrets before parsing
+        to prevent accidental exposure of secrets in floe.yaml files.
+
         Args:
             path: Path to floe.yaml file.
 
@@ -125,6 +133,7 @@ class FloeSpec(BaseModel):
             FileNotFoundError: If file doesn't exist.
             yaml.YAMLError: If YAML syntax is invalid.
             ValidationError: If schema validation fails.
+            CredentialDetectedError: If credentials are detected in the file.
 
         Example:
             >>> spec = FloeSpec.from_yaml("floe.yaml")
@@ -135,7 +144,32 @@ class FloeSpec(BaseModel):
         if not path.exists():
             raise FileNotFoundError(f"File not found: {path}")
 
+        # T046: Scan file for credentials before parsing
+        _scan_file_for_credentials(path)
+
         with path.open("r") as f:
             data: dict[str, Any] = yaml.safe_load(f)
 
         return cls.model_validate(data)
+
+
+def _scan_file_for_credentials(path: Path) -> None:
+    """Scan a YAML file for credentials using detect-secrets.
+
+    This function scans the entire file content to catch any secrets
+    that might be embedded in any field, not just profile references.
+
+    Args:
+        path: Path to the file to scan.
+
+    Raises:
+        CredentialDetectedError: If credentials are detected.
+    """
+    content = path.read_text()
+    detected = detect_credentials_in_string(content)
+
+    if detected:
+        raise CredentialDetectedError(
+            field_name=f"file '{path.name}'",
+            secret_type=detected[0].secret_type,
+        )

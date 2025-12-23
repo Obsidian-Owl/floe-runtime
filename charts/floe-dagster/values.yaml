@@ -11,6 +11,64 @@ dagster:
 
 # Floe-specific configuration
 floe:
+  # Platform Specification (Two-Tier Architecture)
+  # Platform engineers configure infrastructure via platform.yaml
+  # Data engineers configure pipelines via floe.yaml (references profiles by name)
+  # Same floe.yaml works across environments by swapping platform.yaml
+  # Covers: 009-US2 (Same floe.yaml works across dev/staging/prod)
+  platformSpec:
+    # Enable Platform ConfigMap creation
+    enabled: false
+    # Mount path inside containers (FLOE_PLATFORM_FILE env var points here)
+    mountPath: "/app/.floe/platform.yaml"
+    # Raw platform.yaml content (set via --set-file or values override)
+    # If set, overrides all structured fields below
+    content: ""
+    # Additional annotations for the ConfigMap
+    annotations: {}
+
+    # Storage profile configuration
+    storage:
+      type: s3
+      endpoint: ""  # Empty = AWS S3, else MinIO/LocalStack URL
+      region: us-east-1
+      bucket: iceberg-data
+      pathStyleAccess: false
+      credentials:
+        mode: static  # static | iam_role | oauth2
+        secretRef: ""  # K8s secret name for credentials
+        roleArn: ""  # For iam_role mode
+
+    # Catalog profile configuration (Polaris)
+    catalog:
+      type: polaris
+      uri: ""  # Polaris REST API endpoint
+      warehouse: ""
+      namespace: default
+      credentials:
+        mode: oauth2
+        clientId: ""
+        secretRef: ""  # K8s secret with client_secret
+        scope: "PRINCIPAL_ROLE:DATA_ENGINEER"
+      accessDelegation: ""  # vended-credentials for STS
+      tokenRefreshEnabled: false
+
+    # Compute profile configuration
+    compute:
+      type: duckdb  # duckdb | snowflake | bigquery | trino
+      properties: {}
+      credentials:
+        mode: static
+        secretRef: ""
+
+    # Observability configuration
+    observability:
+      traces: true
+      metrics: true
+      lineage: true
+      otlpEndpoint: ""
+      lineageEndpoint: ""
+
   # CompiledArtifacts configuration
   compiledArtifacts:
     # Enable CompiledArtifacts ConfigMap creation

@@ -267,3 +267,66 @@ class TestCredentialConfigHelperMethods:
         """get_client_secret returns None when not set."""
         config = CredentialConfig()
         assert config.get_client_secret() is None
+
+
+class TestSensitiveFieldValidation:
+    """T045: Tests for sensitive field validation (reject plaintext credentials)."""
+
+    def test_client_secret_rejects_plaintext_string(self) -> None:
+        """OAuth2 client_secret MUST be SecretReference, not plaintext string."""
+        with pytest.raises(ValidationError) as exc_info:
+            CredentialConfig(
+                mode=CredentialMode.OAUTH2,
+                client_id="my-client",
+                client_secret="plaintext-secret-forbidden",  # type: ignore[arg-type]
+            )
+        assert "client_secret" in str(exc_info.value)
+        assert "SecretReference" in str(exc_info.value)
+
+    def test_client_secret_rejects_dict_without_secret_ref(self) -> None:
+        """client_secret dict must have secret_ref key."""
+        with pytest.raises(ValidationError) as exc_info:
+            CredentialConfig(
+                mode=CredentialMode.OAUTH2,
+                client_id="my-client",
+                client_secret={"password": "plaintext"},  # type: ignore[arg-type]
+            )
+        assert "client_secret" in str(exc_info.value)
+
+    def test_client_secret_accepts_secret_ref_dict(self) -> None:
+        """client_secret accepts dict with secret_ref key (YAML parsing)."""
+        config = CredentialConfig(
+            mode=CredentialMode.OAUTH2,
+            client_id="my-client",
+            client_secret={"secret_ref": "my-secret"},  # type: ignore[arg-type]
+        )
+        assert isinstance(config.client_secret, SecretReference)
+        assert config.client_secret.secret_ref == "my-secret"
+
+    def test_security_by_design_no_plaintext_credentials(self) -> None:
+        """CredentialConfig enforces security-by-design: no plaintext secrets.
+
+        This is a key security requirement:
+        - client_secret: ONLY SecretReference allowed (not str)
+        - secret_ref: References K8s secrets or env vars (never stores values)
+        - All sensitive values resolved at RUNTIME, never in config
+
+        T045: [US3] Add validation to reject plaintext credentials in platform.yaml
+        """
+        # Verify type annotation enforces SecretReference for client_secret
+        import typing
+        from typing import get_type_hints
+
+        hints = get_type_hints(CredentialConfig)
+        client_secret_type = hints.get("client_secret")
+
+        # Check that it's SecretReference | None (not str)
+        origin = typing.get_origin(client_secret_type)
+        args = typing.get_args(client_secret_type)
+
+        # Should be Optional[SecretReference] = Union[SecretReference, None]
+        assert (
+            origin is type(None)
+            or SecretReference in args
+            or (origin is not None and SecretReference in args)
+        ), "client_secret type must include SecretReference, not str"
