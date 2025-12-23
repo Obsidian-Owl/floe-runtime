@@ -18,9 +18,10 @@ pip install floe-cli
 | Command | Purpose | Status |
 |---------|---------|--------|
 | `floe init` | Scaffold a new project | Implemented |
-| `floe validate` | Validate floe.yaml | Implemented |
-| `floe compile` | Generate CompiledArtifacts | Implemented |
+| `floe validate` | Validate floe.yaml + platform.yaml | Implemented |
+| `floe compile` | Merge FloeSpec + PlatformSpec → CompiledArtifacts | Implemented |
 | `floe schema export` | Export JSON Schema for IDE support | Implemented |
+| `floe platform list-profiles` | List available profiles from platform.yaml | Planned |
 | `floe run` | Execute pipeline via Dagster | Stub (requires floe-dagster) |
 | `floe dev` | Start Dagster development UI | Stub (requires floe-dagster) |
 
@@ -54,9 +55,15 @@ floe validate --file path/to/floe.yaml
 
 ### Compile artifacts
 
+The compile command merges `floe.yaml` (pipeline) with `platform.yaml` (infrastructure) to produce `CompiledArtifacts`:
+
 ```bash
-# Compile to .floe/ directory
+# Compile using FLOE_PLATFORM_ENV environment variable
+export FLOE_PLATFORM_ENV=local
 floe compile
+
+# Compile with explicit platform environment
+floe compile --platform staging
 
 # Compile to custom output directory
 floe compile --output build/artifacts/
@@ -64,6 +71,8 @@ floe compile --output build/artifacts/
 # Validate specific target
 floe compile --target duckdb
 ```
+
+The platform configuration is loaded from `platform/{env}/platform.yaml` based on the environment.
 
 ### Export JSON Schema for IDE support
 
