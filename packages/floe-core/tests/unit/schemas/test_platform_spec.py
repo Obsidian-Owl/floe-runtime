@@ -17,6 +17,7 @@ from pydantic import ValidationError
 
 from floe_core.schemas.catalog_profile import CatalogProfile
 from floe_core.schemas.compute_profile import ComputeProfile
+from floe_core.schemas.observability import ObservabilityConfig
 from floe_core.schemas.platform_spec import (
     ENVIRONMENT_TYPES,
     PLATFORM_SPEC_VERSION,
@@ -101,7 +102,7 @@ class TestPlatformSpecCreation:
         """PlatformSpec is immutable."""
         spec = PlatformSpec()
         with pytest.raises(ValidationError):
-            spec.version = "2.0.0"  # type: ignore[misc]
+            spec.version = "2.0.0"
 
     def test_spec_rejects_extra_fields(self) -> None:
         """PlatformSpec rejects unknown fields."""
@@ -305,3 +306,220 @@ class TestPlatformSpecGetterMethods:
         with pytest.raises(KeyError) as exc_info:
             spec_with_profiles.get_compute_profile("nonexistent")
         assert "nonexistent" in str(exc_info.value)
+
+
+class TestPlatformSpecWithObservability:
+    """Tests for PlatformSpec with observability configuration."""
+
+    def test_spec_with_observability(self) -> None:
+        """PlatformSpec accepts observability config."""
+        spec = PlatformSpec(
+            observability=ObservabilityConfig(
+                traces=True,
+                metrics=True,
+                lineage=True,
+                otlp_endpoint="http://jaeger:4317",
+                lineage_endpoint="http://marquez:5000",
+            ),
+        )
+        assert spec.observability is not None
+        assert spec.observability.traces is True
+        assert spec.observability.otlp_endpoint == "http://jaeger:4317"
+        assert spec.observability.lineage_endpoint == "http://marquez:5000"
+
+    def test_spec_with_observability_attributes(self) -> None:
+        """PlatformSpec observability accepts custom attributes."""
+        spec = PlatformSpec(
+            observability=ObservabilityConfig(
+                traces=True,
+                attributes={
+                    "service.name": "floe-local",
+                    "deployment.environment": "local",
+                },
+            ),
+        )
+        assert spec.observability is not None
+        assert spec.observability.attributes["service.name"] == "floe-local"
+
+    def test_spec_without_observability(self) -> None:
+        """PlatformSpec works without observability config."""
+        spec = PlatformSpec()
+        assert spec.observability is None
+
+    def test_observability_is_frozen(self) -> None:
+        """Observability config is immutable."""
+        spec = PlatformSpec(
+            observability=ObservabilityConfig(traces=True),
+        )
+        with pytest.raises(ValidationError):
+            spec.observability.traces = False  # type: ignore[union-attr]
+
+
+class TestPlatformSpecCompleteConfig:
+    """Tests for complete PlatformSpec configurations."""
+
+    def test_complete_local_config(self) -> None:
+        """Complete local development configuration."""
+        yaml_content = """
+version: "1.0.0"
+storage:
+  default:
+    type: s3
+    endpoint: "http://minio:9000"
+    region: us-east-1
+    bucket: iceberg-data
+    path_style_access: true
+    credentials:
+      mode: static
+      secret_ref: minio-credentials
+catalogs:
+  default:
+    type: polaris
+    uri: http://polaris:8181/api/catalog
+    warehouse: demo
+    namespace: default
+    credentials:
+      mode: oauth2
+      client_id: root
+      client_secret:
+        secret_ref: polaris-client-secret
+      scope: "PRINCIPAL_ROLE:ALL"
+    access_delegation: vended-credentials
+compute:
+  default:
+    type: duckdb
+    properties:
+      path: ":memory:"
+      threads: 4
+observability:
+  traces: true
+  metrics: true
+  lineage: true
+  otlp_endpoint: http://jaeger:4317
+  lineage_endpoint: http://marquez:5000
+  attributes:
+    service.name: floe-local
+    deployment.environment: local
+"""
+        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False, mode="w") as f:
+            f.write(yaml_content)
+            f.flush()
+            spec = PlatformSpec.from_yaml(Path(f.name))
+
+        # Verify storage profile
+        assert "default" in spec.storage
+        storage = spec.storage["default"]
+        assert storage.bucket == "iceberg-data"
+        assert storage.path_style_access is True
+        assert storage.credentials.mode.value == "static"
+
+        # Verify catalog profile
+        assert "default" in spec.catalogs
+        catalog = spec.catalogs["default"]
+        assert catalog.warehouse == "demo"
+        assert catalog.credentials.mode.value == "oauth2"
+        assert catalog.credentials.scope == "PRINCIPAL_ROLE:ALL"
+
+        # Verify compute profile
+        assert "default" in spec.compute
+        compute = spec.compute["default"]
+        assert compute.properties["path"] == ":memory:"
+
+        # Verify observability
+        assert spec.observability is not None
+        assert spec.observability.traces is True
+        assert spec.observability.attributes["service.name"] == "floe-local"
+
+    def test_multi_profile_config(self) -> None:
+        """Config with multiple named profiles."""
+        yaml_content = """
+version: "1.0.0"
+storage:
+  default:
+    bucket: dev-bucket
+    region: us-east-1
+  production:
+    bucket: prod-bucket
+    region: us-west-2
+catalogs:
+  default:
+    uri: http://polaris:8181/api/catalog
+    warehouse: dev
+  analytics:
+    uri: http://polaris:8181/api/catalog
+    warehouse: analytics
+compute:
+  default:
+    type: duckdb
+  snowflake:
+    type: snowflake
+    properties:
+      account: acme.us-east-1
+      warehouse: ANALYTICS_WH
+"""
+        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False, mode="w") as f:
+            f.write(yaml_content)
+            f.flush()
+            spec = PlatformSpec.from_yaml(Path(f.name))
+
+        # Verify multiple storage profiles
+        assert len(spec.storage) == 2
+        assert spec.get_storage_profile("default").bucket == "dev-bucket"
+        assert spec.get_storage_profile("production").bucket == "prod-bucket"
+
+        # Verify multiple catalog profiles
+        assert len(spec.catalogs) == 2
+        assert spec.get_catalog_profile("default").warehouse == "dev"
+        assert spec.get_catalog_profile("analytics").warehouse == "analytics"
+
+        # Verify multiple compute profiles
+        assert len(spec.compute) == 2
+        assert spec.get_compute_profile("snowflake").properties["account"] == "acme.us-east-1"
+
+
+class TestPlatformSpecValidationErrors:
+    """Tests for PlatformSpec validation error messages."""
+
+    def test_invalid_storage_bucket_too_short(self) -> None:
+        """Storage bucket name too short triggers error."""
+        with pytest.raises(ValidationError) as exc_info:
+            PlatformSpec(
+                storage={"default": StorageProfile(bucket="ab")},  # Min is 3
+            )
+        assert "bucket" in str(exc_info.value).lower() or "string" in str(exc_info.value).lower()
+
+    def test_invalid_catalog_warehouse_empty(self) -> None:
+        """Catalog warehouse cannot be empty."""
+        with pytest.raises(ValidationError) as exc_info:
+            PlatformSpec(
+                catalogs={
+                    "default": CatalogProfile(
+                        uri="http://example.com",
+                        warehouse="",  # Empty not allowed
+                    )
+                },
+            )
+        assert "warehouse" in str(exc_info.value).lower() or "string" in str(exc_info.value).lower()
+
+    def test_invalid_observability_extra_field(self) -> None:
+        """Observability rejects extra fields."""
+        with pytest.raises(ValidationError) as exc_info:
+            ObservabilityConfig(
+                traces=True,
+                unknown_field="value",  # type: ignore[call-arg]  # Extra field
+            )
+        assert "unknown_field" in str(exc_info.value)
+
+    def test_profile_name_with_special_chars(self) -> None:
+        """Profile names with special characters are rejected."""
+        with pytest.raises(ValidationError) as exc_info:
+            PlatformSpec(
+                storage={"invalid@profile": StorageProfile(bucket="bucket")},
+            )
+        assert "invalid@profile" in str(exc_info.value)
+
+    def test_catalog_missing_required_fields(self) -> None:
+        """Catalog profile requires uri and warehouse."""
+        with pytest.raises(ValidationError):
+            # Missing required fields - CatalogProfile requires uri and warehouse
+            CatalogProfile()  # type: ignore[call-arg]

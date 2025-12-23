@@ -79,7 +79,7 @@ class TestSecretReference:
         """SecretReference is immutable."""
         ref = SecretReference(secret_ref="my-secret")
         with pytest.raises(ValidationError):
-            ref.secret_ref = "other-secret"  # type: ignore[misc]
+            ref.secret_ref = "other-secret"
 
     def test_resolve_from_env_var(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """SecretReference resolves from environment variable."""
@@ -117,10 +117,10 @@ class TestCredentialMode:
 
     def test_all_modes_defined(self) -> None:
         """All credential modes are defined."""
-        assert CredentialMode.STATIC == "static"
-        assert CredentialMode.OAUTH2 == "oauth2"
-        assert CredentialMode.IAM_ROLE == "iam_role"
-        assert CredentialMode.SERVICE_ACCOUNT == "service_account"
+        assert CredentialMode.STATIC.value == "static"
+        assert CredentialMode.OAUTH2.value == "oauth2"
+        assert CredentialMode.IAM_ROLE.value == "iam_role"
+        assert CredentialMode.SERVICE_ACCOUNT.value == "service_account"
 
     def test_mode_count(self) -> None:
         """Four credential modes exist."""
