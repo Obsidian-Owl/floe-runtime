@@ -27,7 +27,7 @@ This is a monorepo with 7 packages:
 
 **Purpose**: Create directory structure and placeholder files for new modules
 
-- [ ] T001 Create platform environment directories: `platform/local/`, `platform/dev/`, `platform/staging/`, `platform/prod/`
+- [x] T001 Create platform environment directories: `platform/local/`, `platform/dev/`, `platform/staging/`, `platform/prod/`
 - [ ] T002 [P] Create schema module structure: `packages/floe-core/src/floe_core/schemas/platform_spec.py`
 - [ ] T003 [P] Create schema module: `packages/floe-core/src/floe_core/schemas/credential_config.py`
 - [ ] T004 [P] Create schema module: `packages/floe-core/src/floe_core/schemas/storage_profile.py`
