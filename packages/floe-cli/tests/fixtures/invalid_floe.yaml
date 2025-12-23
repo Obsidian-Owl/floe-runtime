@@ -1,14 +1,13 @@
 # Invalid floe.yaml test fixture
 # Contains schema violations for testing error messages
+#
+# Two-Tier Architecture: profile references must be valid strings
 
 # Missing required 'version' field
 name: test-pipeline
 
-compute:
-  # Invalid target - 'invalid_target' is not a valid ComputeTarget
-  target: invalid_target
-  properties:
-    path: ":memory:"
+# Invalid profile reference (must start with letter, not special char)
+compute: "123-invalid"
 
 # Invalid transform type
 transforms:

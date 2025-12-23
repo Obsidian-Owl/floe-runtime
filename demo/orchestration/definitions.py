@@ -46,18 +46,23 @@ from demo.orchestration.config import (
     DEMO_PRODUCTS_COUNT,
     DEMO_SEED,
     get_lineage_config,
+    get_lineage_config_from_platform,
     get_polaris_config,
+    get_polaris_config_from_platform,
     get_tracing_config,
+    get_tracing_config_from_platform,
 )
 
 logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Observability Setup (Module-Level Initialization)
+# Two-Tier Architecture: Prefer platform config, fall back to environment
 # =============================================================================
 
 # Initialize tracing manager for OpenTelemetry → Jaeger
-_tracing_config = get_tracing_config()
+# Try platform config first (Two-Tier Architecture)
+_tracing_config = get_tracing_config_from_platform() or get_tracing_config()
 _tracing_manager = None
 
 if _tracing_config.enabled:
@@ -83,7 +88,8 @@ else:
     logger.info("Tracing disabled (OTEL_EXPORTER_OTLP_ENDPOINT not set)")
 
 # Initialize lineage emitter for OpenLineage → Marquez
-_lineage_config = get_lineage_config()
+# Try platform config first (Two-Tier Architecture)
+_lineage_config = get_lineage_config_from_platform() or get_lineage_config()
 _lineage_emitter = None
 
 if _lineage_config.enabled:
@@ -116,12 +122,15 @@ else:
 def _create_polaris_catalog() -> Any:
     """Create Polaris catalog from configuration.
 
+    Uses Two-Tier Architecture: prefers platform config, falls back to environment.
+
     Returns:
         PolarisCatalog instance for Iceberg operations.
     """
     from floe_polaris import PolarisCatalogConfig, create_catalog
 
-    polaris_config = get_polaris_config()
+    # Two-Tier Architecture: prefer platform config, fall back to environment
+    polaris_config = get_polaris_config_from_platform() or get_polaris_config()
 
     # Convert SecretStr values for PolarisCatalogConfig
     client_secret = polaris_config.client_secret

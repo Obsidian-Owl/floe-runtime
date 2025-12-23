@@ -143,14 +143,19 @@ class TestValidateEdgeCases:
         assert result.exit_code != 0
 
     def test_valid_minimal_config(self, cli_runner: CliRunner, tmp_path: Path) -> None:
-        """Test validation of minimal valid config."""
+        """Test validation of minimal valid config.
+
+        Two-Tier Architecture: Use profile references (strings) for compute, catalog, storage.
+        """
         minimal = tmp_path / "minimal.yaml"
         minimal.write_text(
             """
 name: minimal-project
 version: "1.0.0"
-compute:
-  target: duckdb
+# Two-Tier Architecture: use profile references
+storage: default
+catalog: default
+compute: default
 """
         )
         result = cli_runner.invoke(validate, ["--file", str(minimal)])

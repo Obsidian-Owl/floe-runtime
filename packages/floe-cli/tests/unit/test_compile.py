@@ -70,12 +70,15 @@ class TestCompileCommand:
         )
         assert result.exit_code == 1
 
-    def test_compile_default_output(
-        self, isolated_runner: CliRunner, valid_floe_yaml: Path
-    ) -> None:
+    def test_compile_default_output(self, isolated_runner: CliRunner, fixtures_dir: Path) -> None:
         """Test compilation uses default .floe/ output."""
-        # Copy valid yaml to isolated dir
-        Path("floe.yaml").write_text(valid_floe_yaml.read_text())
+        # Copy valid yaml to isolated dir (Two-Tier Architecture)
+        Path("floe.yaml").write_text((fixtures_dir / "valid_floe.yaml").read_text())
+
+        # Create platform.yaml for Two-Tier Architecture
+        platform_dir = Path("platform") / "local"
+        platform_dir.mkdir(parents=True, exist_ok=True)
+        (platform_dir / "platform.yaml").write_text((fixtures_dir / "platform.yaml").read_text())
 
         result = isolated_runner.invoke(compile_cmd)
         assert result.exit_code == 0
@@ -86,13 +89,18 @@ class TestCompileCommand:
 
 
 class TestCompileTargetOption:
-    """Tests for --target option."""
+    """Tests for --target option.
+
+    In Two-Tier Architecture, --target must match the profile name (e.g., "default"),
+    not the compute type (e.g., "duckdb"). The profile name is what's in floe.yaml.
+    """
 
     def test_compile_with_valid_target(
         self, cli_runner: CliRunner, valid_floe_yaml: Path, tmp_path: Path
     ) -> None:
         """Test compilation with valid --target option."""
         output_dir = tmp_path / ".floe"
+        # Target must match the compute profile name in floe.yaml ("default")
         result = cli_runner.invoke(
             compile_cmd,
             [
@@ -101,7 +109,7 @@ class TestCompileTargetOption:
                 "--output",
                 str(output_dir),
                 "--target",
-                "duckdb",
+                "default",  # Profile name, not compute type
             ],
         )
         assert result.exit_code == 0
@@ -188,17 +196,30 @@ class TestCompileEdgeCases:
         assert "old" not in new_content
         assert "version" in new_content
 
-    def test_compile_empty_transforms(self, cli_runner: CliRunner, tmp_path: Path) -> None:
-        """Test compilation with no transforms."""
+    def test_compile_empty_transforms(
+        self, cli_runner: CliRunner, tmp_path: Path, fixtures_dir: Path
+    ) -> None:
+        """Test compilation with no transforms.
+
+        Two-Tier Architecture requires platform.yaml alongside floe.yaml.
+        """
         config_file = tmp_path / "minimal.yaml"
         config_file.write_text(
             """
 name: minimal
 version: "1.0.0"
-compute:
-  target: duckdb
+# Two-Tier: use profile references
+storage: default
+catalog: default
+compute: default
 """
         )
+
+        # Create platform.yaml for Two-Tier Architecture
+        platform_dir = tmp_path / "platform" / "local"
+        platform_dir.mkdir(parents=True, exist_ok=True)
+        (platform_dir / "platform.yaml").write_text((fixtures_dir / "platform.yaml").read_text())
+
         output_dir = tmp_path / ".floe"
         result = cli_runner.invoke(
             compile_cmd,

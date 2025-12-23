@@ -1,0 +1,42 @@
+# Platform configuration fixture for CLI tests
+# Two-Tier Architecture: Infrastructure configuration for test environment
+
+version: "1.0.0"
+
+storage:
+  default:
+    type: s3
+    endpoint: "http://localstack:4566"
+    region: us-east-1
+    bucket: test-bucket
+    path_style_access: true
+    credentials:
+      mode: static
+      secret_ref: test-credentials
+
+catalogs:
+  default:
+    type: polaris
+    uri: "http://polaris:8181/api/catalog"
+    warehouse: test-warehouse
+    namespace: default
+    credentials:
+      mode: oauth2
+      client_id: test-client
+      client_secret:
+        secret_ref: polaris-client-secret
+      scope: "PRINCIPAL_ROLE:ALL"
+
+compute:
+  default:
+    type: duckdb
+    properties:
+      path: ":memory:"
+      threads: 4
+    credentials:
+      mode: static
+
+observability:
+  traces: true
+  metrics: true
+  lineage: true

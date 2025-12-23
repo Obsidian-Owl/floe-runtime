@@ -1,0 +1,51 @@
+# Floe Runtime Demo Pipeline Configuration
+#
+# This file defines the demo pipeline using logical profile references (Two-Tier Architecture).
+# Infrastructure configuration (endpoints, credentials) is defined in platform.yaml.
+# The same floe.yaml works across local, dev, staging, and production environments.
+#
+# Profile references:
+#   storage: "default"  - Resolved from platform.yaml storage profiles
+#   catalog: "default"  - Resolved from platform.yaml catalogs profiles
+#   compute: "default"  - Resolved from platform.yaml compute profiles
+#
+# To run the demo:
+#   export FLOE_PLATFORM_ENV=local  # or dev, staging, prod
+#   floe compile
+#   dagster dev
+#
+# Covers: 007-FR-029 (E2E validation tests)
+# Covers: 007-FR-031 (Medallion architecture demo)
+# Covers: 009-FR-001 (Two-Tier Configuration Architecture)
+
+name: floe-demo
+version: "1.0.0"
+
+# Profile references - resolved at compile/deploy time from platform.yaml
+storage: default
+catalog: default
+compute: default
+
+# dbt transformation layer
+transforms:
+  - type: dbt
+    path: "."
+    target: demo
+
+# Semantic layer configuration (Cube)
+consumption:
+  enabled: false  # Disabled for initial demo
+
+# Data governance configuration
+governance:
+  classification_source: dbt_meta
+
+# Observability configuration
+# Actual endpoints (Jaeger, Marquez) are configured in platform.yaml
+observability:
+  traces: true
+  metrics: true
+  lineage: true
+  attributes:
+    service.name: floe-demo
+    deployment.environment: "${FLOE_PLATFORM_ENV:-local}"

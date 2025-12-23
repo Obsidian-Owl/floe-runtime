@@ -1,14 +1,15 @@
 # Valid floe.yaml test fixture
 # Used for testing CLI commands with valid configuration
+#
+# Two-Tier Architecture: Uses profile references (strings) not inline config
 
 name: test-pipeline
 version: "1.0.0"
 
-compute:
-  target: duckdb
-  properties:
-    path: ":memory:"
-    threads: 4
+# Profile references - resolved from platform.yaml at compile time
+storage: default
+catalog: default
+compute: default
 
 transforms:
   - type: dbt

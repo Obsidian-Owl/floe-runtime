@@ -181,8 +181,9 @@ class Compiler:
 
         Searches for platform.yaml in standard locations:
         1. platform/<env>/platform.yaml (env from FLOE_PLATFORM_ENV or self.platform_env)
-        2. .floe/platform.yaml
-        3. platform.yaml in project directory
+        2. <project_dir>/<env>/platform.yaml
+        3. .floe/<env>/platform.yaml
+        4. Fallback: platform.yaml without env subdirectory
 
         Args:
             project_dir: Project directory (parent of floe.yaml).
@@ -193,9 +194,14 @@ class Compiler:
         Raises:
             PlatformNotFoundError: If platform.yaml not found.
         """
+        # Include project_dir/platform as first search path for standard layout
         resolver = PlatformResolver(
             env=self.platform_env,
-            search_paths=(project_dir,),
+            search_paths=(
+                project_dir / "platform",  # Standard: project/platform/{env}/platform.yaml
+                project_dir,  # Fallback: project/{env}/platform.yaml
+                project_dir / ".floe",  # Fallback: project/.floe/{env}/platform.yaml
+            ),
         )
         return resolver.load()
 

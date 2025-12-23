@@ -67,18 +67,20 @@ def compile_cmd(file_path: str, output_path: str, target: str | None) -> None:
         # Validate first
         spec = FloeSpec.from_yaml(path)
 
-        # Check target if specified
-        if target is not None:
-            valid_targets = [spec.compute.target.value]
-            if target not in valid_targets:
-                error(f"Target not found: {target}")
-                error(f"Available targets: {', '.join(valid_targets)}")
-                raise SystemExit(1)
+        # Note: In Two-Tier Architecture, spec.compute is a profile reference (string),
+        # not an inline config object. Target validation happens during compilation
+        # when platform profiles are resolved.
+        # Target override: verify it matches a profile name from floe.yaml
+        # (actual profile resolution happens in Compiler from platform.yaml)
+        if target is not None and target != spec.compute:
+            error(f"Target '{target}' does not match compute profile '{spec.compute}'")
+            error("Use a compute profile defined in your floe.yaml")
+            raise SystemExit(1)
 
         # Create output directory
         output.mkdir(parents=True, exist_ok=True)
 
-        # Compile (target validation done above, Compiler uses spec's target)
+        # Compile (Two-Tier: resolves profile references from platform.yaml)
         compiler = Compiler()
         artifacts = compiler.compile(path)
 

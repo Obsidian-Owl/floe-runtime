@@ -1,36 +1,36 @@
-"""Demo pipeline configuration.
+"""Demo pipeline configuration - Two-Tier Architecture.
 
 Centralized configuration for the production-quality demo pipeline.
-All configuration is read from environment variables with sensible defaults.
+Uses the Two-Tier Configuration Architecture:
+- Platform config loaded from platform.yaml (via FLOE_PLATFORM_ENV)
+- Credentials injected via environment variables (from K8s secrets)
 
 Environment Variables:
+    FLOE_PLATFORM_ENV: Platform environment (local, dev, staging, prod)
     DEMO_CUSTOMERS_COUNT: Number of customers to generate (default: 1000)
     DEMO_ORDERS_COUNT: Number of orders to generate (default: 5000)
     DEMO_PRODUCTS_COUNT: Number of products to generate (default: 100)
     DEMO_ORDER_ITEMS_COUNT: Number of order items to generate (default: 10000)
-    POLARIS_URI: Polaris catalog URI (default: http://polaris:8181/api/catalog)
-    POLARIS_WAREHOUSE: Polaris warehouse name (default: warehouse)
-    POLARIS_CLIENT_ID: OAuth2 client ID (from polaris-credentials.env)
-    POLARIS_CLIENT_SECRET: OAuth2 client secret (from polaris-credentials.env)
-    AWS_ENDPOINT_URL: S3 endpoint (default: http://localstack:4566)
-    AWS_ACCESS_KEY_ID: S3 access key (default: test)
-    AWS_SECRET_ACCESS_KEY: S3 secret key (default: test)
-    AWS_REGION: S3 region (default: us-east-1)
-    OTEL_EXPORTER_OTLP_ENDPOINT: Jaeger OTLP endpoint (default: None)
-    OTEL_SERVICE_NAME: Service name for traces (default: floe-demo)
-    OPENLINEAGE_URL: Marquez lineage endpoint (default: None)
-    OPENLINEAGE_NAMESPACE: Lineage namespace (default: demo)
+    POLARIS_CLIENT_ID: OAuth2 client ID (from polaris-credentials secret)
+    POLARIS_CLIENT_SECRET: OAuth2 client secret (from polaris-credentials secret)
+    AWS_ACCESS_KEY_ID: S3 access key (from storage-credentials secret)
+    AWS_SECRET_ACCESS_KEY: S3 secret key (from storage-credentials secret)
+    AWS_ENDPOINT_URL: Override for S3 endpoint (optional, platform.yaml preferred)
 
 Covers: 007-FR-029 (E2E validation tests)
 Covers: 007-FR-031 (Medallion architecture demo)
+Covers: 009-FR-001 (Two-Tier Configuration Architecture)
 """
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Data Volume Configuration (Configurable via environment)
@@ -240,3 +240,145 @@ def get_demo_config() -> dict[str, Any]:
         },
         "seed": DEMO_SEED,
     }
+
+
+# =============================================================================
+# Two-Tier Architecture: Platform Config Loading
+# =============================================================================
+
+
+def _load_platform_config() -> Any:
+    """Load platform configuration from platform.yaml.
+
+    Uses PlatformResolver to find and load the platform.yaml based on
+    FLOE_PLATFORM_ENV environment variable.
+
+    Returns:
+        PlatformSpec instance, or None if not available.
+
+    Note:
+        This is an internal function. Public API uses get_*_config() functions
+        which fall back to environment variables if platform.yaml is not found.
+    """
+    try:
+        from floe_core.compiler.platform_resolver import PlatformResolver
+
+        resolver = PlatformResolver()
+        return resolver.load()
+    except ImportError:
+        logger.debug("floe_core not available, using environment variables")
+        return None
+    except Exception as e:
+        logger.debug("Platform config not found, using environment variables: %s", e)
+        return None
+
+
+def get_polaris_config_from_platform() -> DemoPolarisConfig | None:
+    """Get Polaris config from platform.yaml (Two-Tier Architecture).
+
+    Loads catalog profile from platform.yaml and merges with environment
+    variables for credentials. This is the preferred method for Two-Tier.
+
+    Returns:
+        DemoPolarisConfig from platform.yaml, or None if not available.
+    """
+    platform = _load_platform_config()
+    if platform is None:
+        return None
+
+    try:
+        catalog = platform.get_catalog_profile("default")
+        storage = platform.get_storage_profile("default")
+
+        # Get credential values from environment (K8s secrets)
+        client_id = os.environ.get("POLARIS_CLIENT_ID")
+        client_secret_str = os.environ.get("POLARIS_CLIENT_SECRET")
+        client_secret = SecretStr(client_secret_str) if client_secret_str else None
+
+        # S3 credentials from environment (K8s secrets)
+        s3_access_key = os.environ.get("AWS_ACCESS_KEY_ID", "test")
+        s3_secret_key = os.environ.get("AWS_SECRET_ACCESS_KEY", "test")
+
+        # Get endpoint from storage profile, with env var override
+        s3_endpoint = os.environ.get("AWS_ENDPOINT_URL")
+        if not s3_endpoint:
+            s3_endpoint = storage.get_endpoint() or "http://localstack:4566"
+
+        # Get scope from catalog credentials config
+        scope = "PRINCIPAL_ROLE:ALL"  # Default for demo
+        if catalog.credentials and catalog.credentials.scope:
+            scope = catalog.credentials.scope
+
+        return DemoPolarisConfig(
+            uri=catalog.get_uri(),
+            warehouse=catalog.warehouse,
+            client_id=client_id,
+            client_secret=client_secret,
+            scope=scope,
+            s3_endpoint=s3_endpoint,
+            s3_access_key_id=s3_access_key,
+            s3_secret_access_key=SecretStr(s3_secret_key),
+            s3_region=storage.region,
+            s3_path_style_access=storage.path_style_access,
+            access_delegation=catalog.access_delegation.value if catalog.access_delegation else "",
+        )
+    except Exception as e:
+        logger.debug("Error loading catalog profile: %s", e)
+        return None
+
+
+def get_tracing_config_from_platform() -> DemoTracingConfig | None:
+    """Get tracing config from platform.yaml (Two-Tier Architecture).
+
+    Returns:
+        DemoTracingConfig from platform.yaml, or None if not available.
+    """
+    platform = _load_platform_config()
+    if platform is None or platform.observability is None:
+        return None
+
+    try:
+        obs = platform.observability
+        endpoint = getattr(obs, "otlp_endpoint", None)
+        if not endpoint:
+            return None
+
+        attrs = getattr(obs, "attributes", {}) or {}
+        service_name = attrs.get("service.name", "floe-demo")
+
+        return DemoTracingConfig(
+            endpoint=endpoint,
+            service_name=service_name,
+            batch_export=True,
+        )
+    except Exception as e:
+        logger.debug("Error loading observability config: %s", e)
+        return None
+
+
+def get_lineage_config_from_platform() -> DemoLineageConfig | None:
+    """Get lineage config from platform.yaml (Two-Tier Architecture).
+
+    Returns:
+        DemoLineageConfig from platform.yaml, or None if not available.
+    """
+    platform = _load_platform_config()
+    if platform is None or platform.observability is None:
+        return None
+
+    try:
+        obs = platform.observability
+        endpoint = getattr(obs, "lineage_endpoint", None)
+        if not endpoint:
+            return None
+
+        namespace = os.environ.get("OPENLINEAGE_NAMESPACE", "demo")
+
+        return DemoLineageConfig(
+            endpoint=endpoint,
+            namespace=namespace,
+            timeout=5.0,
+        )
+    except Exception as e:
+        logger.debug("Error loading lineage config: %s", e)
+        return None
