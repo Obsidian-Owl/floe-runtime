@@ -35,7 +35,7 @@ from floe_cli.output import error, success
     "target",
     type=str,
     default=None,
-    help="Compute target (must exist in spec)",
+    help="Compute profile name (must match floe.yaml compute field)",
 )
 def compile_cmd(file_path: str, output_path: str, target: str | None) -> None:
     """Generate CompiledArtifacts from floe.yaml.
@@ -73,8 +73,8 @@ def compile_cmd(file_path: str, output_path: str, target: str | None) -> None:
         # Target override: verify it matches a profile name from floe.yaml
         # (actual profile resolution happens in Compiler from platform.yaml)
         if target is not None and target != spec.compute:
-            error(f"Target '{target}' does not match compute profile '{spec.compute}'")
-            error("Use a compute profile defined in your floe.yaml")
+            error(f"Profile '{target}' does not match floe.yaml compute profile '{spec.compute}'")
+            error("The --target must match the compute profile in floe.yaml")
             raise SystemExit(1)
 
         # Create output directory

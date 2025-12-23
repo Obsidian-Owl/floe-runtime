@@ -29,7 +29,7 @@ from floe_cli.output import error, success, warning
         ["duckdb", "snowflake", "bigquery", "redshift", "databricks", "postgres", "spark"]
     ),
     default="duckdb",
-    help="Compute target [default: duckdb]",
+    help="Informational: suggested compute type (Two-Tier uses profiles)",
 )
 @click.option(
     "--force",
@@ -80,21 +80,24 @@ def init(name: str | None, target: str, force: bool) -> None:
             lstrip_blocks=True,
         )
 
-        # Render floe.yaml
+        # Render floe.yaml (Two-Tier Architecture)
+        # In Two-Tier Architecture:
+        # - storage/catalog/compute are logical profile references
+        # - Actual infrastructure is defined in platform.yaml
         floe_yaml_template = """\
 # {{ name }} - Floe Pipeline Configuration
 # yaml-language-server: $schema=./schemas/floe.schema.json
+#
+# Two-Tier Architecture: This file defines WHAT your pipeline does.
+# Infrastructure details (endpoints, credentials) go in platform.yaml.
 
 name: {{ name }}
 version: "1.0.0"
 
-compute:
-  target: {{ target }}
-{% if target == 'duckdb' %}
-  properties:
-    path: ":memory:"
-    threads: 4
-{% endif %}
+# Logical profile references (resolved from platform.yaml at runtime)
+storage: default
+catalog: default
+compute: default
 
 transforms:
   - type: dbt
@@ -115,7 +118,7 @@ observability:
             target=target,
         )
 
-        # Render README.md
+        # Render README.md (Two-Tier Architecture)
         readme_template = """\
 # {{ name }}
 
@@ -140,11 +143,17 @@ A data pipeline built with [Floe Runtime](https://github.com/your-org/floe-runti
 
 ## Configuration
 
-Edit `floe.yaml` to configure your pipeline:
-- **compute**: Target database ({{ target }})
+This project uses the **Two-Tier Architecture**:
+
+- **floe.yaml**: Defines WHAT your pipeline does (transforms, governance)
+- **platform.yaml**: Defines WHERE it runs (endpoints, credentials)
+
+Edit `floe.yaml` to configure your pipeline logic:
 - **transforms**: dbt models
 - **governance**: Data classification
 - **observability**: Tracing and metrics
+
+Your platform engineer provides `platform.yaml` with infrastructure details.
 
 ## Learn More
 

@@ -21,32 +21,82 @@ import pytest
 
 from floe_cli.main import cli
 
-# Valid floe.yaml content for tests
+# Valid floe.yaml content for tests (Two-Tier Architecture)
+# Note: compute/catalog/storage are logical profile references, not nested objects
 VALID_FLOE_YAML = """\
 name: test-project
 version: "1.0.0"
-compute:
-  target: duckdb
-  properties:
-    path: ":memory:"
-    threads: 4
+storage: default
+catalog: default
+compute: default
 transforms:
   - type: dbt
     path: ./dbt
 """
 
 # Multi-target floe.yaml (for testing --target option)
+# In Two-Tier Architecture, targets are defined in platform.yaml, not floe.yaml
 MULTI_TARGET_FLOE_YAML = """\
 name: multi-target-project
 version: "1.0.0"
-compute:
-  target: duckdb
-  properties:
-    path: ":memory:"
+storage: default
+catalog: default
+compute: default
 transforms:
   - type: dbt
     path: ./dbt
 """
+
+# Minimal platform.yaml for Two-Tier Architecture tests
+VALID_PLATFORM_YAML = """\
+version: "1.0.0"
+
+storage:
+  default:
+    type: s3
+    endpoint: http://localhost:9000
+    region: us-east-1
+    bucket: test-bucket
+    path_style_access: true
+    credentials:
+      mode: static
+      secret_ref: test-credentials
+
+catalogs:
+  default:
+    type: polaris
+    uri: http://localhost:8181/api/catalog
+    warehouse: test
+    credentials:
+      mode: oauth2
+      client_id: test-client
+      client_secret:
+        secret_ref: test-secret
+      scope: PRINCIPAL_ROLE:ALL
+    access_delegation: none
+    token_refresh_enabled: true
+
+compute:
+  default:
+    type: duckdb
+    properties:
+      path: ":memory:"
+      threads: 4
+    credentials:
+      mode: static
+
+observability:
+  traces: false
+  metrics: false
+  lineage: false
+"""
+
+
+def setup_platform_yaml(base_path: Path) -> None:
+    """Create platform.yaml in the standard location for tests."""
+    platform_dir = base_path / "platform" / "local"
+    platform_dir.mkdir(parents=True, exist_ok=True)
+    (platform_dir / "platform.yaml").write_text(VALID_PLATFORM_YAML)
 
 
 class TestRunCommand:
@@ -277,18 +327,22 @@ class TestTargetOption:
 
     @pytest.mark.requirement("002-FR-012")
     def test_compile_validates_target_exists(self, tmp_path: Path) -> None:
-        """Test that floe compile validates target exists in spec.
+        """Test that floe compile validates target matches compute profile.
 
         Covers:
-        - 002-FR-012: CLI validates target exists in spec before compilation
+        - 002-FR-012: CLI validates target matches compute profile in floe.yaml
+
+        Note: In Two-Tier Architecture, --target must match the compute profile
+        reference in floe.yaml (e.g., "default"). Profile resolution to actual
+        infrastructure happens via platform.yaml at compile time.
         """
         runner = CliRunner()
 
-        # Create floe.yaml with duckdb target
+        # Create floe.yaml with 'default' compute profile
         floe_yaml = tmp_path / "floe.yaml"
         floe_yaml.write_text(VALID_FLOE_YAML)
 
-        # Try to compile with invalid target
+        # Try to compile with target that doesn't match compute profile
         result = runner.invoke(
             cli,
             ["compile", "--file", str(floe_yaml), "--target", "invalid_target"],
@@ -297,23 +351,29 @@ class TestTargetOption:
         # Should fail with informative error
         assert result.exit_code == 1
         assert "target" in result.output.lower()
-        assert "not found" in result.output.lower() or "invalid" in result.output.lower()
+        assert "does not match" in result.output.lower() or "profile" in result.output.lower()
 
     @pytest.mark.requirement("002-FR-012")
     def test_compile_accepts_valid_target(self, tmp_path: Path) -> None:
-        """Test that floe compile accepts valid target from spec.
+        """Test that floe compile accepts valid target matching compute profile.
 
         Covers:
-        - 002-FR-012: CLI accepts valid target that exists in spec
+        - 002-FR-012: CLI accepts valid target that matches compute profile
+
+        Note: In Two-Tier Architecture, --target must match the compute profile
+        reference in floe.yaml (e.g., "default").
         """
         runner = CliRunner()
 
         floe_yaml = tmp_path / "floe.yaml"
         floe_yaml.write_text(VALID_FLOE_YAML)
 
+        # Two-Tier Architecture: compiler needs platform.yaml to resolve profiles
+        setup_platform_yaml(tmp_path)
+
         output_dir = tmp_path / "output"
 
-        # Compile with valid target (duckdb is defined in the spec)
+        # Compile with valid target (must match compute profile 'default')
         result = runner.invoke(
             cli,
             [
@@ -323,7 +383,7 @@ class TestTargetOption:
                 "--output",
                 str(output_dir),
                 "--target",
-                "duckdb",
+                "default",  # Must match spec.compute profile reference
             ],
         )
 
@@ -332,10 +392,13 @@ class TestTargetOption:
 
     @pytest.mark.requirement("002-FR-012")
     def test_compile_shows_available_targets_on_error(self, tmp_path: Path) -> None:
-        """Test that compile error shows available targets.
+        """Test that compile error shows the expected compute profile.
 
         Covers:
-        - 002-FR-012: Error message lists valid targets
+        - 002-FR-012: Error message shows expected compute profile
+
+        Note: In Two-Tier Architecture, the error message shows which compute
+        profile was expected (from floe.yaml) when --target doesn't match.
         """
         runner = CliRunner()
 
@@ -347,10 +410,10 @@ class TestTargetOption:
             ["compile", "--file", str(floe_yaml), "--target", "nonexistent"],
         )
 
-        # Should list available targets in error
+        # Should show the expected compute profile in error
         assert result.exit_code == 1
-        # Should mention what targets are available
-        assert "duckdb" in result.output.lower() or "available" in result.output.lower()
+        # Should mention the expected compute profile 'default'
+        assert "default" in result.output.lower() or "profile" in result.output.lower()
 
 
 class TestColoredOutput:

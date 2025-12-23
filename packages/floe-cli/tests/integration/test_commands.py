@@ -22,26 +22,80 @@ import pytest
 
 from floe_cli.main import cli
 
-# Valid floe.yaml content for integration tests
+# Valid floe.yaml content for integration tests (Two-Tier Architecture)
+# Note: compute/catalog/storage are logical profile references, not nested objects
 VALID_FLOE_YAML = """\
 name: integration-test
 version: "1.0.0"
-compute:
-  target: duckdb
-  properties:
-    path: ":memory:"
-    threads: 4
+storage: default
+catalog: default
+compute: default
 transforms:
   - type: dbt
     path: ./dbt
 """
 
-# Invalid floe.yaml content (missing required field)
+# Invalid floe.yaml content (missing required field 'name')
 INVALID_FLOE_YAML = """\
 version: "1.0.0"
-compute:
-  target: duckdb
+compute: default
 """
+
+# Minimal platform.yaml for Two-Tier Architecture tests
+# This provides the "default" profiles that floe.yaml references
+VALID_PLATFORM_YAML = """\
+version: "1.0.0"
+
+storage:
+  default:
+    type: s3
+    endpoint: http://localhost:9000
+    region: us-east-1
+    bucket: test-bucket
+    path_style_access: true
+    credentials:
+      mode: static
+      secret_ref: test-credentials
+
+catalogs:
+  default:
+    type: polaris
+    uri: http://localhost:8181/api/catalog
+    warehouse: test
+    credentials:
+      mode: oauth2
+      client_id: test-client
+      client_secret:
+        secret_ref: test-secret
+      scope: PRINCIPAL_ROLE:ALL
+    access_delegation: none
+    token_refresh_enabled: true
+
+compute:
+  default:
+    type: duckdb
+    properties:
+      path: ":memory:"
+      threads: 4
+    credentials:
+      mode: static
+
+observability:
+  traces: false
+  metrics: false
+  lineage: false
+"""
+
+
+def setup_platform_yaml(base_path: Path) -> None:
+    """Create platform.yaml in the standard location for tests.
+
+    In Two-Tier Architecture, the compiler needs platform.yaml to resolve
+    profile references. This helper creates a minimal platform.yaml.
+    """
+    platform_dir = base_path / "platform" / "local"
+    platform_dir.mkdir(parents=True, exist_ok=True)
+    (platform_dir / "platform.yaml").write_text(VALID_PLATFORM_YAML)
 
 
 class TestValidateCommandIntegration:
@@ -188,6 +242,9 @@ class TestCompileCommandIntegration:
         floe_yaml = tmp_path / "floe.yaml"
         floe_yaml.write_text(VALID_FLOE_YAML)
 
+        # Two-Tier Architecture: compiler needs platform.yaml to resolve profiles
+        setup_platform_yaml(tmp_path)
+
         output_dir = tmp_path / "output"
 
         # Run compile
@@ -224,6 +281,9 @@ class TestCompileCommandIntegration:
 
         floe_yaml = tmp_path / "floe.yaml"
         floe_yaml.write_text(VALID_FLOE_YAML)
+
+        # Two-Tier Architecture: compiler needs platform.yaml to resolve profiles
+        setup_platform_yaml(tmp_path)
 
         # Nested output directory that doesn't exist
         output_dir = tmp_path / "nested" / "output" / "dir"
@@ -297,6 +357,9 @@ class TestCompileCommandIntegration:
         with runner.isolated_filesystem():
             Path("floe.yaml").write_text(VALID_FLOE_YAML)
 
+            # Two-Tier Architecture: compiler needs platform.yaml to resolve profiles
+            setup_platform_yaml(Path.cwd())
+
             result = runner.invoke(cli, ["compile"])
 
             assert result.exit_code == 0
@@ -361,10 +424,14 @@ class TestInitCommandIntegration:
     @pytest.mark.requirement("006-FR-009")
     @pytest.mark.requirement("002-FR-003")
     def test_init_with_custom_target(self) -> None:
-        """Verify init command accepts custom compute target.
+        """Verify init command accepts --target option.
 
         Covers:
         - 002-FR-003: floe init with --target option
+
+        Note: In Two-Tier Architecture, --target is informational only.
+        The actual compute target is defined in platform.yaml, not floe.yaml.
+        floe.yaml uses logical profile references (e.g., "compute: default").
         """
         runner = CliRunner()
 
@@ -376,7 +443,9 @@ class TestInitCommandIntegration:
             assert result.exit_code == 0
 
             content = Path("floe.yaml").read_text()
-            assert "target: snowflake" in content
+            # In Two-Tier Architecture, floe.yaml uses profile references
+            assert "compute: default" in content
+            assert "snowflake-project" in content
 
     @pytest.mark.requirement("006-FR-006")
     @pytest.mark.requirement("006-FR-009")
@@ -511,6 +580,9 @@ class TestCommandChaining:
             init_result = runner.invoke(cli, ["init", "--name", "compile-test"])
             assert init_result.exit_code == 0
 
+            # Two-Tier Architecture: compiler needs platform.yaml to resolve profiles
+            setup_platform_yaml(Path.cwd())
+
             # Run compile on the created config
             compile_result = runner.invoke(cli, ["compile"])
             assert compile_result.exit_code == 0
@@ -539,6 +611,9 @@ class TestCommandChaining:
             # Validate configuration
             result = runner.invoke(cli, ["validate"])
             assert result.exit_code == 0
+
+            # Two-Tier Architecture: compiler needs platform.yaml to resolve profiles
+            setup_platform_yaml(Path.cwd())
 
             # Compile artifacts
             result = runner.invoke(cli, ["compile"])

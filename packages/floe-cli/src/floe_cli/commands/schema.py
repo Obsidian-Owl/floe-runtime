@@ -17,11 +17,12 @@ from floe_cli.output import error, success
 def schema() -> None:
     """Manage JSON Schema for IDE support.
 
-    Export FloeSpec JSON Schema for IDE autocomplete and validation.
+    Export JSON Schema files for IDE autocomplete and validation.
 
     **Commands:**
 
-    - `floe schema export` - Export JSON Schema to file
+    - `floe schema export` - Export FloeSpec (floe.yaml) JSON Schema
+    - `floe schema export-platform` - Export PlatformSpec (platform.yaml) JSON Schema
     """
     pass
 
@@ -74,4 +75,60 @@ def export_schema(output_path: str) -> None:
 
     except Exception as e:
         error(f"Schema export failed: {e}")
+        raise SystemExit(1) from None
+
+
+@schema.command("export-platform")
+@click.option(
+    "-o",
+    "--output",
+    "output_path",
+    type=click.Path(),
+    default="./schemas/platform.schema.json",
+    help="Output path [default: ./schemas/platform.schema.json]",
+)
+def export_platform_schema(output_path: str) -> None:
+    """Export PlatformSpec JSON Schema.
+
+    Exports the JSON Schema for platform.yaml configuration to enable
+    IDE autocomplete and validation.
+
+    Examples:
+
+        floe schema export-platform
+
+        floe schema export-platform --output custom/path/platform.schema.json
+    """
+    output = Path(output_path)
+
+    try:
+        # Import here to avoid heavy imports at CLI startup
+        from floe_core.schemas import PlatformSpec
+
+        # Create output directory
+        output.parent.mkdir(parents=True, exist_ok=True)
+
+        # Generate JSON Schema
+        json_schema = PlatformSpec.model_json_schema()
+
+        # Add $schema and $id metadata
+        json_schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
+        json_schema["$id"] = "https://floe.dev/schemas/platform.schema.json"
+
+        # Write schema
+        output.write_text(json.dumps(json_schema, indent=2))
+
+        success(f"Platform schema exported to {output}")
+
+    except ImportError:
+        error("PlatformSpec not available.")
+        error("Ensure floe-core is installed with Two-Tier Architecture support.")
+        raise SystemExit(2) from None
+
+    except PermissionError:
+        error(f"Cannot write to: {output_path}")
+        raise SystemExit(2) from None
+
+    except Exception as e:
+        error(f"Platform schema export failed: {e}")
         raise SystemExit(1) from None

@@ -75,35 +75,57 @@ class TestInitNameOption:
 
 
 class TestInitTargetOption:
-    """Tests for --target option."""
+    """Tests for --target option.
+
+    Note: In Two-Tier Architecture, --target is informational only.
+    The floe.yaml uses logical profile references (compute: default).
+    Actual infrastructure is defined in platform.yaml.
+    """
 
     @pytest.mark.parametrize(
         "target",
         ["duckdb", "snowflake", "bigquery", "redshift", "databricks", "postgres", "spark"],
     )
     def test_init_with_valid_target(self, isolated_runner: CliRunner, target: str) -> None:
-        """Test init with valid --target option."""
+        """Test init with valid --target option accepts all targets.
+
+        In Two-Tier Architecture, all targets result in compute: default.
+        """
         result = isolated_runner.invoke(init, ["--target", target])
         assert result.exit_code == 0
 
         content = Path("floe.yaml").read_text()
-        assert f"target: {target}" in content
+        # Two-Tier Architecture: floe.yaml uses profile references
+        assert "compute: default" in content
 
     def test_init_default_target_is_duckdb(self, isolated_runner: CliRunner) -> None:
-        """Test init defaults to duckdb target."""
+        """Test init works with default target.
+
+        In Two-Tier Architecture, floe.yaml uses profile references.
+        """
         result = isolated_runner.invoke(init)
         assert result.exit_code == 0
 
         content = Path("floe.yaml").read_text()
-        assert "target: duckdb" in content
+        # Two-Tier Architecture: uses profile reference, not inline target
+        assert "compute: default" in content
 
-    def test_init_duckdb_has_memory_path(self, isolated_runner: CliRunner) -> None:
-        """Test init with duckdb includes :memory: path."""
+    def test_init_creates_two_tier_structure(self, isolated_runner: CliRunner) -> None:
+        """Test init creates Two-Tier Architecture floe.yaml.
+
+        floe.yaml should have profile references (storage/catalog/compute)
+        rather than inline infrastructure configuration.
+        """
         result = isolated_runner.invoke(init, ["--target", "duckdb"])
         assert result.exit_code == 0
 
         content = Path("floe.yaml").read_text()
-        assert ":memory:" in content
+        # Should have Two-Tier profile references
+        assert "storage: default" in content
+        assert "catalog: default" in content
+        assert "compute: default" in content
+        # Should NOT have inline infrastructure details
+        assert ":memory:" not in content
 
 
 class TestInitForceOption:
