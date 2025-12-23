@@ -475,9 +475,21 @@ class TestCreateCatalogFactory:
 
     @patch("floe_polaris.factory.PolarisCatalog")
     def test_create_catalog_with_generic_config(self, mock_catalog_cls: MagicMock) -> None:
-        """Test factory with generic CatalogConfig-like object."""
-        # Create a mock that looks like a CatalogConfig
-        generic_config = MagicMock()
+        """Test factory with generic CatalogConfig-like object (legacy pattern)."""
+        # Create a mock that looks like a legacy CatalogConfig
+        # Use spec to limit attributes - legacy config has uri/warehouse but NOT credentials/get_uri
+
+        class LegacyCatalogConfig:
+            """Mock legacy config structure (no credentials/get_uri attributes)."""
+
+            uri: str
+            warehouse: str
+            client_id: str | None
+            client_secret: str | None
+            token: str | None
+            scope: str | None
+
+        generic_config = MagicMock(spec=LegacyCatalogConfig)
         generic_config.uri = "http://localhost:8181/api/catalog"
         generic_config.warehouse = "test_warehouse"
         generic_config.client_id = None
@@ -500,8 +512,20 @@ class TestCreateCatalogFactory:
 
     def test_create_catalog_with_missing_scope(self) -> None:
         """Test factory with missing scope raises ValueError (security: least privilege)."""
-        # Create a mock that looks like a CatalogConfig without scope
-        generic_config = MagicMock()
+        # Create a mock that looks like a legacy CatalogConfig without scope
+        # Use spec to limit attributes - legacy config has uri/warehouse but NOT credentials/get_uri
+
+        class LegacyCatalogConfig:
+            """Mock legacy config structure (no credentials/get_uri attributes)."""
+
+            uri: str
+            warehouse: str
+            client_id: str | None
+            client_secret: str | None
+            token: str | None
+            scope: str | None
+
+        generic_config = MagicMock(spec=LegacyCatalogConfig)
         generic_config.uri = "http://localhost:8181/api/catalog"
         generic_config.warehouse = "test_warehouse"
         generic_config.client_id = None
@@ -522,6 +546,151 @@ class TestCreateCatalogFactory:
             create_catalog(invalid_config)
 
         assert "Unsupported config type" in str(exc_info.value)
+
+    @patch("floe_polaris.factory.PolarisCatalog")
+    def test_create_catalog_with_catalog_profile(self, mock_catalog_cls: MagicMock) -> None:
+        """Test factory with CatalogProfile (two-tier architecture)."""
+        # Create a mock that looks like a CatalogProfile with credentials
+
+        class MockCredentialConfig:
+            """Mock CredentialConfig structure."""
+
+            scope: str | None
+            client_id: str | None
+            client_secret: object | None
+
+        class MockCatalogProfile:
+            """Mock CatalogProfile structure with get_uri and credentials."""
+
+            warehouse: str
+            credentials: MockCredentialConfig
+            access_delegation: object | None
+            token_refresh_enabled: bool | None
+
+            def get_uri(self) -> str:
+                """Return the catalog URI."""
+                return ""
+
+        # Create the profile mock with spec
+        profile = MagicMock(spec=MockCatalogProfile)
+        profile.get_uri.return_value = "http://localhost:8181/api/catalog"
+        profile.warehouse = "test_warehouse"
+        profile.token_refresh_enabled = True
+
+        # Create credentials mock
+        creds = MagicMock(spec=MockCredentialConfig)
+        creds.scope = TEST_SCOPE
+        creds.client_id = "test_client"
+        creds.client_secret = None
+        profile.credentials = creds
+
+        # No access_delegation
+        profile.access_delegation = None
+
+        mock_catalog = MagicMock()
+        mock_catalog_cls.return_value = mock_catalog
+
+        result = create_catalog(profile)
+
+        assert result is mock_catalog
+        # Verify PolarisCatalogConfig was created from CatalogProfile
+        call_args = mock_catalog_cls.call_args[0][0]
+        assert isinstance(call_args, PolarisCatalogConfig)
+        assert call_args.uri == "http://localhost:8181/api/catalog"
+        assert call_args.warehouse == "test_warehouse"
+        assert call_args.scope == TEST_SCOPE
+        assert call_args.client_id == "test_client"
+        assert call_args.token_refresh_enabled is True
+
+    def test_create_catalog_profile_missing_scope(self) -> None:
+        """Test CatalogProfile without scope raises ValueError."""
+
+        class MockCredentialConfig:
+            """Mock CredentialConfig structure."""
+
+            scope: str | None
+            client_id: str | None
+            client_secret: object | None
+
+        class MockCatalogProfile:
+            """Mock CatalogProfile structure."""
+
+            warehouse: str
+            credentials: MockCredentialConfig
+
+            def get_uri(self) -> str:
+                """Return the catalog URI."""
+                return ""
+
+        profile = MagicMock(spec=MockCatalogProfile)
+        profile.get_uri.return_value = "http://localhost:8181/api/catalog"
+        profile.warehouse = "test_warehouse"
+
+        # Credentials without scope
+        creds = MagicMock(spec=MockCredentialConfig)
+        creds.scope = None  # Missing scope
+        creds.client_id = None
+        creds.client_secret = None
+        profile.credentials = creds
+
+        with pytest.raises(ValueError) as exc_info:
+            create_catalog(profile)
+
+        assert "scope is required" in str(exc_info.value)
+
+    @patch("floe_polaris.factory.PolarisCatalog")
+    def test_create_catalog_profile_with_access_delegation(
+        self, mock_catalog_cls: MagicMock
+    ) -> None:
+        """Test CatalogProfile with access_delegation is converted."""
+
+        class MockAccessDelegation:
+            """Mock AccessDelegation enum."""
+
+            value: str
+
+        class MockCredentialConfig:
+            """Mock CredentialConfig structure."""
+
+            scope: str | None
+            client_id: str | None
+            client_secret: object | None
+
+        class MockCatalogProfile:
+            """Mock CatalogProfile structure."""
+
+            warehouse: str
+            credentials: MockCredentialConfig
+            access_delegation: MockAccessDelegation | None
+
+            def get_uri(self) -> str:
+                """Return the catalog URI."""
+                return ""
+
+        profile = MagicMock(spec=MockCatalogProfile)
+        profile.get_uri.return_value = "http://localhost:8181/api/catalog"
+        profile.warehouse = "test_warehouse"
+
+        # Credentials with scope
+        creds = MagicMock(spec=MockCredentialConfig)
+        creds.scope = TEST_SCOPE
+        creds.client_id = None
+        creds.client_secret = None
+        profile.credentials = creds
+
+        # Access delegation enum
+        access_delegation = MagicMock(spec=MockAccessDelegation)
+        access_delegation.value = "vended-credentials"
+        profile.access_delegation = access_delegation
+
+        mock_catalog = MagicMock()
+        mock_catalog_cls.return_value = mock_catalog
+
+        result = create_catalog(profile)
+
+        assert result is mock_catalog
+        call_args = mock_catalog_cls.call_args[0][0]
+        assert call_args.access_delegation == "vended-credentials"
 
 
 class TestNormalizeNamespace:
