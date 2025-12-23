@@ -437,3 +437,284 @@ compute:
         assert profiles.storage.credentials is not None
         assert str(profiles.storage.credentials.mode.value) == "iam_role"
         assert profiles.storage.credentials.role_arn == "arn:aws:iam::123456789012:role/TestRole"
+
+
+class TestSecretRefInjection:
+    """T049: Integration tests for secret_ref injection from environment variables.
+
+    These tests verify the security-by-design pattern where:
+    - platform.yaml contains secret_ref references (not actual credentials)
+    - Secrets are resolved at runtime from environment variables
+    - Missing secrets raise clear SecretNotFoundError
+    """
+
+    @pytest.fixture(autouse=True)
+    def clear_cache(self) -> None:
+        """Clear resolver cache before each test."""
+        PlatformResolver.clear_cache()
+
+    def test_oauth2_secret_ref_resolves_from_env(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """OAuth2 client_secret secret_ref resolves from environment variable."""
+        # Setup: Set environment variable for the secret
+        monkeypatch.setenv("POLARIS_OAUTH_SECRET", "test-secret-value-12345")
+
+        platform_yaml = """
+version: "1.0.0"
+
+storage:
+  default:
+    bucket: test-bucket
+
+catalogs:
+  default:
+    uri: http://localhost:8181/api/catalog
+    warehouse: demo
+    credentials:
+      mode: oauth2
+      client_id: test-client-id
+      client_secret:
+        secret_ref: polaris-oauth-secret
+      scope: "PRINCIPAL_ROLE:DATA_ENGINEER"
+
+compute:
+  default:
+    type: duckdb
+"""
+        yaml_file = tmp_path / "platform.yaml"
+        yaml_file.write_text(platform_yaml)
+
+        # Act: Parse platform.yaml and resolve profiles
+        platform = PlatformSpec.from_yaml(yaml_file)
+        resolver = ProfileResolver(platform)
+        profiles = resolver.resolve_all()
+
+        # Assert: Secret reference is parsed correctly
+        assert profiles.catalog.credentials is not None
+        assert profiles.catalog.credentials.client_secret is not None
+
+        # Assert: Secret can be resolved at runtime
+        secret = profiles.catalog.credentials.get_client_secret()
+        assert secret is not None
+        assert secret.get_secret_value() == "test-secret-value-12345"
+
+    def test_oauth2_client_id_as_secret_ref_resolves(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """OAuth2 client_id can also be a secret_ref that resolves from env."""
+        # Setup: Set environment variables for both secrets
+        monkeypatch.setenv("CLIENT_ID_SECRET", "resolved-client-id")
+        monkeypatch.setenv("CLIENT_SECRET_REF", "resolved-client-secret")
+
+        platform_yaml = """
+version: "1.0.0"
+
+storage:
+  default:
+    bucket: test-bucket
+
+catalogs:
+  default:
+    uri: http://localhost:8181/api/catalog
+    warehouse: demo
+    credentials:
+      mode: oauth2
+      client_id:
+        secret_ref: client-id-secret
+      client_secret:
+        secret_ref: client-secret-ref
+      scope: "PRINCIPAL_ROLE:ALL"
+
+compute:
+  default:
+    type: duckdb
+"""
+        yaml_file = tmp_path / "platform.yaml"
+        yaml_file.write_text(platform_yaml)
+
+        # Act: Parse and resolve
+        platform = PlatformSpec.from_yaml(yaml_file)
+        resolver = ProfileResolver(platform)
+        profiles = resolver.resolve_all()
+
+        # Assert: Both client_id and client_secret resolve correctly
+        assert profiles.catalog.credentials is not None
+        assert profiles.catalog.credentials.get_client_id() == "resolved-client-id"
+        secret = profiles.catalog.credentials.get_client_secret()
+        assert secret is not None
+        assert secret.get_secret_value() == "resolved-client-secret"
+
+    def test_missing_secret_raises_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Missing secret_ref raises SecretNotFoundError at resolution time."""
+        from floe_core.schemas.credential_config import SecretNotFoundError
+
+        # Ensure the environment variable does NOT exist
+        monkeypatch.delenv("NONEXISTENT_SECRET", raising=False)
+
+        platform_yaml = """
+version: "1.0.0"
+
+storage:
+  default:
+    bucket: test-bucket
+
+catalogs:
+  default:
+    uri: http://localhost:8181/api/catalog
+    warehouse: demo
+    credentials:
+      mode: oauth2
+      client_id: test-client
+      client_secret:
+        secret_ref: nonexistent-secret
+      scope: "PRINCIPAL_ROLE:ALL"
+
+compute:
+  default:
+    type: duckdb
+"""
+        yaml_file = tmp_path / "platform.yaml"
+        yaml_file.write_text(platform_yaml)
+
+        # Act: Parse succeeds (secret not resolved yet)
+        platform = PlatformSpec.from_yaml(yaml_file)
+        resolver = ProfileResolver(platform)
+        profiles = resolver.resolve_all()
+
+        # Assert: Resolution at runtime fails with clear error
+        assert profiles.catalog.credentials is not None
+        with pytest.raises(SecretNotFoundError) as exc_info:
+            profiles.catalog.credentials.get_client_secret()
+
+        # Error message should be helpful
+        assert "nonexistent-secret" in str(exc_info.value)
+        assert "NONEXISTENT_SECRET" in str(exc_info.value)
+
+    def test_static_mode_secret_ref_resolves(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Static mode with secret_ref resolves from environment."""
+        monkeypatch.setenv("STORAGE_CREDENTIALS", "static-credential-value")
+
+        platform_yaml = """
+version: "1.0.0"
+
+storage:
+  default:
+    bucket: test-bucket
+    credentials:
+      mode: static
+      secret_ref: storage-credentials
+
+catalogs:
+  default:
+    uri: http://localhost:8181/api/catalog
+    warehouse: demo
+
+compute:
+  default:
+    type: duckdb
+"""
+        yaml_file = tmp_path / "platform.yaml"
+        yaml_file.write_text(platform_yaml)
+
+        # Act: Parse and resolve
+        platform = PlatformSpec.from_yaml(yaml_file)
+        resolver = ProfileResolver(platform)
+        profiles = resolver.resolve_all()
+
+        # Assert: secret_ref is preserved in config
+        assert profiles.storage.credentials is not None
+        assert profiles.storage.credentials.secret_ref == "storage-credentials"
+
+    def test_hyphen_to_underscore_conversion(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Secret refs with hyphens convert to underscores for env var lookup."""
+        # Set env var with underscores (converted from hyphens)
+        monkeypatch.setenv("MY_COMPLEX_SECRET_NAME", "hyphen-converted-value")
+
+        platform_yaml = """
+version: "1.0.0"
+
+storage:
+  default:
+    bucket: test-bucket
+
+catalogs:
+  default:
+    uri: http://localhost:8181/api/catalog
+    warehouse: demo
+    credentials:
+      mode: oauth2
+      client_id: test-client
+      client_secret:
+        secret_ref: my-complex-secret-name
+      scope: "PRINCIPAL_ROLE:ALL"
+
+compute:
+  default:
+    type: duckdb
+"""
+        yaml_file = tmp_path / "platform.yaml"
+        yaml_file.write_text(platform_yaml)
+
+        # Act: Parse and resolve
+        platform = PlatformSpec.from_yaml(yaml_file)
+        resolver = ProfileResolver(platform)
+        profiles = resolver.resolve_all()
+
+        # Assert: Hyphenated secret_ref finds underscore env var
+        secret = profiles.catalog.credentials.get_client_secret()
+        assert secret is not None
+        assert secret.get_secret_value() == "hyphen-converted-value"
+
+    def test_secrets_never_logged_or_exposed(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """SecretStr values are never exposed in string representations."""
+        monkeypatch.setenv("SENSITIVE_SECRET", "super-secret-password-123")
+
+        platform_yaml = """
+version: "1.0.0"
+
+storage:
+  default:
+    bucket: test-bucket
+
+catalogs:
+  default:
+    uri: http://localhost:8181/api/catalog
+    warehouse: demo
+    credentials:
+      mode: oauth2
+      client_id: test-client
+      client_secret:
+        secret_ref: sensitive-secret
+      scope: "PRINCIPAL_ROLE:ALL"
+
+compute:
+  default:
+    type: duckdb
+"""
+        yaml_file = tmp_path / "platform.yaml"
+        yaml_file.write_text(platform_yaml)
+
+        platform = PlatformSpec.from_yaml(yaml_file)
+        resolver = ProfileResolver(platform)
+        profiles = resolver.resolve_all()
+
+        secret = profiles.catalog.credentials.get_client_secret()
+        assert secret is not None
+
+        # Assert: Secret value is masked in string representations
+        secret_str = str(secret)
+        assert "super-secret-password-123" not in secret_str
+        assert "**" in secret_str  # SecretStr masks with asterisks
+
+        # Assert: repr also masks the value
+        secret_repr = repr(secret)
+        assert "super-secret-password-123" not in secret_repr
