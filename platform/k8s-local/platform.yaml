@@ -1,0 +1,177 @@
+# Kubernetes Local Platform Configuration
+#
+# Environment: k8s-local
+# Purpose: Local Kubernetes deployment (Docker Desktop)
+# Schema Version: 1.1.0 (Enterprise features)
+#
+# Two-Tier Configuration Architecture:
+# - This file is injected as a ConfigMap by floe-infrastructure chart
+# - Dagster pods mount the ConfigMap at /etc/floe/platform.yaml
+# - PlatformResolver loads config via FLOE_PLATFORM_FILE env var
+#
+# Usage:
+#   make deploy-local-infra   # Injects this as ConfigMap
+#   make deploy-local-dagster # Mounts ConfigMap
+#
+# Required environment variables (injected from K8s Secrets):
+#   POLARIS_CLIENT_ID      - OAuth2 client ID for Polaris
+#   POLARIS_CLIENT_SECRET  - OAuth2 client secret for Polaris
+#   AWS_ACCESS_KEY_ID      - MinIO access key
+#   AWS_SECRET_ACCESS_KEY  - MinIO secret key
+#
+# Infrastructure (floe-infrastructure chart):
+#   - Storage: MinIO (http://floe-infra-minio:9000)
+#   - Catalog: Polaris (http://floe-infra-polaris:8181)
+#   - Observability: Jaeger + Marquez
+#
+# Service URLs (NodePort - resilient to pod restarts):
+#   - Dagster UI:     http://localhost:30000
+#   - Polaris API:    http://localhost:30181
+#   - MinIO Console:  http://localhost:30901
+#   - Jaeger UI:      http://localhost:30686
+#   - Marquez Web:    http://localhost:30301
+#   - Marquez API:    http://localhost:30500
+#
+# Covers: 009-US2 (Same floe.yaml works across dev/staging/prod)
+
+version: "1.1.0"
+
+# =============================================================================
+# Infrastructure Configuration (v1.1.0)
+# =============================================================================
+infrastructure:
+  network:
+    enabled: true
+    dns:
+      internal_domain: floe.local
+      strategy: kubernetes
+    # NodePort for resilient local access (survives pod restarts)
+    local_access:
+      enabled: true
+      access_type: nodeport
+      ports:
+        dagster: 30000
+        polaris: 30181
+        minio_console: 30901
+        jaeger: 30686
+        marquez_web: 30301
+        marquez_api: 30500
+  cloud:
+    provider: local
+    localstack:
+      enabled: false  # Using MinIO directly, not LocalStack
+
+# =============================================================================
+# Security Configuration (v1.1.0)
+# =============================================================================
+security:
+  authentication:
+    enabled: false  # No auth for local development
+    method: static
+  authorization:
+    enabled: false
+  secret_backends:
+    primary: kubernetes
+    kubernetes:
+      enabled: true
+      namespace: floe
+      mount_path: /var/run/secrets
+  encryption:
+    in_transit:
+      enabled: false  # TLS disabled for local dev
+    at_rest:
+      enabled: false
+
+# =============================================================================
+# Governance Configuration (v1.1.0)
+# =============================================================================
+governance:
+  classifications:
+    enabled: false  # Disabled for local development
+  retention:
+    enabled: false
+  compliance:
+    enabled: false
+  data_quality:
+    enabled: false
+
+# =============================================================================
+# Storage Profiles
+# =============================================================================
+storage:
+  default:
+    type: s3
+    # MinIO endpoint in K8s (floe-infrastructure chart)
+    endpoint: "http://floe-infra-minio:9000"
+    region: us-east-1
+    bucket: iceberg-data
+    path_style_access: true
+    credentials:
+      mode: static
+      # Resolved from AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY env vars
+      secret_ref: aws-credentials
+
+catalogs:
+  default:
+    type: polaris
+    # Polaris endpoint in K8s (floe-infrastructure chart)
+    uri: "http://floe-infra-polaris:8181/api/catalog"
+    warehouse: demo_catalog
+    namespace: default
+    credentials:
+      mode: oauth2
+      # Resolved from POLARIS_CLIENT_ID env var
+      client_id:
+        secret_ref: polaris-client-id
+      client_secret:
+        secret_ref: polaris-client-secret
+      scope: "PRINCIPAL_ROLE:ALL"
+    # Disable vended credentials for MinIO (doesn't support STS)
+    access_delegation: none
+    token_refresh_enabled: true
+
+compute:
+  default:
+    type: duckdb
+    properties:
+      path: ":memory:"
+      threads: 4
+    credentials:
+      mode: static
+
+# =============================================================================
+# Observability Configuration (Extended in v1.1.0)
+# =============================================================================
+observability:
+  traces: true
+  metrics: true
+  lineage: true
+  # Jaeger OTLP endpoint in K8s (floe-infrastructure chart)
+  otlp_endpoint: "http://floe-infra-jaeger-collector:4317"
+  # Marquez endpoint in K8s (floe-infrastructure chart)
+  lineage_endpoint: "http://floe-infra-marquez:5000"
+  attributes:
+    service.name: floe-k8s-local
+    deployment.environment: k8s-local
+  # Extended tracing configuration (v1.1.0)
+  tracing:
+    sampling:
+      sampling_type: always_on  # Full tracing for local dev
+      probability: 1.0
+    exporters:
+      jaeger: true
+      xray: false
+  # Extended metrics configuration (v1.1.0)
+  metrics_config:
+    scrape_interval: "15s"
+    retention_days: 7
+    exporters:
+      prometheus: true
+      cloudwatch: false
+  # Extended logging configuration (v1.1.0)
+  logging:
+    level: INFO
+    log_format: json
+    backends:
+      loki: false  # Not deployed in local K8s
+      cloudwatch: false

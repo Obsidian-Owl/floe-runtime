@@ -13,6 +13,11 @@ Profile Models (Two-Tier Configuration):
 - CredentialConfig: Credential management (OAuth2, IAM, static)
 - SecretReference: Reference to external secrets
 
+Enterprise Configuration (v1.1.0):
+- InfrastructureConfig: Network, DNS, cloud provider configuration
+- SecurityConfig: Authentication, authorization, secret backends
+- EnterpriseGovernanceConfig: Classification, retention, compliance
+
 Legacy Models:
 - ComputeTarget: Enum for compute targets
 - ComputeConfig: Compute target configuration
@@ -54,12 +59,91 @@ from floe_core.schemas.floe_spec import (
     PROFILE_NAME_PATTERN as FLOE_PROFILE_NAME_PATTERN,
 )
 from floe_core.schemas.governance import ColumnClassification, GovernanceConfig
-from floe_core.schemas.observability import ObservabilityConfig
+from floe_core.schemas.governance_config import (
+    ClassificationClass,
+    ClassificationsConfig,
+    ComplianceConfig,
+    ComplianceEnforcement,
+    ComplianceFramework,
+    DataQualityCheck,
+    DataQualityConfig,
+    EnterpriseGovernanceConfig,
+    FrameworkConfig,
+    RetentionConfig,
+    RetentionPolicy,
+    SensitivityLevel,
+)
+from floe_core.schemas.infrastructure_config import (
+    AwsConfig,
+    AwsIamConfig,
+    AwsKmsConfig,
+    AwsServiceAccountConfig,
+    AwsVpcConfig,
+    CloudConfig,
+    CloudProvider,
+    DnsConfig,
+    DnsStrategy,
+    InfrastructureConfig,
+    IngressClass,
+    IngressConfig,
+    IngressRoute,
+    LocalAccessConfig,
+    LocalAccessPorts,
+    LocalAccessType,
+    LocalStackConfig,
+    NetworkConfig,
+    NetworkPoliciesConfig,
+    NetworkPolicyRule,
+    NetworkZone,
+    TlsConfig,
+    TlsProvider,
+)
+from floe_core.schemas.observability import (
+    AlertRule,
+    AlertSeverity,
+    LogFormat,
+    LoggingBackendsConfig,
+    LoggingConfig,
+    LogLevel,
+    MetricsAlertingConfig,
+    MetricsConfig,
+    MetricsExportersConfig,
+    ObservabilityConfig,
+    SamplingType,
+    TraceExportersConfig,
+    TraceSamplingConfig,
+    TracingConfig,
+)
 from floe_core.schemas.platform_spec import (
     ENVIRONMENT_TYPES,
     PLATFORM_SPEC_VERSION,
     PROFILE_NAME_PATTERN,
     PlatformSpec,
+)
+from floe_core.schemas.security_config import (
+    AtRestEncryption,
+    AuditBackend,
+    AuditConfig,
+    AuditEventsConfig,
+    AuthenticationConfig,
+    AuthMethod,
+    AuthorizationConfig,
+    AuthorizationMode,
+    AwsSecretsManagerBackend,
+    EncryptionConfig,
+    EncryptionProvider,
+    InTransitEncryption,
+    KubernetesSecretBackend,
+    OidcClaimsMapping,
+    OidcConfig,
+    RoleDefinition,
+    SameSitePolicy,
+    SecretBackendsConfig,
+    SecretBackendType,
+    SecurityConfig,
+    SessionConfig,
+    VaultAuthMethod,
+    VaultSecretBackend,
 )
 from floe_core.schemas.storage_profile import StorageProfile, StorageType
 from floe_core.schemas.transforms import TransformConfig
@@ -89,6 +173,67 @@ __all__: list[str] = [
     "AccessDelegation",
     # Compute profiles
     "ComputeProfile",
+    # Infrastructure (v1.1.0)
+    "InfrastructureConfig",
+    "NetworkConfig",
+    "DnsConfig",
+    "DnsStrategy",
+    "NetworkPoliciesConfig",
+    "NetworkPolicyRule",
+    "NetworkZone",
+    "IngressConfig",
+    "IngressClass",
+    "IngressRoute",
+    "TlsConfig",
+    "TlsProvider",
+    "LocalAccessConfig",
+    "LocalAccessType",
+    "LocalAccessPorts",
+    "CloudConfig",
+    "CloudProvider",
+    "AwsConfig",
+    "AwsVpcConfig",
+    "AwsIamConfig",
+    "AwsServiceAccountConfig",
+    "AwsKmsConfig",
+    "LocalStackConfig",
+    # Security (v1.1.0)
+    "SecurityConfig",
+    "AuthenticationConfig",
+    "AuthMethod",
+    "OidcConfig",
+    "OidcClaimsMapping",
+    "SessionConfig",
+    "SameSitePolicy",
+    "AuthorizationConfig",
+    "AuthorizationMode",
+    "RoleDefinition",
+    "SecretBackendsConfig",
+    "SecretBackendType",
+    "KubernetesSecretBackend",
+    "VaultSecretBackend",
+    "VaultAuthMethod",
+    "AwsSecretsManagerBackend",
+    "EncryptionConfig",
+    "InTransitEncryption",
+    "AtRestEncryption",
+    "EncryptionProvider",
+    "AuditConfig",
+    "AuditEventsConfig",
+    "AuditBackend",
+    # Enterprise Governance (v1.1.0)
+    "EnterpriseGovernanceConfig",
+    "ClassificationsConfig",
+    "ClassificationClass",
+    "SensitivityLevel",
+    "RetentionConfig",
+    "RetentionPolicy",
+    "ComplianceConfig",
+    "FrameworkConfig",
+    "ComplianceFramework",
+    "ComplianceEnforcement",
+    "DataQualityConfig",
+    "DataQualityCheck",
     # Compute (legacy)
     "ComputeTarget",
     "ComputeConfig",
@@ -100,11 +245,24 @@ __all__: list[str] = [
     "PreAggregationConfig",
     "CubeSecurityConfig",
     "ConsumptionConfig",
-    # Governance
+    # Governance (legacy)
     "ColumnClassification",
     "GovernanceConfig",
-    # Observability
+    # Observability (extended in v1.1.0)
     "ObservabilityConfig",
+    "TracingConfig",
+    "TraceSamplingConfig",
+    "SamplingType",
+    "TraceExportersConfig",
+    "MetricsConfig",
+    "MetricsExportersConfig",
+    "MetricsAlertingConfig",
+    "AlertRule",
+    "AlertSeverity",
+    "LoggingConfig",
+    "LoggingBackendsConfig",
+    "LogLevel",
+    "LogFormat",
     # Catalog (legacy)
     "CatalogConfig",
 ]

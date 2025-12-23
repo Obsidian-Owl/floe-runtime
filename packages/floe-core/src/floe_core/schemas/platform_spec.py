@@ -5,6 +5,11 @@ This module defines the platform.yaml schema including:
 - Environment-specific configuration
 - Profile references (storage, catalog, compute)
 - Observability configuration
+- Infrastructure configuration (network, cloud) - v1.1.0
+- Security configuration (auth, authz, secrets) - v1.1.0
+- Governance configuration (classification, compliance) - v1.1.0
+
+Covers: 009-US2 (Enterprise Platform Configuration)
 """
 
 from __future__ import annotations
@@ -17,14 +22,19 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from floe_core.schemas.catalog_profile import CatalogProfile
 from floe_core.schemas.compute_profile import ComputeProfile
+from floe_core.schemas.governance_config import EnterpriseGovernanceConfig
+from floe_core.schemas.infrastructure_config import InfrastructureConfig
 from floe_core.schemas.observability import ObservabilityConfig
+from floe_core.schemas.security_config import SecurityConfig
 from floe_core.schemas.storage_profile import StorageProfile
 
 # Supported environment types
 ENVIRONMENT_TYPES = frozenset({"local", "dev", "staging", "prod"})
 
 # Platform spec version for schema compatibility
-PLATFORM_SPEC_VERSION = "1.0.0"
+# v1.0.0: Initial release (storage, catalogs, compute, observability)
+# v1.1.0: Enterprise features (infrastructure, security, governance)
+PLATFORM_SPEC_VERSION = "1.1.0"
 
 # Pattern for valid profile names
 PROFILE_NAME_PATTERN = r"^[a-zA-Z][a-zA-Z0-9_-]*$"
@@ -34,13 +44,22 @@ class PlatformSpec(BaseModel):
     """Platform infrastructure configuration.
 
     This is the root model for platform.yaml files. It contains
-    named profiles for storage, catalogs, and compute resources.
+    named profiles for storage, catalogs, and compute resources,
+    plus enterprise configuration for infrastructure, security,
+    and governance.
 
     Platform engineers define this configuration, which is then
     referenced by FloeSpec (floe.yaml) using logical profile names.
 
+    Schema Version History:
+        v1.0.0: Initial release (storage, catalogs, compute, observability)
+        v1.1.0: Enterprise features (infrastructure, security, governance)
+
     Attributes:
         version: Schema version for forward compatibility.
+        infrastructure: Network, DNS, and cloud configuration (v1.1.0).
+        security: Authentication, authorization, secrets (v1.1.0).
+        governance: Classification, retention, compliance (v1.1.0).
         storage: Named storage profiles (S3, MinIO, etc.).
         catalogs: Named catalog profiles (Polaris, Glue, etc.).
         compute: Named compute profiles (DuckDB, Snowflake, etc.).
@@ -58,6 +77,14 @@ class PlatformSpec(BaseModel):
         ...         warehouse="demo",
         ...     )},
         ... )
+
+        >>> # v1.1.0 with enterprise features
+        >>> spec = PlatformSpec(
+        ...     version="1.1.0",
+        ...     infrastructure=InfrastructureConfig(),
+        ...     security=SecurityConfig(),
+        ...     governance=EnterpriseGovernanceConfig(),
+        ... )
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -67,6 +94,22 @@ class PlatformSpec(BaseModel):
         pattern=r"^\d+\.\d+\.\d+$",
         description="Schema version (semver)",
     )
+
+    # v1.1.0: Enterprise configuration sections (optional for backward compatibility)
+    infrastructure: InfrastructureConfig | None = Field(
+        default=None,
+        description="Infrastructure configuration (network, cloud) - v1.1.0",
+    )
+    security: SecurityConfig | None = Field(
+        default=None,
+        description="Security configuration (auth, authz, secrets) - v1.1.0",
+    )
+    governance: EnterpriseGovernanceConfig | None = Field(
+        default=None,
+        description="Governance configuration (classification, compliance) - v1.1.0",
+    )
+
+    # v1.0.0: Core profile configuration
     storage: dict[str, StorageProfile] = Field(
         default_factory=dict,
         description="Named storage profiles",
