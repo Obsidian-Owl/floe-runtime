@@ -46,7 +46,13 @@ from floe_core.schemas.credential_config import (
     SecretNotFoundError,
     SecretReference,
 )
-from floe_core.schemas.floe_spec import FloeSpec
+from floe_core.schemas.floe_spec import (
+    DEFAULT_PROFILE_NAME,
+    FloeSpec,
+)
+from floe_core.schemas.floe_spec import (
+    PROFILE_NAME_PATTERN as FLOE_PROFILE_NAME_PATTERN,
+)
 from floe_core.schemas.governance import ColumnClassification, GovernanceConfig
 from floe_core.schemas.observability import ObservabilityConfig
 from floe_core.schemas.platform_spec import (
@@ -66,6 +72,9 @@ __all__: list[str] = [
     "ENVIRONMENT_TYPES",
     "PLATFORM_SPEC_VERSION",
     "PROFILE_NAME_PATTERN",
+    # FloeSpec configuration constants
+    "DEFAULT_PROFILE_NAME",
+    "FLOE_PROFILE_NAME_PATTERN",
     # Credential management
     "CredentialConfig",
     "CredentialMode",

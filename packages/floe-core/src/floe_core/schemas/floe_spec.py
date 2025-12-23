@@ -1,9 +1,15 @@
 """FloeSpec root model for floe-runtime.
 
 T030: [US1] Implement FloeSpec root model with from_yaml()
+T035: [US2] Add profile reference fields for Two-Tier Architecture
 
 This module defines the FloeSpec root configuration model
 that represents a complete floe.yaml definition.
+
+In the Two-Tier Architecture:
+- FloeSpec uses logical profile references (e.g., catalog: "default")
+- PlatformSpec defines the actual infrastructure configuration
+- Profile references are resolved at compile/deploy time
 """
 
 from __future__ import annotations
@@ -14,38 +20,50 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
-from floe_core.schemas.catalog import CatalogConfig
-from floe_core.schemas.compute import ComputeConfig
 from floe_core.schemas.consumption import ConsumptionConfig
 from floe_core.schemas.governance import GovernanceConfig
 from floe_core.schemas.observability import ObservabilityConfig
 from floe_core.schemas.transforms import TransformConfig
 
+# Default profile name for profile references
+DEFAULT_PROFILE_NAME = "default"
+
+# Valid profile name pattern (alphanumeric with hyphens/underscores)
+PROFILE_NAME_PATTERN = r"^[a-zA-Z][a-zA-Z0-9_-]*$"
+
 
 class FloeSpec(BaseModel):
-    """Root configuration model for floe.yaml.
+    """Root configuration model for floe.yaml (Data Engineer domain).
 
-    Represents a complete pipeline definition including compute target,
-    transformations, consumption layer, governance, and observability.
+    Represents a complete pipeline definition with logical profile references.
+    This is the Data Engineer's view - no infrastructure details, credentials,
+    or endpoints. All infrastructure is referenced via profile names that
+    resolve to PlatformSpec configurations at compile/deploy time.
 
     Attributes:
         name: Pipeline name (1-100 chars, alphanumeric with hyphens/underscores).
         version: Pipeline version (semver format).
-        compute: Compute target configuration.
+        storage: Logical storage profile reference (e.g., "default", "archive").
+        catalog: Logical catalog profile reference (e.g., "default", "analytics").
+        compute: Logical compute profile reference (e.g., "default", "snowflake").
         transforms: List of transformation steps.
         consumption: Semantic layer configuration.
         governance: Data governance configuration.
         observability: Observability configuration.
-        catalog: Optional Iceberg catalog configuration.
 
     Example:
+        >>> # Data engineer creates floe.yaml with logical references
         >>> spec = FloeSpec(
-        ...     name="my-pipeline",
+        ...     name="customer-analytics",
         ...     version="1.0.0",
-        ...     compute=ComputeConfig(target=ComputeTarget.duckdb)
+        ...     storage="default",
+        ...     catalog="default",
+        ...     compute="default",
         ... )
 
+        >>> # Same floe.yaml works across environments
         >>> spec = FloeSpec.from_yaml("floe.yaml")
+        >>> spec.catalog  # Returns "default" - resolved by PlatformSpec
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -61,7 +79,21 @@ class FloeSpec(BaseModel):
         ...,
         description="Pipeline version (semver)",
     )
-    compute: ComputeConfig
+    storage: str = Field(
+        default=DEFAULT_PROFILE_NAME,
+        pattern=PROFILE_NAME_PATTERN,
+        description="Logical storage profile reference",
+    )
+    catalog: str = Field(
+        default=DEFAULT_PROFILE_NAME,
+        pattern=PROFILE_NAME_PATTERN,
+        description="Logical catalog profile reference",
+    )
+    compute: str = Field(
+        default=DEFAULT_PROFILE_NAME,
+        pattern=PROFILE_NAME_PATTERN,
+        description="Logical compute profile reference",
+    )
     transforms: list[TransformConfig] = Field(
         default_factory=list,
         description="List of transformation steps",
@@ -77,10 +109,6 @@ class FloeSpec(BaseModel):
     observability: ObservabilityConfig = Field(
         default_factory=ObservabilityConfig,
         description="Observability configuration",
-    )
-    catalog: CatalogConfig | None = Field(
-        default=None,
-        description="Iceberg catalog configuration",
     )
 
     @classmethod
