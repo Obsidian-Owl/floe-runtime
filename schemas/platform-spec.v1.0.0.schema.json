@@ -1,0 +1,416 @@
+{
+  "$defs": {
+    "AccessDelegation": {
+      "description": "STS credential delegation modes for storage access.\n\nValues:\n    VENDED_CREDENTIALS: Catalog vends temporary STS credentials.\n    REMOTE_SIGNING: Catalog signs requests remotely.\n    NONE: No delegation (use storage credentials directly).",
+      "enum": [
+        "vended-credentials",
+        "remote-signing",
+        "none"
+      ],
+      "title": "AccessDelegation",
+      "type": "string"
+    },
+    "CatalogProfile": {
+      "additionalProperties": false,
+      "description": "Iceberg catalog configuration.\n\nDefines connection parameters for Iceberg REST catalogs.\nSupports Polaris, Glue, Nessie, and other Iceberg catalog implementations.\n\nAttributes:\n    type: Catalog type (polaris, glue, nessie, rest).\n    uri: Catalog URI endpoint.\n    warehouse: Warehouse/catalog name.\n    namespace: Default namespace.\n    credentials: Credential configuration (OAuth2, IAM, etc.).\n    access_delegation: Access delegation mode for STS.\n    token_refresh_enabled: Enable automatic OAuth2 token refresh.\n    properties: Additional catalog properties.\n\nExample:\n    >>> profile = CatalogProfile(\n    ...     type=CatalogType.POLARIS,\n    ...     uri=\"http://polaris:8181/api/catalog\",\n    ...     warehouse=\"production\",\n    ...     credentials=CredentialConfig(\n    ...         mode=CredentialMode.OAUTH2,\n    ...         client_id=\"data-platform-svc\",\n    ...         client_secret=SecretReference(secret_ref=\"polaris-oauth-secret\"),\n    ...         scope=\"PRINCIPAL_ROLE:DATA_ENGINEER\",\n    ...     ),\n    ... )",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/CatalogType",
+          "default": "polaris",
+          "description": "Catalog type"
+        },
+        "uri": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/SecretReference"
+            }
+          ],
+          "description": "Catalog URI endpoint",
+          "title": "Uri"
+        },
+        "warehouse": {
+          "description": "Warehouse/catalog name",
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Warehouse",
+          "type": "string"
+        },
+        "namespace": {
+          "default": "default",
+          "description": "Default namespace",
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Namespace",
+          "type": "string"
+        },
+        "credentials": {
+          "$ref": "#/$defs/CredentialConfig",
+          "description": "Credential configuration"
+        },
+        "access_delegation": {
+          "$ref": "#/$defs/AccessDelegation",
+          "default": "none",
+          "description": "Access delegation mode (vended-credentials, remote-signing, none)"
+        },
+        "token_refresh_enabled": {
+          "default": true,
+          "description": "Enable automatic OAuth2 token refresh",
+          "title": "Token Refresh Enabled",
+          "type": "boolean"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Additional catalog properties",
+          "title": "Properties"
+        }
+      },
+      "required": [
+        "uri",
+        "warehouse"
+      ],
+      "title": "CatalogProfile",
+      "type": "object"
+    },
+    "CatalogType": {
+      "description": "Supported Iceberg catalog types.\n\nValues:\n    POLARIS: Apache Polaris REST catalog.\n    GLUE: AWS Glue Data Catalog.\n    NESSIE: Project Nessie catalog.\n    REST: Generic Iceberg REST catalog.\n    HIVE: Hive Metastore catalog.",
+      "enum": [
+        "polaris",
+        "glue",
+        "nessie",
+        "rest",
+        "hive"
+      ],
+      "title": "CatalogType",
+      "type": "string"
+    },
+    "ComputeProfile": {
+      "additionalProperties": false,
+      "description": "Compute engine configuration for platform.yaml.\n\nDefines connection parameters for dbt compute targets.\nUses CredentialConfig for consistent credential management.\n\nAttributes:\n    type: Compute target type (duckdb, snowflake, bigquery, etc.).\n    properties: Target-specific connection properties.\n    credentials: Credential configuration.\n\nExample:\n    >>> profile = ComputeProfile(\n    ...     type=ComputeTarget.snowflake,\n    ...     properties={\n    ...         \"account\": \"acme.us-east-1\",\n    ...         \"warehouse\": \"ANALYTICS_WH\",\n    ...         \"database\": \"PROD\",\n    ...     },\n    ...     credentials=CredentialConfig(\n    ...         mode=CredentialMode.STATIC,\n    ...         secret_ref=\"snowflake-credentials\",\n    ...     ),\n    ... )\n\nTarget-specific properties:\n    DuckDB:\n        - path: Database file path or \":memory:\" (default: \":memory:\")\n        - threads: Number of threads (default: 4)\n        - memory_limit: Memory limit (e.g., \"4GB\")\n\n    Snowflake:\n        - account: Snowflake account identifier (required)\n        - warehouse: Virtual warehouse name\n        - database: Default database\n        - schema: Default schema\n        - role: User role\n\n    BigQuery:\n        - project: GCP project ID (required)\n        - dataset: Default dataset\n        - location: Dataset location (US, EU, etc.)\n\n    Redshift:\n        - host: Cluster endpoint (required)\n        - port: Connection port (default: 5439)\n        - database: Database name\n\n    Databricks:\n        - host: Workspace URL (required)\n        - http_path: SQL warehouse HTTP path\n        - catalog: Unity Catalog name\n\n    PostgreSQL:\n        - host: Database host (required)\n        - port: Connection port (default: 5432)\n        - database: Database name\n\n    Spark:\n        - host: Spark master URL\n        - method: Connection method (thrift, http)",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ComputeTarget",
+          "default": "duckdb",
+          "description": "Compute target type (dbt adapter)"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Target-specific connection properties",
+          "title": "Properties"
+        },
+        "credentials": {
+          "$ref": "#/$defs/CredentialConfig",
+          "description": "Credential configuration"
+        }
+      },
+      "title": "ComputeProfile",
+      "type": "object"
+    },
+    "ComputeTarget": {
+      "description": "Supported compute targets matching dbt adapter names.\n\nThese values correspond to dbt adapter names for SQL compilation\nand execution targeting.",
+      "enum": [
+        "duckdb",
+        "snowflake",
+        "bigquery",
+        "redshift",
+        "databricks",
+        "postgres",
+        "spark"
+      ],
+      "title": "ComputeTarget",
+      "type": "string"
+    },
+    "CredentialConfig": {
+      "additionalProperties": false,
+      "description": "Credential configuration with multiple modes.\n\nSupports different credential management strategies depending on\nthe deployment environment and security requirements.\n\nAttributes:\n    mode: Credential management mode.\n    client_id: OAuth2 client ID (for oauth2 mode).\n    client_secret: OAuth2 client secret reference (for oauth2 mode).\n    scope: OAuth2 scope (for oauth2 mode).\n    role_arn: AWS IAM role ARN (for iam_role mode).\n    secret_ref: Generic secret reference name (for static mode).\n\nExample:\n    >>> config = CredentialConfig(\n    ...     mode=CredentialMode.OAUTH2,\n    ...     client_id=\"data-platform-svc\",\n    ...     client_secret=SecretReference(secret_ref=\"polaris-oauth-secret\"),\n    ...     scope=\"PRINCIPAL_ROLE:DATA_ENGINEER\",\n    ... )",
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/CredentialMode",
+          "default": "static",
+          "description": "Credential management mode"
+        },
+        "client_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/SecretReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "OAuth2 client ID (can be string or secret reference)",
+          "title": "Client Id"
+        },
+        "client_secret": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SecretReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "OAuth2 client secret (must be secret reference)"
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "OAuth2 scope (e.g., 'PRINCIPAL_ROLE:DATA_ENGINEER')",
+          "title": "Scope"
+        },
+        "role_arn": {
+          "anyOf": [
+            {
+              "pattern": "^arn:aws:iam::\\d{12}:role/[\\w+=,.@-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AWS IAM role ARN (for iam_role mode)",
+          "title": "Role Arn"
+        },
+        "secret_ref": {
+          "anyOf": [
+            {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,252}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Generic secret reference (K8s secret name)",
+          "title": "Secret Ref"
+        }
+      },
+      "title": "CredentialConfig",
+      "type": "object"
+    },
+    "CredentialMode": {
+      "description": "Credential management modes.\n\nDefines how credentials are managed and retrieved at runtime.\n\nValues:\n    STATIC: Credentials from K8s secret or environment variable.\n    OAUTH2: OAuth2 client credentials flow.\n    IAM_ROLE: AWS IAM role assumption (no static credentials).\n    SERVICE_ACCOUNT: GCP/Azure workload identity.",
+      "enum": [
+        "static",
+        "oauth2",
+        "iam_role",
+        "service_account"
+      ],
+      "title": "CredentialMode",
+      "type": "string"
+    },
+    "ObservabilityConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for observability.\n\nEnables OpenTelemetry traces and metrics, plus OpenLineage\nfor data lineage tracking.\n\nAttributes:\n    traces: Enable OpenTelemetry traces.\n    metrics: Enable metrics collection.\n    lineage: Enable OpenLineage emission.\n    otlp_endpoint: OTLP exporter endpoint.\n    lineage_endpoint: OpenLineage API endpoint.\n    attributes: Custom trace attributes (service.name, etc.)\n\nExample:\n    >>> config = ObservabilityConfig(\n    ...     traces=True,\n    ...     otlp_endpoint=\"http://otel-collector:4317\",\n    ...     attributes={\"service.name\": \"my-pipeline\"}\n    ... )",
+      "properties": {
+        "traces": {
+          "default": true,
+          "description": "Enable OpenTelemetry traces",
+          "title": "Traces",
+          "type": "boolean"
+        },
+        "metrics": {
+          "default": true,
+          "description": "Enable metrics collection",
+          "title": "Metrics",
+          "type": "boolean"
+        },
+        "lineage": {
+          "default": true,
+          "description": "Enable OpenLineage emission",
+          "title": "Lineage",
+          "type": "boolean"
+        },
+        "otlp_endpoint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "OTLP exporter endpoint",
+          "title": "Otlp Endpoint"
+        },
+        "lineage_endpoint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "OpenLineage API endpoint",
+          "title": "Lineage Endpoint"
+        },
+        "attributes": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Custom trace attributes",
+          "title": "Attributes",
+          "type": "object"
+        }
+      },
+      "title": "ObservabilityConfig",
+      "type": "object"
+    },
+    "SecretReference": {
+      "additionalProperties": false,
+      "description": "Reference to external secret (K8s secret or environment variable).\n\nSecrets are never stored in configuration files. Instead,\nsecret_ref points to a K8s secret name or environment variable.\n\nResolution order:\n    1. Check environment variable: {SECRET_REF_UPPER_SNAKE_CASE}\n    2. Check K8s secret mount: /var/run/secrets/{secret_ref}\n    3. Fail with clear error if not found\n\nAttributes:\n    secret_ref: K8s secret name or environment variable name.\n\nExample:\n    >>> ref = SecretReference(secret_ref=\"polaris-oauth-secret\")\n    >>> ref.resolve()  # Returns SecretStr from env or K8s mount\n    SecretStr('**********')",
+      "properties": {
+        "secret_ref": {
+          "description": "K8s secret name or environment variable name",
+          "maxLength": 253,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,252}$",
+          "title": "Secret Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "secret_ref"
+      ],
+      "title": "SecretReference",
+      "type": "object"
+    },
+    "StorageProfile": {
+      "additionalProperties": false,
+      "description": "S3-compatible storage configuration.\n\nDefines connection parameters for object storage backends.\nSupports AWS S3, MinIO, LocalStack, and other S3-compatible services.\n\nAttributes:\n    type: Storage backend type.\n    endpoint: S3 endpoint URL (empty for AWS S3).\n    region: AWS region.\n    bucket: Default bucket name.\n    path_style_access: Use path-style S3 access (required for MinIO).\n    credentials: Credential configuration.\n\nExample:\n    >>> profile = StorageProfile(\n    ...     type=StorageType.S3,\n    ...     endpoint=\"http://minio:9000\",\n    ...     bucket=\"iceberg-data\",\n    ...     path_style_access=True,\n    ...     credentials=CredentialConfig(\n    ...         mode=CredentialMode.STATIC,\n    ...         secret_ref=\"minio-credentials\",\n    ...     ),\n    ... )",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/StorageType",
+          "default": "s3",
+          "description": "Storage backend type"
+        },
+        "endpoint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/SecretReference"
+            }
+          ],
+          "default": "",
+          "description": "S3 endpoint URL (empty for AWS S3, set for MinIO/LocalStack)",
+          "title": "Endpoint"
+        },
+        "region": {
+          "default": "us-east-1",
+          "description": "AWS region",
+          "title": "Region",
+          "type": "string"
+        },
+        "bucket": {
+          "description": "Default bucket name",
+          "maxLength": 63,
+          "minLength": 3,
+          "title": "Bucket",
+          "type": "string"
+        },
+        "path_style_access": {
+          "default": false,
+          "description": "Use path-style S3 access (required for MinIO)",
+          "title": "Path Style Access",
+          "type": "boolean"
+        },
+        "credentials": {
+          "$ref": "#/$defs/CredentialConfig",
+          "description": "Credential configuration"
+        }
+      },
+      "required": [
+        "bucket"
+      ],
+      "title": "StorageProfile",
+      "type": "object"
+    },
+    "StorageType": {
+      "description": "Supported storage backend types.\n\nValues:\n    S3: Amazon S3 or S3-compatible storage (MinIO, LocalStack).\n    GCS: Google Cloud Storage.\n    AZURE: Azure Blob Storage.\n    LOCAL: Local filesystem (development only).",
+      "enum": [
+        "s3",
+        "gcs",
+        "azure",
+        "local"
+      ],
+      "title": "StorageType",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Platform infrastructure configuration.\n\nThis is the root model for platform.yaml files. It contains\nnamed profiles for storage, catalogs, and compute resources.\n\nPlatform engineers define this configuration, which is then\nreferenced by FloeSpec (floe.yaml) using logical profile names.\n\nAttributes:\n    version: Schema version for forward compatibility.\n    storage: Named storage profiles (S3, MinIO, etc.).\n    catalogs: Named catalog profiles (Polaris, Glue, etc.).\n    compute: Named compute profiles (DuckDB, Snowflake, etc.).\n    observability: Observability configuration (traces, lineage).\n\nExample:\n    >>> spec = PlatformSpec.from_yaml(Path(\"platform/local/platform.yaml\"))\n    >>> spec.catalogs[\"default\"].uri\n    'http://polaris:8181/api/catalog'\n\n    >>> spec = PlatformSpec(\n    ...     storage={\"default\": StorageProfile(bucket=\"iceberg-data\")},\n    ...     catalogs={\"default\": CatalogProfile(\n    ...         uri=\"http://polaris:8181/api/catalog\",\n    ...         warehouse=\"demo\",\n    ...     )},\n    ... )",
+  "properties": {
+    "version": {
+      "default": "1.0.0",
+      "description": "Schema version (semver)",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Version",
+      "type": "string"
+    },
+    "storage": {
+      "additionalProperties": {
+        "$ref": "#/$defs/StorageProfile"
+      },
+      "description": "Named storage profiles",
+      "title": "Storage",
+      "type": "object"
+    },
+    "catalogs": {
+      "additionalProperties": {
+        "$ref": "#/$defs/CatalogProfile"
+      },
+      "description": "Named catalog profiles",
+      "title": "Catalogs",
+      "type": "object"
+    },
+    "compute": {
+      "additionalProperties": {
+        "$ref": "#/$defs/ComputeProfile"
+      },
+      "description": "Named compute profiles",
+      "title": "Compute",
+      "type": "object"
+    },
+    "observability": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ObservabilityConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Observability configuration"
+    }
+  },
+  "title": "PlatformSpec",
+  "type": "object",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://floe.dev/schemas/platform-spec.v1.0.0.schema.json"
+}
