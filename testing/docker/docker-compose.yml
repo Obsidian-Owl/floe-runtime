@@ -552,6 +552,9 @@ services:
     env_file:
       - ./config/polaris-credentials.env
     environment:
+      # Two-Tier Architecture: Use platform.yaml for configuration
+      # PlatformResolver loads platform/local/platform.yaml
+      FLOE_PLATFORM_ENV: local
       # Docker context detection
       DOCKER_CONTAINER: "1"
       # Override POLARIS_URI to use internal hostname (file has localhost)
@@ -559,6 +562,7 @@ services:
       POLARIS_WAREHOUSE: warehouse
       # LocalStack S3 configuration (internal Docker hostname)
       LOCALSTACK_ENDPOINT: http://localstack:4566
+      AWS_ENDPOINT_URL: http://localstack:4566
       # Override credentials from file with LocalStack values
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
@@ -601,6 +605,9 @@ services:
       - "3000:3000"
     environment:
       DAGSTER_HOME: /opt/dagster
+      # Two-Tier Architecture: Use platform.yaml for configuration
+      # demo/orchestration/config.py loads via PlatformResolver
+      FLOE_PLATFORM_ENV: local
       # PostgreSQL connection string for Dagster storage
       DAGSTER_PG_CONN_STRING: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/dagster
       # Demo configuration (configurable data volumes)
@@ -611,6 +618,7 @@ services:
       DEMO_PRODUCTS_COUNT: ${DEMO_PRODUCTS_COUNT:-100}
       DEMO_ORDER_ITEMS_COUNT: ${DEMO_ORDER_ITEMS_COUNT:-10000}
       # Polaris catalog (OAuth2 credentials loaded from env file)
+      # NOTE: These env vars are fallback for when platform.yaml is not loaded
       POLARIS_URI: http://polaris:8181/api/catalog
       POLARIS_WAREHOUSE: warehouse
       # LocalStack S3 configuration
@@ -674,6 +682,9 @@ services:
     container_name: floe-dagster-daemon
     environment:
       DAGSTER_HOME: /opt/dagster
+      # Two-Tier Architecture: Use platform.yaml for configuration
+      # demo/orchestration/config.py loads via PlatformResolver
+      FLOE_PLATFORM_ENV: local
       # PostgreSQL connection string for Dagster storage
       DAGSTER_PG_CONN_STRING: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/dagster
       # Demo configuration (configurable data volumes)

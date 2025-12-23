@@ -128,6 +128,42 @@ After starting services, access UIs at:
 | Marquez API | http://localhost:5002 | - |
 | Marquez UI | http://localhost:3001 | - |
 
+## Two-Tier Configuration (Platform Injection)
+
+The testing infrastructure follows the two-tier configuration architecture ([ADR-0002](../../docs/adr/0002-two-tier-config.md)).
+
+### Environment Variable
+
+All test services set `FLOE_PLATFORM_ENV=local`, which causes the `PlatformResolver` to load `platform/local/platform.yaml` for infrastructure configuration:
+
+```bash
+# Services with FLOE_PLATFORM_ENV: local
+- test-runner (integration tests)
+- dagster-webserver (demo UI)
+- dagster-daemon (background jobs)
+```
+
+### Configuration Loading
+
+The demo orchestration code (`demo/orchestration/config.py`) uses this flow:
+
+```python
+def get_polaris_config_from_platform() -> PolarisConfig | None:
+    """Load Polaris config from platform.yaml based on FLOE_PLATFORM_ENV."""
+    env = os.environ.get("FLOE_PLATFORM_ENV")
+    if not env:
+        return None  # Fall back to legacy env vars
+
+    platform = PlatformResolver.load(env)  # loads platform/{env}/platform.yaml
+    return platform.catalogs.get("default")
+```
+
+### Why Both Env Vars and Platform Config?
+
+The docker-compose.yml sets both `FLOE_PLATFORM_ENV=local` AND legacy environment variables (POLARIS_URI, AWS_*, etc.) for backward compatibility. The production code prefers platform.yaml when available.
+
+**Note**: Environment variable overrides in docker-compose.yml take precedence over values in platform.yaml for service-specific settings like Docker internal hostnames.
+
 ## Automatic Credential Management
 
 Polaris auto-generates OAuth2 credentials on startup. The `polaris-init` container:
