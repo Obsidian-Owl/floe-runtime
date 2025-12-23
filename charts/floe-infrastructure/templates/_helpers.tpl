@@ -104,6 +104,24 @@ Marquez endpoint
 {{- end }}
 
 {{/*
+LocalStack endpoint
+*/}}
+{{- define "floe-infrastructure.localstack.endpoint" -}}
+{{- printf "http://%s-localstack:4566" .Release.Name }}
+{{- end }}
+
+{{/*
+S3 endpoint - returns LocalStack or MinIO endpoint based on configuration
+*/}}
+{{- define "floe-infrastructure.s3.endpoint" -}}
+{{- if .Values.localstack.enabled }}
+{{- printf "http://%s-localstack:4566" .Release.Name }}
+{{- else }}
+{{- printf "http://%s-minio:9000" .Release.Name }}
+{{- end }}
+{{- end }}
+
+{{/*
 Polaris catalog name
 */}}
 {{- define "floe-infrastructure.polaris.catalogName" -}}

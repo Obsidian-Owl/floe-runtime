@@ -5,6 +5,19 @@
 global:
   storageClass: ""
 
+# Platform Configuration (Two-Tier Architecture)
+# This ConfigMap injects platform.yaml into the cluster for apps to consume
+# Usage: helm install ... --set-file platformConfig.content=./platform/local/platform.yaml
+platformConfig:
+  # Enable platform.yaml ConfigMap injection
+  enabled: false
+  # Platform.yaml content - set via --set-file platformConfig.content=path/to/platform.yaml
+  content: ""
+  # Mount path in pods (standard location)
+  mountPath: /etc/floe/platform.yaml
+  # ConfigMap name override (default: {{ .Release.Name }}-platform-config)
+  nameOverride: ""
+
 # PostgreSQL configuration (Dagster + Marquez metadata)
 postgresql:
   enabled: true
@@ -120,6 +133,23 @@ marquez:
     limits:
       cpu: 500m
       memory: 512Mi
+  # Marquez Web UI
+  web:
+    enabled: true
+    image:
+      repository: marquezproject/marquez-web
+      tag: "0.49.0"
+      pullPolicy: IfNotPresent
+    service:
+      type: ClusterIP
+      port: 3001
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
   # Marquez uses PostgreSQL for metadata
   postgres:
     host: "{{ .Release.Name }}-postgresql"
@@ -128,6 +158,69 @@ marquez:
     username: postgres
     existingSecret: ""
     secretPasswordKey: postgres-password
+
+# LocalStack configuration (AWS service emulator for local development)
+# Replaces MinIO when enabled - provides S3 + STS + IAM + Secrets Manager
+# Use for production-aligned testing with credential vending support
+localstack:
+  enabled: false  # Set to true to use LocalStack instead of MinIO
+  image:
+    repository: localstack/localstack
+    tag: "3.0"
+    pullPolicy: IfNotPresent
+  # AWS services to enable
+  services: "s3,sts,iam,secretsmanager"
+  region: "us-east-1"
+  # Enable debug logging
+  debug: "0"
+  # Persistence configuration
+  persistence:
+    enabled: false  # Uses emptyDir by default
+    existingClaim: ""
+  # Resource limits
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  # Health check configuration
+  livenessProbe:
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    failureThreshold: 3
+  # Initialization job configuration
+  init:
+    enabled: true
+    image:
+      repository: amazon/aws-cli
+      tag: "2.15.0"
+      pullPolicy: IfNotPresent
+    # S3 buckets to create
+    buckets:
+      - name: iceberg-data
+      - name: cube-preaggs
+    # IAM role for Polaris credential vending
+    iamRole:
+      name: "polaris-storage-role"
+    # Store credentials in Secrets Manager
+    secretsManager:
+      enabled: false
+    # Job configuration
+    backoffLimit: 5
+    ttlSecondsAfterFinished: 300
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
 
 # Polaris initialization job
 polarisInit:

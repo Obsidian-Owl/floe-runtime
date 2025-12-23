@@ -16,18 +16,18 @@
 # Required environment variables (injected from K8s Secrets):
 #   POLARIS_CLIENT_ID      - OAuth2 client ID for Polaris
 #   POLARIS_CLIENT_SECRET  - OAuth2 client secret for Polaris
-#   AWS_ACCESS_KEY_ID      - MinIO access key
-#   AWS_SECRET_ACCESS_KEY  - MinIO secret key
+#   AWS_ACCESS_KEY_ID      - LocalStack access key (any value works)
+#   AWS_SECRET_ACCESS_KEY  - LocalStack secret key (any value works)
 #
 # Infrastructure (floe-infrastructure chart):
-#   - Storage: MinIO (http://floe-infra-minio:9000)
+#   - Storage: LocalStack S3 (http://floe-infra-localstack:4566)
 #   - Catalog: Polaris (http://floe-infra-polaris:8181)
 #   - Observability: Jaeger + Marquez
 #
 # Service URLs (NodePort - resilient to pod restarts):
 #   - Dagster UI:     http://localhost:30000
 #   - Polaris API:    http://localhost:30181
-#   - MinIO Console:  http://localhost:30901
+#   - LocalStack:     http://localhost:30566  (S3, STS, IAM, Secrets Manager)
 #   - Jaeger UI:      http://localhost:30686
 #   - Marquez Web:    http://localhost:30301
 #   - Marquez API:    http://localhost:30500
@@ -52,14 +52,20 @@ infrastructure:
       ports:
         dagster: 30000
         polaris: 30181
-        minio_console: 30901
+        localstack: 30566
         jaeger: 30686
         marquez_web: 30301
         marquez_api: 30500
   cloud:
     provider: local
     localstack:
-      enabled: false  # Using MinIO directly, not LocalStack
+      enabled: true  # Using LocalStack for S3 + STS + IAM
+      endpoint: "http://floe-infra-localstack:4566"
+      services:
+        - s3
+        - sts
+        - iam
+        - secretsmanager
 
 # =============================================================================
 # Security Configuration (v1.1.0)
@@ -101,15 +107,18 @@ governance:
 storage:
   default:
     type: s3
-    # MinIO endpoint in K8s (floe-infrastructure chart)
-    endpoint: "http://floe-infra-minio:9000"
+    # LocalStack S3 endpoint in K8s (floe-infrastructure chart)
+    endpoint: "http://floe-infra-localstack:4566"
     region: us-east-1
     bucket: iceberg-data
     path_style_access: true
     credentials:
       mode: static
-      # Resolved from AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY env vars
-      secret_ref: aws-credentials
+      # LocalStack accepts any credentials (test/test is conventional)
+      access_key_id:
+        secret_ref: aws-access-key-id
+      secret_access_key:
+        secret_ref: aws-secret-access-key
 
 catalogs:
   default:
@@ -125,9 +134,9 @@ catalogs:
         secret_ref: polaris-client-id
       client_secret:
         secret_ref: polaris-client-secret
-      scope: "PRINCIPAL_ROLE:ALL"
-    # Disable vended credentials for MinIO (doesn't support STS)
-    access_delegation: none
+      scope: "PRINCIPAL_ROLE:DATA_ENGINEER"
+    # Enable vended credentials for LocalStack (supports STS)
+    access_delegation: vended_credentials
     token_refresh_enabled: true
 
 compute:

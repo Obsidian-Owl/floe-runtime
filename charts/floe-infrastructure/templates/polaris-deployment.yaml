@@ -35,13 +35,23 @@ spec:
             # This pre-sets the root credentials instead of auto-generating
             - name: POLARIS_BOOTSTRAP_CREDENTIALS
               value: "POLARIS,{{ .Values.polarisInit.oauthClientId | default "demo_client" }},{{ .Values.polarisInit.oauthClientSecret | default "demo_secret" }}"
+            {{- if .Values.localstack.enabled }}
+            # LocalStack credentials (any value works for LocalStack)
+            - name: AWS_ACCESS_KEY_ID
+              value: "test"
+            - name: AWS_SECRET_ACCESS_KEY
+              value: "test"
+            - name: AWS_ENDPOINT_URL
+              value: {{ include "floe-infrastructure.localstack.endpoint" . | quote }}
+            {{- else }}
             # MinIO/S3 credentials for storage access
             - name: AWS_ACCESS_KEY_ID
               value: {{ .Values.minio.rootUser | default "minioadmin" | quote }}
             - name: AWS_SECRET_ACCESS_KEY
               value: {{ .Values.minio.rootPassword | default "minioadmin" | quote }}
+            {{- end }}
             - name: AWS_REGION
-              value: "us-east-1"
+              value: {{ .Values.localstack.region | default "us-east-1" | quote }}
           livenessProbe:
             httpGet:
               path: /q/health/live
@@ -67,12 +77,19 @@ metadata:
     {{- include "floe-infrastructure.labels" . | nindent 4 }}
     app.kubernetes.io/component: polaris
 spec:
+  {{- if and .Values.localAccess .Values.localAccess.enabled }}
+  type: NodePort
+  {{- else }}
   type: ClusterIP
+  {{- end }}
   ports:
     - port: 8181
       targetPort: http
       protocol: TCP
       name: http
+      {{- if and .Values.localAccess .Values.localAccess.enabled .Values.localAccess.nodeports }}
+      nodePort: {{ .Values.localAccess.nodeports.polaris | default 30181 }}
+      {{- end }}
     - port: 8182
       targetPort: management
       protocol: TCP
