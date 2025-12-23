@@ -1,0 +1,131 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://floe.dev/schemas/floe-spec/v2.0.0",
+  "title": "FloeSpec",
+  "description": "Pipeline configuration schema for floe.yaml. Data engineers define pipelines using logical profile references - NO infrastructure details, NO credentials.",
+  "type": "object",
+  "required": ["name", "version"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-zA-Z][a-zA-Z0-9_-]{0,62}$",
+      "description": "Pipeline name (alphanumeric, hyphens, underscores)"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Pipeline version (semver)"
+    },
+    "catalog": {
+      "type": "string",
+      "default": "default",
+      "description": "Logical catalog profile name (resolved from platform.yaml)"
+    },
+    "storage": {
+      "type": "string",
+      "default": "default",
+      "description": "Logical storage profile name (resolved from platform.yaml)"
+    },
+    "compute": {
+      "type": "string",
+      "default": "default",
+      "description": "Logical compute profile name (resolved from platform.yaml)"
+    },
+    "transforms": {
+      "type": "array",
+      "description": "Transform definitions (dbt models)",
+      "items": {
+        "$ref": "#/$defs/TransformConfig"
+      },
+      "default": []
+    },
+    "governance": {
+      "$ref": "#/$defs/GovernanceConfig",
+      "description": "Data governance configuration"
+    },
+    "observability": {
+      "$ref": "#/$defs/PipelineObservabilityConfig",
+      "description": "Pipeline observability flags"
+    }
+  },
+  "$defs": {
+    "TransformConfig": {
+      "type": "object",
+      "description": "Transform configuration (dbt)",
+      "required": ["type", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["dbt"],
+          "description": "Transform type"
+        },
+        "path": {
+          "type": "string",
+          "description": "Path to dbt project (relative to floe.yaml)"
+        },
+        "target": {
+          "type": "string",
+          "description": "dbt target name override"
+        },
+        "selector": {
+          "type": "string",
+          "description": "dbt model selector (e.g., tag:daily)"
+        }
+      }
+    },
+    "GovernanceConfig": {
+      "type": "object",
+      "description": "Data governance configuration",
+      "additionalProperties": false,
+      "properties": {
+        "classification_source": {
+          "type": "string",
+          "enum": ["dbt_meta", "external"],
+          "default": "dbt_meta",
+          "description": "Source of data classification metadata"
+        },
+        "emit_lineage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Emit OpenLineage events"
+        },
+        "pii_detection": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable automatic PII detection"
+        }
+      }
+    },
+    "PipelineObservabilityConfig": {
+      "type": "object",
+      "description": "Pipeline-level observability flags",
+      "additionalProperties": false,
+      "properties": {
+        "traces": {
+          "type": "boolean",
+          "default": true,
+          "description": "Emit OpenTelemetry traces"
+        },
+        "lineage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Emit OpenLineage events"
+        },
+        "metrics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Emit OpenTelemetry metrics"
+        },
+        "attributes": {
+          "type": "object",
+          "description": "Custom attributes added to all telemetry",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

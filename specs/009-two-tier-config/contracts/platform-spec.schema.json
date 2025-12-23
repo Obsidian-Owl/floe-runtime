@@ -1,0 +1,255 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://floe.dev/schemas/platform-spec/v1.0.0",
+  "title": "PlatformSpec",
+  "description": "Platform infrastructure configuration schema for platform.yaml. Defines storage, catalog, compute, and observability profiles with credential management.",
+  "type": "object",
+  "required": ["version"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "default": "1.0.0",
+      "description": "Schema version for forward compatibility"
+    },
+    "storage": {
+      "type": "object",
+      "description": "Named storage profiles (S3-compatible backends)",
+      "additionalProperties": {
+        "$ref": "#/$defs/StorageProfile"
+      },
+      "default": {}
+    },
+    "catalogs": {
+      "type": "object",
+      "description": "Named catalog profiles (Iceberg REST catalogs)",
+      "additionalProperties": {
+        "$ref": "#/$defs/CatalogProfile"
+      },
+      "default": {}
+    },
+    "compute": {
+      "type": "object",
+      "description": "Named compute profiles (dbt adapters)",
+      "additionalProperties": {
+        "$ref": "#/$defs/ComputeProfile"
+      },
+      "default": {}
+    },
+    "observability": {
+      "$ref": "#/$defs/ObservabilityConfig",
+      "description": "Observability endpoints (tracing, lineage)"
+    }
+  },
+  "$defs": {
+    "StorageProfile": {
+      "type": "object",
+      "description": "S3-compatible storage configuration",
+      "required": ["type", "bucket"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["s3"],
+          "description": "Storage type (currently only S3-compatible)"
+        },
+        "endpoint": {
+          "oneOf": [
+            { "type": "string" },
+            { "$ref": "#/$defs/SecretReference" }
+          ],
+          "description": "S3 endpoint URL. Empty string for AWS S3, otherwise MinIO/LocalStack URL. Can use secret_ref for internal endpoints."
+        },
+        "region": {
+          "type": "string",
+          "default": "us-east-1",
+          "description": "AWS region"
+        },
+        "bucket": {
+          "type": "string",
+          "description": "S3 bucket name"
+        },
+        "path_style_access": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use path-style access (required for MinIO)"
+        },
+        "credentials": {
+          "$ref": "#/$defs/CredentialConfig",
+          "description": "Storage credentials configuration"
+        }
+      }
+    },
+    "CatalogProfile": {
+      "type": "object",
+      "description": "Iceberg REST catalog configuration",
+      "required": ["type", "uri", "warehouse"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["polaris", "rest", "glue", "unity"],
+          "description": "Catalog type"
+        },
+        "uri": {
+          "oneOf": [
+            { "type": "string", "format": "uri" },
+            { "$ref": "#/$defs/SecretReference" }
+          ],
+          "description": "Catalog REST API endpoint. Can use secret_ref for internal URIs."
+        },
+        "warehouse": {
+          "type": "string",
+          "description": "Warehouse/catalog name"
+        },
+        "credentials": {
+          "$ref": "#/$defs/CredentialConfig",
+          "description": "Catalog credentials configuration"
+        },
+        "access_delegation": {
+          "type": "string",
+          "enum": ["none", "vended-credentials"],
+          "default": "none",
+          "description": "Access delegation mode for storage credentials"
+        },
+        "token_refresh_enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable automatic OAuth2 token refresh"
+        }
+      }
+    },
+    "ComputeProfile": {
+      "type": "object",
+      "description": "Compute engine configuration for dbt",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["duckdb", "snowflake", "bigquery", "databricks"],
+          "description": "Compute engine type"
+        },
+        "properties": {
+          "type": "object",
+          "description": "Engine-specific properties",
+          "additionalProperties": true
+        },
+        "credentials": {
+          "$ref": "#/$defs/CredentialConfig",
+          "description": "Compute credentials configuration"
+        }
+      }
+    },
+    "CredentialConfig": {
+      "type": "object",
+      "description": "Credential configuration with multiple authentication modes",
+      "required": ["mode"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["static", "oauth2", "iam_role", "service_account"],
+          "description": "Credential mode: static (K8s secret), oauth2 (client credentials), iam_role (AWS STS), service_account (GCP/Azure workload identity)"
+        },
+        "secret_ref": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,252}$",
+          "description": "K8s secret name containing credentials (for static/oauth2 modes)"
+        },
+        "scope": {
+          "type": "string",
+          "description": "OAuth2 scope (e.g., PRINCIPAL_ROLE:DATA_ENGINEER)"
+        },
+        "role_arn": {
+          "type": "string",
+          "pattern": "^arn:aws:iam::\\d{12}:role/.+$",
+          "description": "AWS IAM role ARN (for iam_role mode)"
+        },
+        "client_id": {
+          "oneOf": [
+            { "type": "string" },
+            { "$ref": "#/$defs/SecretReference" }
+          ],
+          "description": "OAuth2 client ID (can be inline or secret_ref)"
+        },
+        "client_secret": {
+          "$ref": "#/$defs/SecretReference",
+          "description": "OAuth2 client secret (MUST use secret_ref)"
+        }
+      }
+    },
+    "SecretReference": {
+      "type": "object",
+      "description": "Reference to external secret (K8s secret or environment variable)",
+      "required": ["secret_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "secret_ref": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,252}$",
+          "description": "Secret name. Resolved at runtime from env var (uppercase, hyphens to underscores) or K8s secret."
+        }
+      }
+    },
+    "ObservabilityConfig": {
+      "type": "object",
+      "description": "Observability endpoints configuration",
+      "additionalProperties": false,
+      "properties": {
+        "tracing": {
+          "$ref": "#/$defs/TracingConfig"
+        },
+        "lineage": {
+          "$ref": "#/$defs/LineageConfig"
+        }
+      }
+    },
+    "TracingConfig": {
+      "type": "object",
+      "description": "OpenTelemetry tracing configuration",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "endpoint": {
+          "oneOf": [
+            { "type": "string", "format": "uri" },
+            { "$ref": "#/$defs/SecretReference" }
+          ],
+          "description": "OTel collector endpoint"
+        },
+        "protocol": {
+          "type": "string",
+          "enum": ["grpc", "http"],
+          "default": "grpc"
+        }
+      }
+    },
+    "LineageConfig": {
+      "type": "object",
+      "description": "OpenLineage configuration",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "endpoint": {
+          "oneOf": [
+            { "type": "string", "format": "uri" },
+            { "$ref": "#/$defs/SecretReference" }
+          ],
+          "description": "OpenLineage API endpoint (e.g., Marquez)"
+        },
+        "namespace": {
+          "type": "string",
+          "description": "OpenLineage namespace"
+        }
+      }
+    }
+  }
+}

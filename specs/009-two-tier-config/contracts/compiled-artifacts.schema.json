@@ -1,0 +1,255 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://floe.dev/schemas/compiled-artifacts/v2.0.0",
+  "title": "CompiledArtifacts",
+  "description": "Integration contract between floe-core (compiler) and floe-dagster (runtime). Contains fully resolved configuration with no profile indirection. BREAKING CHANGE from v1.x.",
+  "type": "object",
+  "required": ["version", "metadata", "catalog", "storage", "compute"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "2.0.0",
+      "description": "Contract version (v2.0.0 - breaking change from v1.x)"
+    },
+    "metadata": {
+      "$ref": "#/$defs/ArtifactMetadata"
+    },
+    "catalog": {
+      "$ref": "#/$defs/ResolvedCatalogConfig",
+      "description": "Fully resolved catalog configuration (no profile reference)"
+    },
+    "storage": {
+      "$ref": "#/$defs/ResolvedStorageConfig",
+      "description": "Fully resolved storage configuration"
+    },
+    "compute": {
+      "$ref": "#/$defs/ResolvedComputeConfig",
+      "description": "Fully resolved compute configuration"
+    },
+    "transforms": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ResolvedTransformConfig"
+      },
+      "default": []
+    },
+    "dbt_profiles": {
+      "type": "object",
+      "description": "Generated dbt profiles.yml content",
+      "additionalProperties": true
+    },
+    "dagster_config": {
+      "type": "object",
+      "description": "Generated Dagster resource configuration",
+      "additionalProperties": true
+    },
+    "governance": {
+      "$ref": "#/$defs/GovernanceConfig"
+    },
+    "observability": {
+      "$ref": "#/$defs/ResolvedObservabilityConfig"
+    },
+    "platform_version": {
+      "type": "string",
+      "description": "Source platform.yaml version"
+    },
+    "platform_source": {
+      "type": "string",
+      "description": "Source platform.yaml path or registry URL"
+    }
+  },
+  "$defs": {
+    "ArtifactMetadata": {
+      "type": "object",
+      "required": ["name", "version", "compiled_at"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Pipeline name from floe.yaml"
+        },
+        "version": {
+          "type": "string",
+          "description": "Pipeline version from floe.yaml"
+        },
+        "compiled_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Compilation timestamp (ISO 8601)"
+        },
+        "floe_spec_path": {
+          "type": "string",
+          "description": "Source floe.yaml path"
+        }
+      }
+    },
+    "ResolvedCatalogConfig": {
+      "type": "object",
+      "description": "Fully resolved catalog config (credentials resolved at runtime)",
+      "required": ["type", "uri", "warehouse"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["polaris", "rest", "glue", "unity"]
+        },
+        "uri": {
+          "type": "string",
+          "format": "uri",
+          "description": "Resolved catalog URI (may be from secret_ref)"
+        },
+        "warehouse": {
+          "type": "string"
+        },
+        "credential_mode": {
+          "type": "string",
+          "enum": ["static", "oauth2", "iam_role", "service_account"]
+        },
+        "secret_ref": {
+          "type": "string",
+          "description": "K8s secret name for credentials (resolved at runtime)"
+        },
+        "oauth2_scope": {
+          "type": "string",
+          "description": "OAuth2 scope if mode is oauth2"
+        },
+        "access_delegation": {
+          "type": "string",
+          "enum": ["none", "vended-credentials"]
+        },
+        "token_refresh_enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ResolvedStorageConfig": {
+      "type": "object",
+      "description": "Fully resolved storage config",
+      "required": ["type", "bucket"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["s3"]
+        },
+        "endpoint": {
+          "type": "string",
+          "description": "Resolved S3 endpoint"
+        },
+        "region": {
+          "type": "string"
+        },
+        "bucket": {
+          "type": "string"
+        },
+        "path_style_access": {
+          "type": "boolean"
+        },
+        "credential_mode": {
+          "type": "string",
+          "enum": ["static", "iam_role", "service_account"]
+        },
+        "secret_ref": {
+          "type": "string",
+          "description": "K8s secret name for credentials"
+        },
+        "role_arn": {
+          "type": "string",
+          "description": "IAM role ARN if mode is iam_role"
+        }
+      }
+    },
+    "ResolvedComputeConfig": {
+      "type": "object",
+      "description": "Fully resolved compute config",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["duckdb", "snowflake", "bigquery", "databricks"]
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "credential_mode": {
+          "type": "string",
+          "enum": ["static", "oauth2", "iam_role", "service_account"]
+        },
+        "secret_ref": {
+          "type": "string"
+        }
+      }
+    },
+    "ResolvedTransformConfig": {
+      "type": "object",
+      "required": ["type", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["dbt"]
+        },
+        "path": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "selector": {
+          "type": "string"
+        }
+      }
+    },
+    "GovernanceConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "classification_source": {
+          "type": "string",
+          "enum": ["dbt_meta", "external"]
+        },
+        "emit_lineage": {
+          "type": "boolean"
+        },
+        "pii_detection": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ResolvedObservabilityConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tracing": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "endpoint": { "type": "string" },
+            "protocol": { "type": "string" }
+          }
+        },
+        "lineage": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "endpoint": { "type": "string" },
+            "namespace": { "type": "string" }
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" }
+          }
+        },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    }
+  }
+}
