@@ -234,9 +234,10 @@ class CompiledArtifacts(BaseModel):
     )
 
     # Legacy compute field (deprecated: use resolved_profiles.compute)
+    # Kept for backward compatibility - will be populated from resolved_profiles
     compute: ComputeConfig | None = Field(
         default=None,
-        description="Compute target configuration (legacy - use resolved_profiles.compute)",
+        description="Compute target configuration (deprecated - use resolved_profiles.compute)",
     )
 
     # Configuration sections (with defaults)
