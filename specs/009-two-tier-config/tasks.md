@@ -28,15 +28,15 @@ This is a monorepo with 7 packages:
 **Purpose**: Create directory structure and placeholder files for new modules
 
 - [x] T001 Create platform environment directories: `platform/local/`, `platform/dev/`, `platform/staging/`, `platform/prod/`
-- [ ] T002 [P] Create schema module structure: `packages/floe-core/src/floe_core/schemas/platform_spec.py`
-- [ ] T003 [P] Create schema module: `packages/floe-core/src/floe_core/schemas/credential_config.py`
-- [ ] T004 [P] Create schema module: `packages/floe-core/src/floe_core/schemas/storage_profile.py`
-- [ ] T005 [P] Create schema module: `packages/floe-core/src/floe_core/schemas/catalog_profile.py`
-- [ ] T006 [P] Create schema module: `packages/floe-core/src/floe_core/schemas/compute_profile.py`
-- [ ] T007 [P] Create compiler module: `packages/floe-core/src/floe_core/compiler/platform_resolver.py`
-- [ ] T008 [P] Create compiler module: `packages/floe-core/src/floe_core/compiler/profile_resolver.py`
-- [ ] T009 [P] Create test directory structure: `packages/floe-core/tests/unit/schemas/`, `packages/floe-core/tests/integration/`
-- [ ] T010 [P] Create docs directory: `docs/adr/`, ensure `docs/` exists
+- [x] T002 [P] Create schema module structure: `packages/floe-core/src/floe_core/schemas/platform_spec.py`
+- [x] T003 [P] Create schema module: `packages/floe-core/src/floe_core/schemas/credential_config.py`
+- [x] T004 [P] Create schema module: `packages/floe-core/src/floe_core/schemas/storage_profile.py`
+- [x] T005 [P] Create schema module: `packages/floe-core/src/floe_core/schemas/catalog_profile.py`
+- [x] T006 [P] Create schema module: `packages/floe-core/src/floe_core/schemas/compute_profile.py`
+- [x] T007 [P] Create compiler module: `packages/floe-core/src/floe_core/compiler/platform_resolver.py`
+- [x] T008 [P] Create compiler module: `packages/floe-core/src/floe_core/compiler/profile_resolver.py`
+- [x] T009 [P] Create test directory structure: `packages/floe-core/tests/unit/schemas/`, `packages/floe-core/tests/integration/`
+- [x] T010 [P] Create docs directory: `docs/adr/`, ensure `docs/` exists
 
 ---
 
