@@ -114,11 +114,8 @@ storage:
     path_style_access: true
     credentials:
       mode: static
-      # LocalStack accepts any credentials (test/test is conventional)
-      access_key_id:
-        secret_ref: aws-access-key-id
-      secret_access_key:
-        secret_ref: aws-secret-access-key
+      # LocalStack accepts any credentials - secret resolved from AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY
+      secret_ref: aws-credentials
 
 catalogs:
   default:
@@ -135,8 +132,8 @@ catalogs:
       client_secret:
         secret_ref: polaris-client-secret
       scope: "PRINCIPAL_ROLE:DATA_ENGINEER"
-    # Enable vended credentials for LocalStack (supports STS)
-    access_delegation: vended_credentials
+    # Disable vended credentials for LocalStack (STS support varies)
+    access_delegation: none
     token_refresh_enabled: true
 
 compute:

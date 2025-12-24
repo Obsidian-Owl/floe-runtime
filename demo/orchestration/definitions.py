@@ -234,6 +234,7 @@ def bronze_customers(context: AssetExecutionContext) -> Dict[str, Any]:
 
     # Start tracing span
     span_context = None
+    span = None  # Initialize span before try block to ensure it's always defined
     if _tracing_manager is not None:
         span_context = _tracing_manager.start_span(
             "generate_customers",
@@ -286,10 +287,9 @@ def bronze_customers(context: AssetExecutionContext) -> Dict[str, Any]:
         return result
 
     except Exception as e:
-        if span_context:
-            span = span_context.__enter__() if span_context else None
-            if span and _tracing_manager:
-                _tracing_manager.record_exception(span, e)
+        # span was assigned in try block, reuse it for exception recording
+        if span and _tracing_manager:
+            _tracing_manager.record_exception(span, e)
         _emit_lineage_fail(run_id, job_name, str(e))
         context.log.error("bronze_customers failed: %s", e)
         raise
@@ -315,6 +315,7 @@ def bronze_products(context: AssetExecutionContext) -> Dict[str, Any]:
     run_id = _emit_lineage_start(job_name)
 
     span_context = None
+    span = None  # Initialize span before try block to ensure it's always defined
     if _tracing_manager is not None:
         span_context = _tracing_manager.start_span(
             "generate_products",
@@ -364,10 +365,9 @@ def bronze_products(context: AssetExecutionContext) -> Dict[str, Any]:
         return result
 
     except Exception as e:
-        if span_context:
-            span = span_context.__enter__() if span_context else None
-            if span and _tracing_manager:
-                _tracing_manager.record_exception(span, e)
+        # span was assigned in try block, reuse it for exception recording
+        if span and _tracing_manager:
+            _tracing_manager.record_exception(span, e)
         _emit_lineage_fail(run_id, job_name, str(e))
         context.log.error("bronze_products failed: %s", e)
         raise
@@ -394,6 +394,7 @@ def bronze_orders(context: AssetExecutionContext) -> Dict[str, Any]:
     run_id = _emit_lineage_start(job_name)
 
     span_context = None
+    span = None  # Initialize span before try block to ensure it's always defined
     if _tracing_manager is not None:
         span_context = _tracing_manager.start_span(
             "generate_orders",
@@ -445,10 +446,9 @@ def bronze_orders(context: AssetExecutionContext) -> Dict[str, Any]:
         return result
 
     except Exception as e:
-        if span_context:
-            span = span_context.__enter__() if span_context else None
-            if span and _tracing_manager:
-                _tracing_manager.record_exception(span, e)
+        # span was assigned in try block, reuse it for exception recording
+        if span and _tracing_manager:
+            _tracing_manager.record_exception(span, e)
         _emit_lineage_fail(run_id, job_name, str(e))
         context.log.error("bronze_orders failed: %s", e)
         raise
@@ -475,6 +475,7 @@ def bronze_order_items(context: AssetExecutionContext) -> Dict[str, Any]:
     run_id = _emit_lineage_start(job_name)
 
     span_context = None
+    span = None  # Initialize span before try block to ensure it's always defined
     if _tracing_manager is not None:
         span_context = _tracing_manager.start_span(
             "generate_order_items",
@@ -532,10 +533,9 @@ def bronze_order_items(context: AssetExecutionContext) -> Dict[str, Any]:
         return result
 
     except Exception as e:
-        if span_context:
-            span = span_context.__enter__() if span_context else None
-            if span and _tracing_manager:
-                _tracing_manager.record_exception(span, e)
+        # span was assigned in try block, reuse it for exception recording
+        if span and _tracing_manager:
+            _tracing_manager.record_exception(span, e)
         _emit_lineage_fail(run_id, job_name, str(e))
         context.log.error("bronze_order_items failed: %s", e)
         raise
@@ -567,6 +567,7 @@ def dbt_transformations(context: AssetExecutionContext) -> Dict[str, str]:
     run_id = _emit_lineage_start(job_name)
 
     span_context = None
+    span = None  # Initialize span before try block to ensure it's always defined
     if _tracing_manager is not None:
         span_context = _tracing_manager.start_span(
             "dbt_run",
@@ -601,10 +602,9 @@ def dbt_transformations(context: AssetExecutionContext) -> Dict[str, str]:
         return result
 
     except Exception as e:
-        if span_context:
-            span = span_context.__enter__() if span_context else None
-            if span and _tracing_manager:
-                _tracing_manager.record_exception(span, e)
+        # span was assigned in try block, reuse it for exception recording
+        if span and _tracing_manager:
+            _tracing_manager.record_exception(span, e)
         _emit_lineage_fail(run_id, job_name, str(e))
         raise
     finally:
@@ -635,22 +635,22 @@ demo_pipeline_job = define_asset_job(
 # Schedules
 # =============================================================================
 
-# Hourly schedule for data generation
-demo_hourly_schedule = ScheduleDefinition(
-    name="demo_hourly_schedule",
+# Synthetic data generation schedule - auto-starts on deployment
+synthetic_data_schedule = ScheduleDefinition(
+    name="synthetic_data_schedule",
     job=demo_bronze_job,
-    cron_schedule="0 * * * *",  # Every hour
-    default_status=DefaultScheduleStatus.STOPPED,  # Start stopped for demo
-    description="Hourly synthetic data generation",
+    cron_schedule="*/5 * * * *",  # Every 5 minutes
+    default_status=DefaultScheduleStatus.RUNNING,  # Auto-start on deployment
+    description="Generate synthetic e-commerce data every 5 minutes",
 )
 
-# Daily schedule for full refresh
-demo_daily_schedule = ScheduleDefinition(
-    name="demo_daily_schedule",
+# Transform pipeline schedule - auto-starts on deployment
+transform_pipeline_schedule = ScheduleDefinition(
+    name="transform_pipeline_schedule",
     job=demo_pipeline_job,
-    cron_schedule="0 6 * * *",  # Every day at 6 AM
-    default_status=DefaultScheduleStatus.STOPPED,  # Start stopped for demo
-    description="Daily full pipeline refresh",
+    cron_schedule="*/5 * * * *",  # Every 5 minutes (offset by pipeline duration)
+    default_status=DefaultScheduleStatus.RUNNING,  # Auto-start on deployment
+    description="Run full transform pipeline every 5 minutes",
 )
 
 
@@ -730,8 +730,8 @@ defs = Definitions(
         demo_pipeline_job,
     ],
     schedules=[
-        demo_hourly_schedule,
-        demo_daily_schedule,
+        synthetic_data_schedule,
+        transform_pipeline_schedule,
     ],
     sensors=[
         file_arrival_sensor,

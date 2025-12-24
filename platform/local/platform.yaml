@@ -53,7 +53,7 @@ catalogs:
         secret_ref: polaris-client-secret
       scope: "PRINCIPAL_ROLE:ALL"
     # Disable vended credentials for LocalStack (LocalStack doesn't support STS properly)
-    access_delegation: ""
+    access_delegation: none
     token_refresh_enabled: true
 
 compute:

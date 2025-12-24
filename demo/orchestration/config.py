@@ -250,8 +250,12 @@ def get_demo_config() -> dict[str, Any]:
 def _load_platform_config() -> Any:
     """Load platform configuration from platform.yaml.
 
-    Uses PlatformResolver to find and load the platform.yaml based on
-    FLOE_PLATFORM_ENV environment variable.
+    Two-Tier Architecture: Loads platform.yaml for infrastructure configuration.
+    The platform config is resolved in this order:
+
+    1. FLOE_PLATFORM_FILE: Direct path to platform.yaml (K8s ConfigMap mount)
+    2. FLOE_PLATFORM_ENV: Environment name to search for platform.yaml
+    3. Default search: Look in standard locations (./platform/local, etc.)
 
     Returns:
         PlatformSpec instance, or None if not available.
@@ -259,10 +263,25 @@ def _load_platform_config() -> Any:
     Note:
         This is an internal function. Public API uses get_*_config() functions
         which fall back to environment variables if platform.yaml is not found.
+
+    Covers: 009-FR-001 (Two-Tier Configuration Architecture)
     """
+    from pathlib import Path
+
     try:
         from floe_core.compiler.platform_resolver import PlatformResolver
 
+        # Priority 1: Direct file path (K8s ConfigMap mount pattern)
+        platform_file = os.environ.get("FLOE_PLATFORM_FILE")
+        if platform_file:
+            platform_path = Path(platform_file)
+            if platform_path.exists():
+                logger.info("Loading platform config from FLOE_PLATFORM_FILE: %s", platform_file)
+                resolver = PlatformResolver()
+                return resolver.load(path=platform_path)
+            logger.warning("FLOE_PLATFORM_FILE set but file not found: %s", platform_file)
+
+        # Priority 2-3: Use standard PlatformResolver (FLOE_PLATFORM_ENV or search)
         resolver = PlatformResolver()
         return resolver.load()
     except ImportError:
@@ -320,7 +339,10 @@ def get_polaris_config_from_platform() -> DemoPolarisConfig | None:
             s3_secret_access_key=SecretStr(s3_secret_key),
             s3_region=storage.region,
             s3_path_style_access=storage.path_style_access,
-            access_delegation=catalog.access_delegation.value if catalog.access_delegation else "",
+            # Pass empty string for "none" - Polaris rejects literal "none" value
+            access_delegation=""
+            if (not catalog.access_delegation or catalog.access_delegation.value == "none")
+            else catalog.access_delegation.value,
         )
     except Exception as e:
         logger.debug("Error loading catalog profile: %s", e)
