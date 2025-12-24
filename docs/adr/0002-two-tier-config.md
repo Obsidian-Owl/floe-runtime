@@ -389,6 +389,124 @@ floe-runtime/
                 └── platform_resolver.py
 ```
 
+## Batteries-Included floe-dagster
+
+The two-tier architecture addresses **configuration separation**, but without corresponding runtime abstractions, data engineers still face significant boilerplate. This section documents the companion decision to make floe-dagster "batteries-included".
+
+### Problem: Boilerplate Despite Configuration Separation
+
+Even with clean `floe.yaml` files, the demo codebase revealed ~65% boilerplate in asset definitions:
+
+| Boilerplate Category | Lines per Asset | Impact |
+|---------------------|-----------------|--------|
+| OpenTelemetry span creation | 10-15 | Repeated 5x |
+| OpenLineage event emission | 15-20 | START/COMPLETE/FAIL per asset |
+| Exception handling with observability | 10-15 | Try/except/finally ceremony |
+| Platform config loading | 40+ | Module-level initialization |
+| Catalog resource creation | 10 | Repeated per asset function |
+
+**Result**: A 740-line definitions.py where only ~200 lines were business logic.
+
+### Decision: @floe_asset as Primary API
+
+floe-dagster provides a `@floe_asset` decorator that replaces Dagster's `@asset`:
+
+```python
+# BEFORE: Manual observability (740 LOC)
+@asset(group_name="bronze")
+def bronze_customers(context):
+    job_name = "bronze_customers"
+    run_id = _emit_lineage_start(job_name)
+    span_context = None
+    if _tracing_manager is not None:
+        span_context = _tracing_manager.start_span("generate_customers", {...})
+    try:
+        span = span_context.__enter__() if span_context else None
+        # ... business logic ...
+        if span:
+            span.set_attribute("data.rows", customers.num_rows)
+            _tracing_manager.set_status_ok(span)
+        _emit_lineage_complete(run_id, job_name, outputs=[...])
+        return {...}
+    except Exception as e:
+        if span and _tracing_manager:
+            _tracing_manager.record_exception(span, e)
+        _emit_lineage_fail(run_id, job_name, str(e))
+        raise
+    finally:
+        if span_context:
+            span_context.__exit__(None, None, None)
+
+# AFTER: Zero boilerplate (~300 LOC total)
+@floe_asset(group="bronze", outputs=["demo.bronze_customers"])
+def bronze_customers(context, catalog: PolarisCatalog) -> dict:
+    generator = EcommerceGenerator(seed=42)
+    customers = generator.generate_customers(count=1000)
+    manager = IcebergTableManager(catalog)
+    manager.overwrite("demo.bronze_customers", customers)
+    return {"rows": customers.num_rows}
+```
+
+### Key Components
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `ObservabilityOrchestrator` | `floe_dagster/observability/orchestrator.py` | Unified tracing + lineage context manager |
+| `@floe_asset` | `floe_dagster/decorators.py` | Auto-instrumented asset decorator |
+| `PolarisCatalogResource` | `floe_dagster/resources/catalog.py` | Dagster resource from CompiledArtifacts |
+| `FloeDefinitions.from_compiled_artifacts()` | `floe_dagster/definitions.py` | One-line Definitions factory |
+
+### Design Principles
+
+1. **Observability failures never break pipelines**: If Jaeger/Marquez unavailable, log warning and continue
+2. **Resource injection via signature**: `def my_asset(context, catalog: PolarisCatalog)` auto-injects catalog
+3. **@floe_asset is the primary API**: Replaces raw @asset for all floe projects
+4. **Zero platform code in assets**: No endpoints, credentials, or config loading visible to data engineers
+
+### Relationship to Two-Tier Configuration
+
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│                     Two-Tier Configuration                            │
+│                                                                       │
+│  ┌─────────────────────┐           ┌─────────────────────┐            │
+│  │   platform.yaml     │           │     floe.yaml       │            │
+│  │ (endpoints, creds)  │           │  (profiles, logic)  │            │
+│  └──────────┬──────────┘           └──────────┬──────────┘            │
+│             │                                  │                       │
+│             └──────────────┬───────────────────┘                       │
+│                            ▼                                           │
+│               ┌─────────────────────────────────┐                      │
+│               │       CompiledArtifacts         │                      │
+│               │   (merged, resolved config)     │                      │
+│               └────────────────┬────────────────┘                      │
+└────────────────────────────────┼───────────────────────────────────────┘
+                                 │
+┌────────────────────────────────┼───────────────────────────────────────┐
+│                                ▼                                       │
+│               ┌─────────────────────────────────┐                      │
+│               │   FloeDefinitions.from_        │                      │
+│               │   compiled_artifacts()          │                      │
+│               └────────────────┬────────────────┘                      │
+│                                │                                       │
+│     ┌──────────────────────────┼──────────────────────────┐            │
+│     ▼                          ▼                          ▼            │
+│ ┌───────────────┐   ┌──────────────────────┐   ┌───────────────┐       │
+│ │TracingManager │   │PolarisCatalogResource│   │LineageEmitter │       │
+│ └───────────────┘   └──────────────────────┘   └───────────────┘       │
+│                                │                                       │
+│                                ▼                                       │
+│              ┌────────────────────────────────────┐                    │
+│              │         @floe_asset                │                    │
+│              │  (auto-instruments all above)      │                    │
+│              └────────────────────────────────────┘                    │
+│                                                                        │
+│                     Batteries-Included floe-dagster                    │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+Two-tier configuration separates **what to configure**. Batteries-included floe-dagster hides **how to use that configuration**.
+
 ## Migration
 
 Since floe-runtime has no prior releases, no migration is required. New projects should:

@@ -217,6 +217,74 @@ This is a monorepo with 7 packages:
 
 ---
 
+## Phase 9: Batteries-Included floe-dagster (User Stories 6 & 7)
+
+**Purpose**: Eliminate boilerplate in data engineer code by providing high-level abstractions that consume CompiledArtifacts. Data engineers should write pure business logic with zero observability setup, config loading, or credential handling.
+
+**Success Metrics**:
+- Demo reduced from ~1,150 to ~400 LOC (60% reduction)
+- Zero observability boilerplate in data engineer code
+- Same demo code works in Docker Compose and K8s
+
+### Bead 1: ObservabilityOrchestrator (floe-runtime-5qrc)
+
+**Priority**: P1 | **Dependencies**: None | **Blocks**: Bead 2, Bead 3
+
+- [ ] T089 [US6] Create `packages/floe-dagster/src/floe_dagster/observability/__init__.py` module exports
+- [ ] T090 [US6] Implement `ObservabilityOrchestrator` context manager in `packages/floe-dagster/src/floe_dagster/observability/orchestrator.py`
+  - `from_compiled_artifacts()` factory method
+  - `asset_run()` context manager combining OTel spans + OpenLineage events
+  - Graceful degradation when endpoints unavailable (FR-058)
+  - Exception recording to span before re-raising (FR-057)
+- [ ] T091 [US6] Implement `AssetRunContext` dataclass returned by `asset_run()` context manager
+  - `span: Span | None` (None if tracing unavailable)
+  - `run_id: str | None` (None if lineage unavailable)
+  - `set_attribute(key, value)` helper
+- [ ] T092 [US6] Add unit tests for graceful degradation in `packages/floe-dagster/tests/unit/observability/test_orchestrator.py`
+- [ ] T093 [US6] Add unit tests for exception handling in `packages/floe-dagster/tests/unit/observability/test_orchestrator.py`
+
+### Bead 2: @floe_asset Decorator + Resources (floe-runtime-5u2y)
+
+**Priority**: P1 | **Depends on**: Bead 1 (floe-runtime-5qrc)
+
+- [ ] T094 [US6] Create `packages/floe-dagster/src/floe_dagster/resources/__init__.py` module exports
+- [ ] T095 [US6] Implement `PolarisCatalogResource` (ConfigurableResource) in `packages/floe-dagster/src/floe_dagster/resources/catalog.py`
+  - `from_compiled_artifacts()` factory method (FR-059)
+  - Secret resolution at runtime, not compile time
+  - `get_catalog()` method returning PolarisCatalog
+- [ ] T096 [US6] Implement `@floe_asset` decorator in `packages/floe-dagster/src/floe_dagster/decorators.py`
+  - Auto-creates OTel span with asset name (FR-055)
+  - Auto-emits OpenLineage START/COMPLETE/FAIL events (FR-056)
+  - Resource injection via signature inspection (FR-060)
+  - Pass-through kwargs to Dagster @asset
+- [ ] T097 [US6] Add unit tests for `@floe_asset` decorator in `packages/floe-dagster/tests/unit/test_decorators.py`
+- [ ] T098 [US6] Add unit tests for `PolarisCatalogResource` in `packages/floe-dagster/tests/unit/resources/test_catalog.py`
+
+### Bead 3: FloeDefinitions Factory (floe-runtime-0c7j)
+
+**Priority**: P1 | **Depends on**: Bead 1 (floe-runtime-5qrc), Bead 2 (floe-runtime-5u2y)
+
+- [ ] T099 [US7] Implement `FloeDefinitions.from_compiled_artifacts()` factory in `packages/floe-dagster/src/floe_dagster/definitions.py`
+  - Load CompiledArtifacts from path
+  - Initialize TracingManager + OpenLineageEmitter
+  - Create PolarisCatalogResource
+  - Wire resources into Dagster Definitions (FR-061)
+- [ ] T100 [US7] Update `packages/floe-dagster/src/floe_dagster/__init__.py` to export new public API
+  - `floe_asset`, `FloeDefinitions`, `PolarisCatalogResource`, `ObservabilityOrchestrator`
+- [ ] T101 [US7] Add integration test for full wiring in `packages/floe-dagster/tests/integration/test_definitions_factory.py`
+- [ ] T102 [US7] Add integration test verifying observability flows in `packages/floe-dagster/tests/integration/test_observability_integration.py`
+
+### Bead 4: Demo Refactoring (floe-runtime-i43l)
+
+**Priority**: P2 | **Depends on**: Bead 3 (floe-runtime-0c7j)
+
+- [ ] T103 [US7] Refactor `demo/orchestration/definitions.py` to use `@floe_asset` and `FloeDefinitions.from_compiled_artifacts()` (FR-062)
+- [ ] T104 [US7] Simplify `demo/orchestration/config.py` to contain only business constants (remove platform loading)
+- [ ] T105 [US7] Verify demo assets contain zero observability/config boilerplate (FR-063)
+- [ ] T106 [US7] Run E2E tests in Docker Compose and K8s to verify same code works in both environments
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -239,6 +307,15 @@ Config         Portability    Validation     Errors         Modes
                                   ▼
                           Phase 8: Polish
                           (Documentation, Cleanup)
+                                  │
+                                  ▼
+                    ┌─────────────────────────────┐
+                    │  Phase 9: Batteries-Included │
+                    │  floe-dagster (US6, US7)    │
+                    │                              │
+                    │  Bead 1 ──► Bead 2 ──► Bead 3 ──► Bead 4 │
+                    │  (5qrc)    (5u2y)    (0c7j)    (i43l)   │
+                    └─────────────────────────────┘
 ```
 
 ### User Story Dependencies
@@ -250,6 +327,17 @@ Config         Portability    Validation     Errors         Modes
 | US3 (P2) | Foundational | US4, US5 |
 | US5 (P2) | US2 (needs ProfileResolver) | US3, US4 |
 | US4 (P3) | US1 + US2 | US3, US5 |
+| US6 (P1) | Phase 8 (Polish) | US7 |
+| US7 (P1) | US6 (Bead 1-3) | - |
+
+### Bead Dependencies (Phase 9)
+
+| Bead | ID | Depends On | Blocks |
+|------|-----|------------|--------|
+| 1. ObservabilityOrchestrator | floe-runtime-5qrc | None | Bead 2, Bead 3 |
+| 2. @floe_asset + Resources | floe-runtime-5u2y | Bead 1 | Bead 3 |
+| 3. FloeDefinitions Factory | floe-runtime-0c7j | Bead 1, Bead 2 | Bead 4 |
+| 4. Demo Refactoring | floe-runtime-i43l | Bead 3 | None |
 
 ### Within Each User Story
 
@@ -334,17 +422,21 @@ With 2 developers:
 
 ## Task Summary
 
-| Phase | Task Range | Count | Purpose |
-|-------|------------|-------|---------|
-| Setup | T001-T010 | 10 | Directory and file scaffolding |
-| Foundational | T011-T024 | 14 | Core Pydantic models |
-| US1 (P1) | T025-T033 | 9 | Platform configuration |
-| US2 (P1) | T034-T044 | 11 | Pipeline portability |
-| US3 (P2) | T045-T051 | 7 | Security validation |
-| US5 (P2) | T052-T059 | 8 | Error diagnostics |
-| US4 (P3) | T060-T068 | 9 | Credential modes |
-| Polish | T069-T088 | 20 | Documentation, cleanup, validation |
-| **TOTAL** | T001-T088 | **88** | |
+| Phase | Task Range | Count | Purpose | Bead ID |
+|-------|------------|-------|---------|---------|
+| Setup | T001-T010 | 10 | Directory and file scaffolding | - |
+| Foundational | T011-T024 | 14 | Core Pydantic models | - |
+| US1 (P1) | T025-T033 | 9 | Platform configuration | - |
+| US2 (P1) | T034-T044 | 11 | Pipeline portability | - |
+| US3 (P2) | T045-T051 | 7 | Security validation | - |
+| US5 (P2) | T052-T059 | 8 | Error diagnostics | - |
+| US4 (P3) | T060-T068 | 9 | Credential modes | - |
+| Polish | T069-T088 | 20 | Documentation, cleanup, validation | - |
+| US6/US7 Bead 1 | T089-T093 | 5 | ObservabilityOrchestrator | floe-runtime-5qrc |
+| US6 Bead 2 | T094-T098 | 5 | @floe_asset + Resources | floe-runtime-5u2y |
+| US7 Bead 3 | T099-T102 | 4 | FloeDefinitions Factory | floe-runtime-0c7j |
+| US7 Bead 4 | T103-T106 | 4 | Demo Refactoring | floe-runtime-i43l |
+| **TOTAL** | T001-T106 | **106** | | |
 
 ### Tasks per User Story
 
@@ -355,6 +447,8 @@ With 2 developers:
 | US3 | 7 | 0 (sequential validation) |
 | US5 | 8 | 0 (sequential errors) |
 | US4 | 9 | 0 (sequential auth) |
+| US6 | 10 (T089-T098) | Bead 2 depends on Bead 1 |
+| US7 | 8 (T099-T106) | Bead 4 depends on Bead 3 |
 
 ---
 

@@ -88,6 +88,40 @@ A Platform Engineer wants to quickly identify and fix configuration errors when 
 
 ---
 
+### User Story 6 - Data Engineer Writes Assets Without Observability Boilerplate (Priority: P1)
+
+A Data Engineer wants to write Dagster assets focused purely on business logic (data generation, transformations) without manually configuring OpenTelemetry tracing, OpenLineage lineage emission, or catalog/storage connections. The platform handles observability "under the hood".
+
+**Why this priority**: Without this, data engineers must write 50+ lines of boilerplate per asset for span creation, lineage events, and error handling. This defeats the purpose of Two-Tier Architecture.
+
+**Independent Test**: Can be fully tested by creating an asset with `@floe_asset` decorator and verifying traces appear in Jaeger, lineage appears in Marquez, without any observability code in the asset function.
+
+**Acceptance Scenarios**:
+
+1. **Given** a data engineer uses `@floe_asset(outputs=["demo.customers"])`, **When** the asset executes, **Then** OpenTelemetry spans and OpenLineage events are emitted automatically
+2. **Given** an asset function has signature `def my_asset(context, catalog: PolarisCatalog)`, **When** the asset runs, **Then** the catalog resource is automatically injected from CompiledArtifacts
+3. **Given** an asset raises an exception, **When** the exception propagates, **Then** the system automatically emits OpenLineage FAIL event and records exception to span before re-raising
+4. **Given** observability endpoints are unavailable (Jaeger down, Marquez unreachable), **When** an asset runs, **Then** business logic executes successfully (graceful degradation)
+5. **Given** a data engineer uses `FloeDefinitions.from_compiled_artifacts()`, **When** definitions load, **Then** all observability infrastructure is configured automatically from platform.yaml
+
+---
+
+### User Story 7 - Data Engineer's Code Contains Zero Platform Concerns (Priority: P1)
+
+A Data Engineer wants their asset code to contain only business logic with no references to endpoints, credentials, observability setup, or infrastructure configuration. The same code works in Docker Compose locally and Kubernetes in production.
+
+**Why this priority**: This is the user-facing manifestation of Two-Tier Architecture. If data engineers still see platform concerns, the architecture has failed.
+
+**Independent Test**: Can be tested by counting lines of code in demo assets - observability/config boilerplate should be 0, only business logic remains.
+
+**Acceptance Scenarios**:
+
+1. **Given** demo/orchestration/definitions.py after refactoring, **When** reviewed for platform concerns, **Then** it contains zero lines for tracing setup, lineage initialization, or config loading
+2. **Given** an asset definition using @floe_asset, **When** the code is reviewed, **Then** no endpoint URLs, credential handling, or secret resolution is visible
+3. **Given** demo code reduced from ~1150 LOC to ~400 LOC, **When** compared, **Then** the reduction is entirely boilerplate removal (business logic unchanged)
+
+---
+
 ### Edge Cases
 
 - What happens when a floe.yaml references a profile not defined in platform.yaml? → System fails fast with clear error: "Profile 'X' not found in platform configuration"
@@ -181,6 +215,20 @@ A Platform Engineer wants to quickly identify and fix configuration errors when 
 - **FR-044**: System MUST provide a Security Architecture document (zero-trust model, credential flow, threat mitigations, audit guidance)
 - **FR-045**: System MUST update CLAUDE.md and project documentation to reflect two-tier configuration patterns
 - **FR-046**: System MUST export JSON Schema files for platform.yaml and floe.yaml to enable IDE autocomplete and validation
+
+**Batteries-Included floe-dagster**
+
+- **FR-053**: floe-dagster MUST provide an `ObservabilityOrchestrator` context manager that combines tracing + lineage lifecycle management
+- **FR-054**: floe-dagster MUST provide a `@floe_asset` decorator that auto-instruments observability (replaces raw `@asset` as primary API)
+- **FR-055**: `@floe_asset` MUST automatically create OpenTelemetry spans with asset name and custom attributes
+- **FR-056**: `@floe_asset` MUST automatically emit OpenLineage START/COMPLETE/FAIL events based on execution outcome
+- **FR-057**: `@floe_asset` MUST record exceptions to span before re-raising (preserving stack trace)
+- **FR-058**: Observability failures (unavailable endpoints) MUST NOT break asset execution (graceful degradation)
+- **FR-059**: floe-dagster MUST provide a `PolarisCatalogResource` that resolves secrets at runtime from CompiledArtifacts
+- **FR-060**: `@floe_asset` MUST support resource injection via function signature inspection (e.g., `catalog: PolarisCatalog`)
+- **FR-061**: floe-dagster MUST provide `FloeDefinitions.from_compiled_artifacts()` factory that auto-wires all resources and observability
+- **FR-062**: Demo/orchestration code MUST be refactored to use `@floe_asset` and `FloeDefinitions`, reducing boilerplate by ~60%
+- **FR-063**: After refactoring, demo asset functions MUST contain zero observability setup, config loading, or credential handling code
 
 **Tech Debt & Refactoring**
 

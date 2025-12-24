@@ -171,3 +171,52 @@ tests/
 
 **Ready for**: `/speckit.tasks` to generate implementation tasks.
 
+---
+
+## Phase 2: Batteries-Included floe-dagster
+
+**Added 2025-12-24**: Architectural analysis revealed that Two-Tier Configuration solves **configuration separation** but not **developer experience**. The demo codebase contained ~65% boilerplate (740 of 1150 LOC) for observability, config loading, and resource management.
+
+### Problem Discovered
+
+Even with clean `floe.yaml` files, data engineers still wrote:
+- 56 LOC for module-level observability initialization
+- 280 LOC for per-asset span/lineage ceremony (70 LOC x 4 assets)
+- 155 LOC for platform config loading functions
+- 33 LOC for catalog resource creation (repeated 5 times)
+
+**Root cause**: floe-dagster lacked high-level abstractions to consume CompiledArtifacts.
+
+### Solution: Batteries-Included Abstractions
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `ObservabilityOrchestrator` | `floe_dagster/observability/orchestrator.py` | Unified tracing + lineage context manager |
+| `@floe_asset` | `floe_dagster/decorators.py` | Auto-instrumented asset decorator (replaces @asset) |
+| `PolarisCatalogResource` | `floe_dagster/resources/catalog.py` | Dagster resource from CompiledArtifacts |
+| `FloeDefinitions.from_compiled_artifacts()` | `floe_dagster/definitions.py` | One-line Definitions factory |
+
+### New User Stories (added to spec.md)
+
+- **US6 (P1)**: Data Engineer Writes Assets Without Observability Boilerplate
+- **US7 (P1)**: Data Engineer's Code Contains Zero Platform Concerns
+
+### New Requirements (FR-053 through FR-063)
+
+See [spec.md](./spec.md) for full requirements.
+
+### Delivery via Beads
+
+| Bead ID | Title | Priority | Dependencies |
+|---------|-------|----------|--------------|
+| `floe-runtime-5qrc` | ObservabilityOrchestrator | P1 | None |
+| `floe-runtime-5u2y` | @floe_asset + PolarisCatalogResource | P1 | 5qrc |
+| `floe-runtime-0c7j` | FloeDefinitions.from_compiled_artifacts() | P1 | 5qrc, 5u2y |
+| `floe-runtime-i43l` | Demo refactoring | P2 | 0c7j |
+
+### Success Metrics
+
+- Demo reduced from ~1,150 to ~400 LOC (60% reduction)
+- Zero observability boilerplate in data engineer code
+- Same demo code works in Docker Compose and K8s
+
