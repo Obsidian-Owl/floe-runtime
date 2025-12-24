@@ -26,11 +26,17 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
+      {{- if and (eq .Values.api.service.type "NodePort") .Values.api.service.nodePort }}
+      nodePort: {{ .Values.api.service.nodePort }}
+      {{- end }}
     {{- if .Values.api.sqlApi.enabled | default false }}
     - port: {{ .Values.api.sqlApi.port | default 15432 }}
       targetPort: sql
       protocol: TCP
       name: sql
+      {{- if and (eq .Values.api.service.type "NodePort") .Values.api.sqlApi.nodePort }}
+      nodePort: {{ .Values.api.sqlApi.nodePort }}
+      {{- end }}
     {{- end }}
   selector:
     {{- include "floe-cube.api.selectorLabels" . | nindent 4 }}

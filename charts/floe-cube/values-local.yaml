@@ -1,10 +1,10 @@
 # Floe Cube Helm Chart - Local Kubernetes Testing Values
 #
 # Optimized for Docker Desktop Kubernetes with floe-infrastructure services.
-# Uses DuckDB (built-in) for compute, connecting to Polaris and MinIO.
+# Uses DuckDB (built-in) for compute, connecting to Polaris and LocalStack (S3).
 #
 # Architecture:
-#   Cube API → DuckDB (embedded) → Polaris REST Catalog → MinIO (Iceberg data)
+#   Cube API → DuckDB (embedded) → Polaris REST Catalog → LocalStack S3 (Iceberg data)
 #
 # Prerequisites:
 #   1. Deploy floe-infrastructure first:
@@ -41,43 +41,42 @@ api:
       cpu: 500m
       memory: 512Mi
 
+  # Service configuration for local access
+  service:
+    type: NodePort
+    nodePort: 30400
+
   # Enable SQL API for BI tools (Tableau, Looker, psycopg2)
   sqlApi:
     enabled: true
     port: 15432
+    nodePort: 30432
 
-  # Environment variables for DuckDB + Polaris integration
+  # Environment variables for DuckDB + LocalStack S3 connection
+  # Note: CUBEJS_DB_TYPE, CUBEJS_DEV_MODE, CUBEJS_EXTERNAL_DEFAULT, CUBEJS_CUBESTORE_*
+  # are set by the chart template/helpers - only add unique vars here
   extraEnv:
-    # DuckDB configuration (built into Cube)
-    - name: CUBEJS_DB_TYPE
-      value: "duckdb"
-    # DuckDB S3/MinIO connection for Iceberg files
+    # DuckDB S3/LocalStack connection for Iceberg files
+    # DuckDB endpoint format: host:port (no http:// prefix)
+    # Protocol determined by CUBEJS_DB_DUCKDB_S3_USE_SSL
     - name: CUBEJS_DB_DUCKDB_S3_ENDPOINT
-      value: "http://floe-infra-minio:9000"
+      value: "floe-infra-localstack:4566"
     - name: CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID
-      value: "minioadmin"
+      value: "test"
     - name: CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY
-      value: "minioadmin"
+      value: "test"
     - name: CUBEJS_DB_DUCKDB_S3_REGION
       value: "us-east-1"
     - name: CUBEJS_DB_DUCKDB_S3_USE_SSL
       value: "false"
-    # Cube Store connection (for pre-aggregations)
-    - name: CUBEJS_CUBESTORE_HOST
-      value: "floe-cube-store"
-    - name: CUBEJS_CUBESTORE_PORT
-      value: "3030"
-    # External pre-aggregations (use Cube Store)
-    - name: CUBEJS_EXTERNAL_DEFAULT
-      value: "true"
+    # Path-style URLs required for LocalStack (not virtual-hosted style)
+    - name: CUBEJS_DB_DUCKDB_S3_URL_STYLE
+      value: "path"
     # SQL API credentials
     - name: CUBEJS_SQL_USER
       value: "cube"
     - name: CUBEJS_SQL_PASSWORD
       value: "cube_password"
-    # Development mode settings
-    - name: CUBEJS_DEV_MODE
-      value: "true"
     - name: CUBEJS_LOG_LEVEL
       value: "debug"
     # API secret (for demo - use secrets in production)
@@ -100,26 +99,22 @@ refreshWorker:
       cpu: 500m
       memory: 512Mi
 
-  # Same environment as API
+  # Same environment as API (only unique vars - others set by template/helpers)
   extraEnv:
-    - name: CUBEJS_DB_TYPE
-      value: "duckdb"
+    # DuckDB endpoint format: host:port (no http:// prefix)
     - name: CUBEJS_DB_DUCKDB_S3_ENDPOINT
-      value: "http://floe-infra-minio:9000"
+      value: "floe-infra-localstack:4566"
     - name: CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID
-      value: "minioadmin"
+      value: "test"
     - name: CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY
-      value: "minioadmin"
+      value: "test"
     - name: CUBEJS_DB_DUCKDB_S3_REGION
       value: "us-east-1"
     - name: CUBEJS_DB_DUCKDB_S3_USE_SSL
       value: "false"
-    - name: CUBEJS_CUBESTORE_HOST
-      value: "floe-cube-store"
-    - name: CUBEJS_CUBESTORE_PORT
-      value: "3030"
-    - name: CUBEJS_EXTERNAL_DEFAULT
-      value: "true"
+    # Path-style URLs required for LocalStack (not virtual-hosted style)
+    - name: CUBEJS_DB_DUCKDB_S3_URL_STYLE
+      value: "path"
     - name: CUBEJS_API_SECRET
       value: "floe-demo-secret-change-in-production"
 
@@ -135,8 +130,9 @@ preAggregations:
     enabled: false
 
 # Cube Store configuration (for pre-aggregations)
+# NOTE: Disabled for local demo - pre-aggregations require more resources
 cubeStore:
-  enabled: true
+  enabled: false
   replicaCount: 1
 
   image:
@@ -144,11 +140,11 @@ cubeStore:
     tag: "v0.36"
     pullPolicy: IfNotPresent
 
-  # S3 configuration for pre-aggregation storage (MinIO)
+  # S3 configuration for pre-aggregation storage (LocalStack)
   s3:
     bucket: "cube-preaggs"
     region: "us-east-1"
-    endpoint: "http://floe-infra-minio:9000"
+    endpoint: "http://floe-infra-localstack:4566"
 
   # Minimal resources for local testing
   resources:
@@ -164,18 +160,22 @@ cubeStore:
     enabled: false
 
   extraEnv:
+    - name: CUBESTORE_S3_BUCKET
+      value: "cube-preaggs"
     - name: CUBESTORE_S3_ENDPOINT
-      value: "http://floe-infra-minio:9000"
+      value: "http://floe-infra-localstack:4566"
     - name: CUBESTORE_AWS_ACCESS_KEY_ID
-      value: "minioadmin"
+      value: "test"
     - name: CUBESTORE_AWS_SECRET_ACCESS_KEY
-      value: "minioadmin"
+      value: "test"
     - name: CUBESTORE_S3_REGION
       value: "us-east-1"
 
 # Floe-specific configuration
+# Note: Cube v0.36 uses /cube/conf as base path, so schema must be relative
 floe:
-  schemaPath: "/app/schema"
+  schemaPath: "schema"
+  schemaMountPath: "/cube/conf/schema"
   dbtManifestPath: "/app/.floe/manifest.json"
   compiledArtifacts:
     enabled: false  # Not using CompiledArtifacts for demo
@@ -185,15 +185,26 @@ database:
   type: duckdb
 
 # Demo Cube schema for Iceberg tables via DuckDB
-# These queries use DuckDB's Iceberg extension to read from Polaris catalog
+# These queries use DuckDB's parquet reader to access LocalStack S3
+#
+# ARCHITECTURE NOTE:
+# This is a SIMPLIFIED DEMO that queries bronze layer directly.
+# Production architecture would include:
+#   Bronze → dbt (Silver/Gold) → Trino → Cube
+#
+# The full Docker Compose demo includes Trino and queries gold marts.
+# This K8s demo simplifies by reading bronze parquet files directly.
+#
+# Data path: Seed Job → raw_* tables → Dagster → bronze_* tables → Cube
 schema:
   Orders.js: |
     cube(`Orders`, {
-      // Query Iceberg table via DuckDB
-      // DuckDB connects to Polaris REST catalog for metadata
+      // Query raw orders from Iceberg via DuckDB parquet reader
+      // Actual schema: id, customer_id, status, region, amount, created_at
+      // Production would query: floe_demo.marts.mart_revenue via Trino
       sql: `
         SELECT *
-        FROM read_parquet('s3://iceberg-data/demo.gold/fct_orders/**/*.parquet')
+        FROM read_parquet('s3://iceberg-data/demo/raw_orders/data/*.parquet')
       `,
 
       measures: {
@@ -202,53 +213,61 @@ schema:
           description: `Total number of orders`
         },
         totalAmount: {
-          sql: `total_amount`,
+          sql: `amount`,
           type: `sum`,
           description: `Sum of all order amounts`
         },
         averageAmount: {
-          sql: `total_amount`,
+          sql: `amount`,
           type: `avg`,
           description: `Average order amount`
+        },
+        completedCount: {
+          sql: `CASE WHEN status = 'completed' THEN 1 ELSE 0 END`,
+          type: `sum`,
+          description: `Number of completed orders`
         }
       },
 
       dimensions: {
         id: {
-          sql: `order_id`,
-          type: `string`,
+          sql: `id`,
+          type: `number`,
           primaryKey: true
         },
         status: {
           sql: `status`,
-          type: `string`
+          type: `string`,
+          description: `Order status (pending, shipped, delivered, cancelled)`
+        },
+        region: {
+          sql: `region`,
+          type: `string`,
+          description: `Geographic region`
         },
         customerId: {
           sql: `customer_id`,
-          type: `string`
+          type: `number`
         },
         createdAt: {
           sql: `created_at`,
-          type: `time`
+          type: `time`,
+          description: `Order creation timestamp`
         }
       },
 
-      preAggregations: {
-        ordersByDay: {
-          measures: [CUBE.count, CUBE.totalAmount],
-          dimensions: [CUBE.status],
-          timeDimension: CUBE.createdAt,
-          granularity: `day`,
-          external: true
-        }
-      }
+      // Pre-aggregations disabled for simplified K8s demo
+      preAggregations: {}
     });
 
   Customers.js: |
     cube(`Customers`, {
+      // Query raw customers from Iceberg via DuckDB parquet reader
+      // Actual schema: customer_id, name, email, region, created_at
+      // Production would query: floe_demo.marts.mart_customer_segments via Trino
       sql: `
         SELECT *
-        FROM read_parquet('s3://iceberg-data/demo.silver/dim_customers/**/*.parquet')
+        FROM read_parquet('s3://iceberg-data/demo/raw_customers/data/*.parquet')
       `,
 
       measures: {
@@ -261,24 +280,83 @@ schema:
       dimensions: {
         id: {
           sql: `customer_id`,
-          type: `string`,
+          type: `number`,
           primaryKey: true
         },
         name: {
           sql: `name`,
-          type: `string`
+          type: `string`,
+          description: `Customer full name`
         },
         email: {
           sql: `email`,
-          type: `string`
+          type: `string`,
+          description: `Customer email address`
         },
-        segment: {
-          sql: `segment`,
-          type: `string`
+        region: {
+          sql: `region`,
+          type: `string`,
+          description: `Geographic region`
         },
         createdAt: {
           sql: `created_at`,
-          type: `time`
+          type: `time`,
+          description: `Account creation timestamp`
+        }
+      }
+    });
+
+  Products.js: |
+    cube(`Products`, {
+      // Query raw products from Iceberg via DuckDB parquet reader
+      // Actual schema: product_id, name, category, price, sku
+      sql: `
+        SELECT *
+        FROM read_parquet('s3://iceberg-data/demo/raw_products/data/*.parquet')
+      `,
+
+      measures: {
+        count: {
+          type: `count`,
+          description: `Total number of products`
+        },
+        averagePrice: {
+          sql: `price`,
+          type: `avg`,
+          description: `Average product price`
+        },
+        totalValue: {
+          sql: `price`,
+          type: `sum`,
+          description: `Sum of all product prices`
+        }
+      },
+
+      dimensions: {
+        id: {
+          sql: `product_id`,
+          type: `number`,
+          primaryKey: true
+        },
+        name: {
+          sql: `name`,
+          type: `string`,
+          description: `Product name`
+        },
+        category: {
+          sql: `category`,
+          type: `string`,
+          description: `Product category`
+        },
+        sku: {
+          sql: `sku`,
+          type: `string`,
+          description: `Stock keeping unit`
+        },
+        price: {
+          sql: `price`,
+          type: `number`,
+          description: `Current product price`
         }
       }
     });

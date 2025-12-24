@@ -111,9 +111,12 @@ localstack:
       repository: amazon/aws-cli
       tag: "2.15.0"
       pullPolicy: IfNotPresent
+    # Medallion Architecture: Separate buckets per layer
     buckets:
-      - name: iceberg-data
-      - name: cube-preaggs
+      - name: iceberg-bronze    # Bronze: Raw + lightly cleaned (7yr retention)
+      - name: iceberg-silver    # Silver: Cleaned + enriched (2yr retention)
+      - name: iceberg-gold      # Gold: Aggregated marts (90d retention)
+      - name: cube-preaggs      # Cube: Pre-aggregation cache
     iamRole:
       name: "polaris-storage-role"
     secretsManager:
@@ -152,6 +155,7 @@ polaris:
     failureThreshold: 3
 
 # Jaeger - all-in-one with memory storage
+# NodePort access via localAccess.nodeports.jaeger (templates/jaeger-nodeport.yaml)
 jaeger:
   enabled: true
   provisionDataStore:
@@ -165,10 +169,6 @@ jaeger:
       limits:
         cpu: 500m
         memory: 512Mi
-    # NodePort for resilient Jaeger UI access
-    service:
-      type: NodePort
-      nodePort: 30686
   storage:
     type: memory
   agent:
@@ -204,11 +204,14 @@ marquez:
 polarisInit:
   enabled: true
   catalogName: "demo_catalog"
+  # Medallion architecture namespaces (bronze/silver/gold)
   namespaces:
-    - "demo.bronze"
-    - "demo.silver"
-    - "demo.gold"
-  storageLocation: "s3://iceberg-data/"
+    - "demo.bronze"  # Raw + lightly cleaned layer
+    - "demo.silver"  # Cleaned + enriched layer
+    - "demo.gold"    # Aggregated marts layer
+  # Default storage location (bronze bucket for backward compatibility)
+  # Individual tables can override with table-specific locations
+  storageLocation: "s3://iceberg-bronze/"
   oauthClientId: "demo_client"
   oauthClientSecret: "demo_secret_k8s"
   # IAM role ARN for credential vending (Polaris uses STS AssumeRole)

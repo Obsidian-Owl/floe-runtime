@@ -2,15 +2,165 @@
 
 Run the floe-runtime demo e-commerce pipeline in 5 minutes.
 
+**Two deployment options:**
+- **[Kubernetes (Recommended)](#kubernetes-deployment)** - Production-like deployment on Docker Desktop K8s
+- **[Docker Compose](#docker-compose-deployment)** - Simpler, all-in-one development stack
+
 ---
+
+# Kubernetes Deployment
+
+Production-like deployment using Helm charts on Docker Desktop Kubernetes.
+
+## Prerequisites
+
+- Docker Desktop with **Kubernetes enabled** (Settings → Kubernetes → Enable)
+- 8GB+ RAM allocated to Docker Desktop
+- `kubectl` configured (`kubectl cluster-info` works)
+- `helm` v3.x installed
+- `curl` and `jq` for API testing (optional)
+- `psql` for SQL API testing (optional)
+
+## Quick Start
+
+```bash
+# One command deploys the complete stack
+make deploy-local-full
+
+# Wait ~3-5 minutes for initialization
+# Check pod status
+make demo-status
+```
+
+That's it! All services are now accessible via NodePort.
+
+## Service URLs (NodePort Access)
+
+These URLs are **resilient** - they survive pod restarts without needing port-forward:
+
+| Service | URL | Purpose |
+|---------|-----|---------|
+| **Dagster UI** | http://localhost:30000 | Asset orchestration, run monitoring |
+| **Cube REST API** | http://localhost:30400 | Semantic layer queries |
+| **Cube SQL API** | `psql -h localhost -p 30432 -U cube` | Postgres wire protocol |
+| **Marquez UI** | http://localhost:30301 | Data lineage visualization |
+| **Jaeger UI** | http://localhost:30686 | Distributed tracing |
+| **MinIO Console** | http://localhost:30901 | S3 storage (user: `minioadmin`) |
+| **Polaris API** | http://localhost:30181 | Iceberg catalog |
+| **LocalStack** | http://localhost:30566 | S3/STS emulation |
+
+## Verify Deployment
+
+```bash
+# Check all pods are Running
+kubectl get pods -n floe
+
+# Quick API test
+curl -s http://localhost:30400/cubejs-api/v1/meta | jq '.cubes[].name'
+# Expected: "Orders", "Customers"
+
+# Dagster health
+curl -s http://localhost:30000/server_info | jq
+```
+
+## Query the Cube APIs (Kubernetes)
+
+### REST API
+
+```bash
+# Get order count and total amount
+curl -s http://localhost:30400/cubejs-api/v1/load \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": {
+      "measures": ["Orders.count", "Orders.totalAmount"]
+    }
+  }' | jq '.data'
+```
+
+### GraphQL API
+
+```bash
+curl -s http://localhost:30400/cubejs-api/graphql \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "{ cube(measures: [\"Orders.count\"], dimensions: [\"Orders.status\"]) { Orders { count status } } }"
+  }' | jq '.data.cube'
+```
+
+### SQL API (Postgres Wire Protocol)
+
+```bash
+# Using psql (password: cube_password)
+PGPASSWORD=cube_password psql -h localhost -p 30432 -U cube -d cube \
+  -c "SELECT status, MEASURE(count) as order_count FROM Orders GROUP BY 1"
+
+# Using Python
+python3 -c "
+import psycopg2
+conn = psycopg2.connect(host='localhost', port=30432, user='cube', password='cube_password', database='cube')
+cur = conn.cursor()
+cur.execute('SELECT MEASURE(count), MEASURE(totalAmount) FROM Orders')
+print(cur.fetchone())
+"
+```
+
+## Cleanup
+
+```bash
+# Clean up completed Dagster run pods (accumulate over time)
+make demo-cleanup
+
+# Remove all deployments
+make undeploy-local
+
+# Or delete the entire namespace
+kubectl delete namespace floe
+```
+
+## Troubleshooting (Kubernetes)
+
+### Pod Not Starting
+
+```bash
+# Check pod status and events
+kubectl describe pod <pod-name> -n floe
+
+# Check logs (last 50 lines)
+kubectl logs <pod-name> -n floe --tail=50
+```
+
+### Cube Connection Issues
+
+```bash
+# Check Cube API logs
+kubectl logs -l app.kubernetes.io/component=api -n floe --tail=30
+
+# Verify S3 connectivity
+kubectl exec -it deploy/floe-cube-api -n floe -- env | grep S3
+```
+
+### Dagster Issues
+
+```bash
+# Check webserver logs
+kubectl logs -l component=dagster-webserver -n floe --tail=30
+
+# Check daemon logs
+kubectl logs -l component=dagster-daemon -n floe --tail=30
+```
+
+---
+
+# Docker Compose Deployment
+
+Simpler development stack using Docker Compose.
 
 ## Prerequisites
 
 - Docker Desktop with 8GB+ RAM allocated
 - Docker Compose v2.x
 - `curl` and `jq` for API testing (optional)
-
----
 
 ## Quick Start
 

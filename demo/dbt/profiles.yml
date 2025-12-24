@@ -1,0 +1,19 @@
+floe_demo:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: ':memory:'
+      extensions:
+        - httpfs
+        - parquet
+      settings:
+        # S3 configuration for LocalStack
+        s3_endpoint: 'floe-infra-localstack:4566'
+        s3_use_ssl: false
+        s3_url_style: 'path'
+        s3_region: 'us-east-1'
+        s3_access_key_id: "{{ env_var('AWS_ACCESS_KEY_ID', 'test') }}"
+        s3_secret_access_key: "{{ env_var('AWS_SECRET_ACCESS_KEY', 'test') }}"
+      # Thread count for parallel execution
+      threads: 4

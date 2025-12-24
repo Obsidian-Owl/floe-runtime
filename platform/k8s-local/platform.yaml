@@ -102,19 +102,65 @@ governance:
     enabled: false
 
 # =============================================================================
-# Storage Profiles
+# Storage Profiles - Medallion Architecture (Bronze/Silver/Gold)
 # =============================================================================
+# Best Practice: Separate buckets per layer for:
+# - Layer-specific access controls (Bronze: read-only, Silver: transform, Gold: public)
+# - Differentiated retention policies (Bronze: 7 years, Silver: 2 years, Gold: 90 days)
+# - Performance isolation (Bronze: high write, Gold: high read)
+# - Compliance (GDPR/CCPA data minimization)
 storage:
-  default:
+  # Bronze Layer: Raw and lightly cleaned data
+  # - Retention: Long-term (7 years for audit trail)
+  # - Access: Data engineers (read-only)
+  # - Performance: Optimized for bulk writes
+  bronze:
     type: s3
-    # LocalStack S3 endpoint in K8s (floe-infrastructure chart)
     endpoint: "http://floe-infra-localstack:4566"
     region: us-east-1
-    bucket: iceberg-data
+    bucket: iceberg-bronze
     path_style_access: true
     credentials:
       mode: static
-      # LocalStack accepts any credentials - secret resolved from AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY
+      secret_ref: aws-credentials
+
+  # Silver Layer: Cleaned, deduplicated, enriched data
+  # - Retention: Medium-term (2 years)
+  # - Access: Data engineers and analysts (read-only)
+  # - Performance: Balanced read/write
+  silver:
+    type: s3
+    endpoint: "http://floe-infra-localstack:4566"
+    region: us-east-1
+    bucket: iceberg-silver
+    path_style_access: true
+    credentials:
+      mode: static
+      secret_ref: aws-credentials
+
+  # Gold Layer: Aggregated marts for analytics
+  # - Retention: Short-term (90 days)
+  # - Access: Public via semantic layer
+  # - Performance: Optimized for analytical queries
+  gold:
+    type: s3
+    endpoint: "http://floe-infra-localstack:4566"
+    region: us-east-1
+    bucket: iceberg-gold
+    path_style_access: true
+    credentials:
+      mode: static
+      secret_ref: aws-credentials
+
+  # Default alias points to bronze for backward compatibility
+  default:
+    type: s3
+    endpoint: "http://floe-infra-localstack:4566"
+    region: us-east-1
+    bucket: iceberg-bronze
+    path_style_access: true
+    credentials:
+      mode: static
       secret_ref: aws-credentials
 
 catalogs:
