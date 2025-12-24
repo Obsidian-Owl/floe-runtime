@@ -9,6 +9,52 @@
 dagster:
   enabled: true
 
+  # ==========================================================================
+  # Self-Healing Configuration (Embedded Infrastructure Behavior)
+  # ==========================================================================
+  # These probes ensure pods auto-restart when they become unhealthy.
+  # Users don't need to configure these - they're baked in.
+
+  dagsterWebserver:
+    # Liveness probe: restart webserver if it becomes unresponsive
+    livenessProbe:
+      httpGet:
+        path: /server_info
+        port: 80
+      initialDelaySeconds: 60
+      periodSeconds: 30
+      timeoutSeconds: 10
+      failureThreshold: 3
+    # Startup probe: allow up to 5 minutes for initial startup
+    startupProbe:
+      enabled: true
+      httpGet:
+        path: /server_info
+        port: 80
+      periodSeconds: 10
+      failureThreshold: 30
+
+  dagsterDaemon:
+    # Reduced heartbeat tolerance for faster detection of hung scheduler
+    # Default is 1800s (30min), we use 300s (5min) for quicker recovery
+    heartbeatTolerance: 300
+    # Liveness probe using built-in daemon health check
+    # Checks heartbeats from all daemon threads including SCHEDULER
+    livenessProbe:
+      exec:
+        command: ["dagster-daemon", "liveness-check"]
+      initialDelaySeconds: 60
+      periodSeconds: 30
+      timeoutSeconds: 10
+      failureThreshold: 3
+    # Startup probe: allow daemon threads to initialize
+    startupProbe:
+      enabled: true
+      exec:
+        command: ["dagster-daemon", "liveness-check"]
+      periodSeconds: 10
+      failureThreshold: 30
+
 # Floe-specific configuration
 floe:
   # Platform Specification (Two-Tier Architecture)
@@ -17,7 +63,7 @@ floe:
   # Same floe.yaml works across environments by swapping platform.yaml
   # Covers: 009-US2 (Same floe.yaml works across dev/staging/prod)
   platformSpec:
-    # Enable Platform ConfigMap creation
+    # Enable Platform ConfigMap creation (creates own ConfigMap)
     enabled: false
     # Mount path inside containers (FLOE_PLATFORM_FILE env var points here)
     mountPath: "/app/.floe/platform.yaml"
@@ -26,6 +72,22 @@ floe:
     content: ""
     # Additional annotations for the ConfigMap
     annotations: {}
+
+  # External Platform ConfigMap (Two-Tier Architecture - Preferred)
+  # Mount an existing platform ConfigMap from floe-infrastructure chart
+  # This is the preferred approach: single source of truth for platform config
+  # Covers: 009-US2 (Same floe.yaml works across dev/staging/prod)
+  externalPlatformConfig:
+    # Enable mounting external platform ConfigMap (from floe-infrastructure)
+    enabled: false
+    # Name of the external ConfigMap (e.g., "floe-infra-platform-config")
+    configMapName: ""
+    # Key within the ConfigMap containing platform.yaml
+    configMapKey: "platform.yaml"
+    # Mount path inside containers
+    mountPath: "/etc/floe/platform.yaml"
+    # Set FLOE_PLATFORM_FILE env var to point to mounted config
+    setEnvVar: true
 
     # Storage profile configuration
     storage:
@@ -274,3 +336,12 @@ ingress:
         - path: /
           pathType: Prefix
   tls: []
+
+# =============================================================================
+# Local Access Configuration
+# =============================================================================
+# Provides NodePort access for local development.
+# Disabled by default - enable in values-local.yaml
+localAccess:
+  enabled: false
+  nodePort: 30000

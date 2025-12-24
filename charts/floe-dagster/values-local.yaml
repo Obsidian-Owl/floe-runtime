@@ -1,12 +1,28 @@
 # Floe Dagster Helm Chart - Local Kubernetes Testing Values
 #
+# Two-Tier Configuration Architecture:
+# - Platform config loaded from ConfigMap (injected from platform.yaml)
+# - Credentials injected via environment variables (from K8s secrets)
+# - Same floe.yaml + demo code works across environments
+#
+# Network Access Strategy:
+# - NodePort service for resilient Dagster UI access (survives pod restarts)
+# - No manual port-forwarding required
+# - Access via localhost:<nodePort> on Docker Desktop
+#
+# Service URL (after deployment):
+#   Dagster UI:      http://localhost:30000
+#
 # Optimized for Docker Desktop Kubernetes with floe-infrastructure services.
 # Uses DuckDB (embedded) for compute via dbt-duckdb adapter.
 # Connects to Polaris (Iceberg catalog) and MinIO (S3 storage).
 #
 # Prerequisites:
-#   1. Deploy floe-infrastructure first:
-#      helm install floe-infra charts/floe-infrastructure -n floe -f charts/floe-infrastructure/values-local.yaml
+#   1. Deploy floe-infrastructure with platform.yaml:
+#      helm install floe-infra charts/floe-infrastructure -n floe \
+#        -f charts/floe-infrastructure/values-local.yaml \
+#        --set platformConfig.enabled=true \
+#        --set-file platformConfig.content=./platform/local/platform.yaml
 #   2. Wait for Polaris initialization to complete
 #
 # Usage:
@@ -16,36 +32,36 @@
 #
 # Covers: 007-FR-001 (Helm chart for Kubernetes deployment)
 # Covers: 008-US1 (Deploy complete stack to Kubernetes)
+# Covers: 009-US2 (Two-Tier Configuration Architecture)
 
+# =============================================================================
+# Local Access Configuration
+# =============================================================================
+# Provides NodePort access for local development on Docker Desktop.
+# Access Dagster UI at: http://localhost:30000
+localAccess:
+  enabled: true
+  nodePort: 30000
+
+# =============================================================================
 # Dagster subchart configuration
+# =============================================================================
 dagster:
   enabled: true
 
   # Global environment variables for all Dagster components
+  # NOTE: Infrastructure endpoints are NOW in platform.yaml (ConfigMap)
+  # Only credentials and service-specific overrides remain here
   global:
     env:
-      # Polaris (Iceberg REST catalog) connection
-      - name: POLARIS_URI
-        value: "http://floe-infra-polaris:8181/api/catalog"
-      - name: POLARIS_CATALOG
-        value: "demo_catalog"
-      # MinIO (S3-compatible storage) connection
-      - name: AWS_ENDPOINT_URL
-        value: "http://floe-infra-minio:9000"
-      - name: AWS_ACCESS_KEY_ID
-        value: "minioadmin"
-      - name: AWS_SECRET_ACCESS_KEY
-        value: "minioadmin"
-      - name: AWS_REGION
-        value: "us-east-1"
       # DuckDB configuration for dbt
       - name: DBT_PROFILES_DIR
         value: "/app/demo"
-      # Observability endpoints
-      - name: JAEGER_ENDPOINT
-        value: "http://floe-infra-jaeger-collector:14268/api/traces"
-      - name: MARQUEZ_URL
-        value: "http://floe-infra-marquez:5000"
+      # Service name for observability
+      - name: OTEL_SERVICE_NAME
+        value: "floe-demo"
+      - name: OPENLINEAGE_NAMESPACE
+        value: "demo"
 
   # User deployments configuration
   # Image: ghcr.io/obsidian-owl/floe-demo:latest
@@ -61,33 +77,39 @@ dagster:
         # Note: Don't specify dagsterApiGrpcArgs - the Dockerfile ENTRYPOINT
         # already includes the full command: dagster api grpc -h 0.0.0.0 -p 3030 -m demo.orchestration.definitions
         port: 3030
+        # Two-Tier Architecture: Mount platform ConfigMap
+        # Name pattern: {infra-release-name}-platform-config
+        volumes:
+          - name: platform-config
+            configMap:
+              name: floe-infra-platform-config
+              items:
+                - key: platform.yaml
+                  path: platform.yaml
+        volumeMounts:
+          - name: platform-config
+            mountPath: /etc/floe/platform.yaml
+            subPath: platform.yaml
+            readOnly: true
         env:
-          # Polaris (Iceberg REST catalog) connection
-          - name: POLARIS_URI
-            value: "http://floe-infra-polaris:8181/api/catalog"
-          - name: POLARIS_WAREHOUSE
-            value: "demo_catalog"
-          # Polaris OAuth2 credentials (must match polarisInit values in floe-infrastructure)
+          # Two-Tier Architecture: Point PlatformResolver to mounted config
+          - name: FLOE_PLATFORM_FILE
+            value: "/etc/floe/platform.yaml"
+          # Polaris OAuth2 credentials (from K8s secret in production)
+          # For local dev, these match polarisInit values in floe-infrastructure
           - name: POLARIS_CLIENT_ID
             value: "demo_client"
           - name: POLARIS_CLIENT_SECRET
             value: "demo_secret_k8s"
-          # MinIO (S3-compatible storage) connection
-          - name: AWS_ENDPOINT_URL
-            value: "http://floe-infra-minio:9000"
+          # MinIO credentials (from K8s secret in production)
+          # For local dev, these are default MinIO admin credentials
           - name: AWS_ACCESS_KEY_ID
             value: "minioadmin"
           - name: AWS_SECRET_ACCESS_KEY
             value: "minioadmin"
-          - name: AWS_REGION
-            value: "us-east-1"
-          # Observability endpoints
-          - name: OTEL_EXPORTER_OTLP_ENDPOINT
-            value: "http://floe-infra-jaeger-collector:4317"
+          # Service identification for observability
           - name: OTEL_SERVICE_NAME
             value: "floe-demo"
-          - name: OPENLINEAGE_URL
-            value: "http://floe-infra-marquez:5000"
           - name: OPENLINEAGE_NAMESPACE
             value: "demo"
 
@@ -112,6 +134,12 @@ dagster:
       limits:
         cpu: 500m
         memory: 512Mi
+    # Use ClusterIP internally - NodePort provided by floe-dagster wrapper service
+    service:
+      type: ClusterIP
+      port: 80
+      annotations:
+        description: "Dagster Webserver UI - internal ClusterIP"
 
   dagsterDaemon:
     enabled: true

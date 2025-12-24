@@ -91,3 +91,63 @@ Generate the ConfigMap name for CompiledArtifacts.
 {{- include "floe-dagster.fullname" . }}-compiled-artifacts
 {{- end }}
 {{- end }}
+
+{{/*
+Generate the ConfigMap name for Platform configuration.
+Supports both internal (platformSpec) and external (externalPlatformConfig) modes.
+Two-Tier Architecture: Platform.yaml drives K8s configuration.
+*/}}
+{{- define "floe-dagster.platformConfigMapName" -}}
+{{- if .Values.floe.externalPlatformConfig.enabled }}
+{{- required "externalPlatformConfig.configMapName is required when externalPlatformConfig.enabled=true" .Values.floe.externalPlatformConfig.configMapName }}
+{{- else if .Values.floe.platformSpec.enabled }}
+{{- include "floe-dagster.fullname" . }}-platform
+{{- end }}
+{{- end }}
+
+{{/*
+Generate volume configuration for platform ConfigMap mount.
+Two-Tier Architecture: Mounts platform.yaml for PlatformResolver to load.
+*/}}
+{{- define "floe-dagster.platformConfigVolume" -}}
+{{- if or .Values.floe.platformSpec.enabled .Values.floe.externalPlatformConfig.enabled }}
+- name: platform-config
+  configMap:
+    name: {{ include "floe-dagster.platformConfigMapName" . }}
+    items:
+      - key: {{ .Values.floe.externalPlatformConfig.configMapKey | default "platform.yaml" }}
+        path: platform.yaml
+{{- end }}
+{{- end }}
+
+{{/*
+Generate volumeMount configuration for platform ConfigMap.
+Two-Tier Architecture: Mounts platform.yaml at standard location.
+*/}}
+{{- define "floe-dagster.platformConfigVolumeMount" -}}
+{{- if .Values.floe.externalPlatformConfig.enabled }}
+- name: platform-config
+  mountPath: {{ .Values.floe.externalPlatformConfig.mountPath | default "/etc/floe/platform.yaml" }}
+  subPath: platform.yaml
+  readOnly: true
+{{- else if .Values.floe.platformSpec.enabled }}
+- name: platform-config
+  mountPath: {{ .Values.floe.platformSpec.mountPath | default "/app/.floe/platform.yaml" }}
+  subPath: platform.yaml
+  readOnly: true
+{{- end }}
+{{- end }}
+
+{{/*
+Generate FLOE_PLATFORM_FILE environment variable.
+Two-Tier Architecture: Points PlatformResolver to mounted platform.yaml.
+*/}}
+{{- define "floe-dagster.platformConfigEnv" -}}
+{{- if and .Values.floe.externalPlatformConfig.enabled .Values.floe.externalPlatformConfig.setEnvVar }}
+- name: FLOE_PLATFORM_FILE
+  value: {{ .Values.floe.externalPlatformConfig.mountPath | default "/etc/floe/platform.yaml" }}
+{{- else if .Values.floe.platformSpec.enabled }}
+- name: FLOE_PLATFORM_FILE
+  value: {{ .Values.floe.platformSpec.mountPath | default "/app/.floe/platform.yaml" }}
+{{- end }}
+{{- end }}
