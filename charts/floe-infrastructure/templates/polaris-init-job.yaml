@@ -52,9 +52,10 @@ spec:
               CATALOG_NAME = os.environ["CATALOG_NAME"]
               NAMESPACES = os.environ["NAMESPACES"].split(",")
               STORAGE_LOCATION = os.environ["STORAGE_LOCATION"]
-              MINIO_ENDPOINT = os.environ["MINIO_ENDPOINT"]
+              STORAGE_ENDPOINT = os.environ["STORAGE_ENDPOINT"]
               CLIENT_ID = os.environ["POLARIS_CLIENT_ID"]
               CLIENT_SECRET = os.environ["POLARIS_CLIENT_SECRET"]
+              STORAGE_ROLE_ARN = os.environ.get("STORAGE_ROLE_ARN", "")
 
               def get_oauth_token():
                   """Get OAuth2 token from Polaris."""
@@ -106,32 +107,62 @@ spec:
                   sys.exit(1)
               print("  Token acquired successfully")
 
-              # 1. Create catalog
-              print(f"Creating catalog: {CATALOG_NAME}")
-              status, resp = api_request("POST", "/api/management/v1/catalogs", {
-                  "catalog": {
-                      "name": CATALOG_NAME,
-                      "type": "INTERNAL",
+              # 1. Create or update catalog with proper credential vending config
+              # For vended credentials to work, Polaris needs (per OpenAPI spec):
+              # - roleArn: The IAM role to assume when vending credentials
+              # - endpoint: S3-compatible endpoint for LocalStack/MinIO
+              # - pathStyleAccess: Required for LocalStack/MinIO
+              print(f"Configuring catalog: {CATALOG_NAME}")
+              storage_config = {
+                  "storageType": "S3",
+                  "allowedLocations": [STORAGE_LOCATION],
+                  # Polaris AwsStorageConfigInfo uses flat keys per OpenAPI spec
+                  "endpoint": STORAGE_ENDPOINT,
+                  "pathStyleAccess": True,
+                  "region": "us-east-1"
+              }
+              # Add roleArn for credential vending (required for STS AssumeRole)
+              if STORAGE_ROLE_ARN:
+                  storage_config["roleArn"] = STORAGE_ROLE_ARN
+                  print(f"  Using IAM role for credential vending: {STORAGE_ROLE_ARN}")
+
+              # Check if catalog exists
+              status, resp = api_request("GET", f"/api/management/v1/catalogs/{CATALOG_NAME}", token=token)
+              if status == 200:
+                  # Catalog exists - update it with correct storage config
+                  entity_version = resp.get("entityVersion", 1)
+                  print(f"  Catalog exists (version {entity_version}), updating storage config...")
+                  status, resp = api_request("PUT", f"/api/management/v1/catalogs/{CATALOG_NAME}", {
+                      "currentEntityVersion": entity_version,
                       "properties": {
                           "default-base-location": STORAGE_LOCATION
                       },
-                      "storageConfigInfo": {
-                          "storageType": "S3",
-                          "allowedLocations": [STORAGE_LOCATION],
-                          "s3": {
-                              "endpoint": MINIO_ENDPOINT,
-                              "pathStyleAccess": True,
-                              "region": "us-east-1"
-                          }
+                      "storageConfigInfo": storage_config
+                  }, token)
+                  if status in [200, 204]:
+                      print(f"  Updated catalog: {CATALOG_NAME}")
+                  else:
+                      print(f"  Warning: Failed to update catalog storage config: {status} - {resp}")
+                      print(f"  Continuing with existing catalog configuration")
+              elif status == 404:
+                  # Catalog doesn't exist - create it
+                  print(f"  Creating new catalog: {CATALOG_NAME}")
+                  status, resp = api_request("POST", "/api/management/v1/catalogs", {
+                      "catalog": {
+                          "name": CATALOG_NAME,
+                          "type": "INTERNAL",
+                          "properties": {
+                              "default-base-location": STORAGE_LOCATION
+                          },
+                          "storageConfigInfo": storage_config
                       }
-                  }
-              }, token)
-              if status == 201:
-                  print(f"  Created catalog: {CATALOG_NAME}")
-              elif status == 409:
-                  print(f"  Catalog already exists: {CATALOG_NAME}")
+                  }, token)
+                  if status == 201:
+                      print(f"  Created catalog: {CATALOG_NAME}")
+                  else:
+                      print(f"  Failed to create catalog: {status} - {resp}")
               else:
-                  print(f"  Failed to create catalog: {status} - {resp}")
+                  print(f"  Failed to check catalog status: {status} - {resp}")
 
               # 2. Create namespaces (parent namespaces first, then children)
               # Extract all unique parent namespaces that need to be created first
@@ -250,12 +281,14 @@ spec:
               value: {{ .Values.polarisInit.namespaces | join "," | quote }}
             - name: STORAGE_LOCATION
               value: {{ .Values.polarisInit.storageLocation | quote }}
-            - name: MINIO_ENDPOINT
-              value: {{ include "floe-infrastructure.minio.endpoint" . | quote }}
+            - name: STORAGE_ENDPOINT
+              value: {{ include "floe-infrastructure.storage.endpoint" . | quote }}
             - name: POLARIS_CLIENT_ID
               value: {{ .Values.polarisInit.oauthClientId | default "demo_client" | quote }}
             - name: POLARIS_CLIENT_SECRET
               value: {{ .Values.polarisInit.oauthClientSecret | default "demo_secret" | quote }}
+            - name: STORAGE_ROLE_ARN
+              value: {{ .Values.polarisInit.storageRoleArn | default "" | quote }}
           resources:
             requests:
               cpu: 50m

@@ -1,0 +1,73 @@
+{{/*
+Platform Configuration ConfigMap (Two-Tier Architecture)
+
+This ConfigMap contains the platform.yaml configuration that defines
+infrastructure endpoints, credentials, and profiles. It serves as the
+single source of truth for the floe platform configuration.
+
+Usage:
+  helm install floe-infra ./charts/floe-infrastructure \
+    --set platformConfig.enabled=true \
+    --set-file platformConfig.content=./platform/local/platform.yaml
+
+Consuming pods (floe-dagster, floe-cube) mount this ConfigMap and use
+the PlatformResolver to load configuration at runtime.
+*/}}
+{{- if .Values.platformConfig.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.platformConfig.nameOverride | default (printf "%s-platform-config" .Release.Name) }}
+  labels:
+    {{- include "floe-infrastructure.labels" . | nindent 4 }}
+    app.kubernetes.io/component: platform-config
+  annotations:
+    description: "Platform configuration (Two-Tier Architecture)"
+data:
+  platform.yaml: |
+{{- if .Values.platformConfig.content }}
+{{ .Values.platformConfig.content | indent 4 }}
+{{- else }}
+    # Default minimal platform configuration
+    # Override with --set-file platformConfig.content=./platform/<env>/platform.yaml
+    version: "1.0.0"
+
+    # Storage profiles (S3-compatible backends)
+    storage:
+      default:
+        type: s3
+        endpoint: {{ include "floe-infrastructure.storage.endpoint" . }}
+        region: us-east-1
+        bucket: iceberg-data
+        path_style_access: true
+        credentials:
+          mode: static
+
+    # Catalog profiles (Iceberg REST catalog)
+    catalogs:
+      default:
+        type: polaris
+        uri: {{ include "floe-infrastructure.polaris.endpoint" . }}/api/catalog
+        warehouse: {{ .Values.polarisInit.catalogName | default "demo_catalog" }}
+        credentials:
+          mode: oauth2
+          client_id:
+            secret_ref: POLARIS_CLIENT_ID
+          client_secret:
+            secret_ref: POLARIS_CLIENT_SECRET
+          scope: "PRINCIPAL_ROLE:ALL"
+        access_delegation: none
+        token_refresh_enabled: true
+
+    # Compute profiles
+    compute:
+      default:
+        type: duckdb
+
+    # Observability configuration
+    observability:
+      traces: true
+      otlp_endpoint: {{ include "floe-infrastructure.jaeger.otlp.endpoint" . }}
+      lineage_endpoint: {{ include "floe-infrastructure.marquez.endpoint" . }}
+{{- end }}
+{{- end }}

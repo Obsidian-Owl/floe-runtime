@@ -1,5 +1,5 @@
 {{- if .Values.marquez.enabled }}
-{{- if .Values.marquez.web.enabled | default true }}
+{{- if ((.Values.marquez.web).enabled | default true) }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -22,8 +22,8 @@ spec:
     spec:
       containers:
         - name: marquez-web
-          image: "marquezproject/marquez-web:{{ .Values.marquez.image.tag | default "0.49.0" }}"
-          imagePullPolicy: {{ .Values.marquez.image.pullPolicy | default "IfNotPresent" }}
+          image: "{{ (.Values.marquez.web.image).repository | default "marquezproject/marquez-web" }}:{{ (.Values.marquez.web.image).tag | default .Values.marquez.image.tag | default "0.49.0" }}"
+          imagePullPolicy: {{ (.Values.marquez.web.image).pullPolicy | default .Values.marquez.image.pullPolicy | default "IfNotPresent" }}
           ports:
             - name: http
               containerPort: 3000
@@ -64,12 +64,19 @@ metadata:
     {{- include "floe-infrastructure.labels" . | nindent 4 }}
     app.kubernetes.io/component: marquez-web
 spec:
+  {{- if and .Values.localAccess .Values.localAccess.enabled }}
+  type: NodePort
+  {{- else }}
   type: ClusterIP
+  {{- end }}
   ports:
     - port: 3001
       targetPort: http
       protocol: TCP
       name: http
+      {{- if and .Values.localAccess .Values.localAccess.enabled .Values.localAccess.nodeports }}
+      nodePort: {{ .Values.localAccess.nodeports.marquezWeb | default 30301 }}
+      {{- end }}
   selector:
     {{- include "floe-infrastructure.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: marquez-web

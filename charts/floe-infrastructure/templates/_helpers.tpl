@@ -76,10 +76,26 @@ PostgreSQL port
 {{- end }}
 
 {{/*
-MinIO endpoint
+MinIO endpoint (legacy - use storage.endpoint instead)
 */}}
 {{- define "floe-infrastructure.minio.endpoint" -}}
 {{- printf "http://%s-minio:9000" .Release.Name }}
+{{- end }}
+
+{{/*
+Storage endpoint - cloud-agnostic (supports LocalStack, MinIO, ADLS, GCS)
+Returns the appropriate endpoint based on enabled storage provider.
+*/}}
+{{- define "floe-infrastructure.storage.endpoint" -}}
+{{- if .Values.localstack.enabled }}
+{{- printf "http://%s-localstack:4566" .Release.Name }}
+{{- else if .Values.minio.enabled }}
+{{- printf "http://%s-minio:9000" .Release.Name }}
+{{- else if .Values.azurite.enabled }}
+{{- printf "http://%s-azurite:10000" .Release.Name }}
+{{- else }}
+{{- printf "http://%s-localstack:4566" .Release.Name }}
+{{- end }}
 {{- end }}
 
 {{/*
@@ -90,10 +106,20 @@ Polaris endpoint
 {{- end }}
 
 {{/*
-Jaeger endpoint
+Jaeger UI endpoint (query service)
 */}}
 {{- define "floe-infrastructure.jaeger.endpoint" -}}
 {{- printf "http://%s-jaeger:16686" .Release.Name }}
+{{- end }}
+
+{{/*
+Jaeger OTLP endpoint (collector service for traces)
+The Jaeger Helm chart creates separate services:
+- <release>-jaeger (query, port 16686)
+- <release>-jaeger-collector (OTLP gRPC, port 4317)
+*/}}
+{{- define "floe-infrastructure.jaeger.otlp.endpoint" -}}
+{{- printf "http://%s-jaeger-collector:4317" .Release.Name }}
 {{- end }}
 
 {{/*
@@ -111,14 +137,10 @@ LocalStack endpoint
 {{- end }}
 
 {{/*
-S3 endpoint - returns LocalStack or MinIO endpoint based on configuration
+S3 endpoint - legacy alias for storage.endpoint (use storage.endpoint for cloud-agnostic code)
 */}}
 {{- define "floe-infrastructure.s3.endpoint" -}}
-{{- if .Values.localstack.enabled }}
-{{- printf "http://%s-localstack:4566" .Release.Name }}
-{{- else }}
-{{- printf "http://%s-minio:9000" .Release.Name }}
-{{- end }}
+{{- include "floe-infrastructure.storage.endpoint" . }}
 {{- end }}
 
 {{/*

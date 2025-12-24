@@ -43,6 +43,11 @@ spec:
               value: "test"
             - name: AWS_ENDPOINT_URL
               value: {{ include "floe-infrastructure.localstack.endpoint" . | quote }}
+            # Force path-style S3 access (required for LocalStack/MinIO)
+            # Without this, AWS SDK uses virtual-hosted style (bucket.endpoint)
+            # which fails DNS resolution for LocalStack
+            - name: AWS_S3_USE_PATH_STYLE_ACCESS
+              value: "true"
             {{- else }}
             # MinIO/S3 credentials for storage access
             - name: AWS_ACCESS_KEY_ID

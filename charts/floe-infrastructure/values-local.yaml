@@ -1,6 +1,13 @@
 # Local development values for floe-infrastructure
 # Optimized for Docker Desktop Kubernetes
 # Uses emptyDir instead of PVCs (Docker Desktop hostpath provisioner is unreliable)
+
+# Platform Configuration (Two-Tier Architecture)
+# This ConfigMap is mounted by Dagster pods to load platform.yaml at runtime
+platformConfig:
+  enabled: true
+  # Uses the default minimal config from the template
+  # To use custom config: --set-file platformConfig.content=./platform/local/platform.yaml
 #
 # Storage Strategy:
 # - LocalStack is enabled for AWS-compatible S3 + STS + IAM (production-aligned)
@@ -204,3 +211,6 @@ polarisInit:
   storageLocation: "s3://iceberg-data/"
   oauthClientId: "demo_client"
   oauthClientSecret: "demo_secret_k8s"
+  # IAM role ARN for credential vending (Polaris uses STS AssumeRole)
+  # This role is created by LocalStack init job with S3 read/write permissions
+  storageRoleArn: "arn:aws:iam::000000000000:role/polaris-storage-role"

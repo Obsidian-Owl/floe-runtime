@@ -146,12 +146,19 @@ metadata:
     {{- include "floe-infrastructure.labels" . | nindent 4 }}
     app.kubernetes.io/component: marquez
 spec:
+  {{- if and .Values.localAccess .Values.localAccess.enabled }}
+  type: NodePort
+  {{- else }}
   type: ClusterIP
+  {{- end }}
   ports:
     - port: 5000
       targetPort: http
       protocol: TCP
       name: http
+      {{- if and .Values.localAccess .Values.localAccess.enabled .Values.localAccess.nodeports }}
+      nodePort: {{ .Values.localAccess.nodeports.marquezApi | default 30500 }}
+      {{- end }}
     - port: 5001
       targetPort: admin
       protocol: TCP
