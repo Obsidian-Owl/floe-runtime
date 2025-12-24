@@ -1366,6 +1366,7 @@ dependencies = [
     { name = "pyyaml" },
     { name = "rich" },
     { name = "structlog" },
+    { name = "typing-extensions" },
 ]
 
 [package.optional-dependencies]
@@ -1403,6 +1404,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1" },
     { name = "structlog", specifier = ">=24.4" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0" },
+    { name = "typing-extensions", specifier = ">=4.0" },
 ]
 provides-extras = ["dev"]
 

@@ -66,6 +66,9 @@ warehouse/
 *.sqlite
 *.duckdb
 
+# Claude Code (personal settings)
+.claude/settings.local.json
+
 # IDE
 .idea/
 .vscode/

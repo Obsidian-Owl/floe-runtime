@@ -1,7 +1,7 @@
 # floe-runtime Makefile
 # Provides consistent commands that mirror CI exactly
 
-.PHONY: check lint typecheck security test test-unit test-contract test-integration test-helm helm-lint format install hooks docker-up docker-down docker-logs deploy-local-infra deploy-local-dagster deploy-local-cube deploy-local-full undeploy-local port-forward-all port-forward-stop demo-status demo-logs help
+.PHONY: check lint typecheck security test test-unit test-contract test-integration test-helm helm-lint format install hooks docker-up docker-down docker-logs deploy-local-infra deploy-local-dagster deploy-local-cube deploy-local-full undeploy-local port-forward-all port-forward-stop show-urls demo-status demo-logs help
 
 # Default target
 help:
@@ -27,14 +27,18 @@ help:
 	@echo "  make docker-down     - Stop test infrastructure"
 	@echo "  make docker-logs     - View service logs"
 	@echo ""
-	@echo "Kubernetes Deployment (Docker Desktop):"
-	@echo "  make deploy-local-infra   - Deploy infrastructure (MinIO, Polaris, PostgreSQL, etc.)"
-	@echo "  make deploy-local-dagster - Deploy Dagster orchestration layer"
+	@echo "Kubernetes Deployment (Docker Desktop - Two-Tier Architecture):"
+	@echo "  make deploy-local-infra   - Deploy infra with platform.yaml ConfigMap"
+	@echo "  make deploy-local-dagster - Deploy Dagster (mounts platform ConfigMap)"
 	@echo "  make deploy-local-cube    - Deploy Cube semantic layer"
 	@echo "  make deploy-local-full    - Deploy complete stack (infra + dagster + cube)"
 	@echo "  make undeploy-local       - Remove all local Kubernetes deployments"
 	@echo ""
+	@echo "  Two-Tier: Platform config drives K8s deployment via:"
+	@echo "    PLATFORM_FILE=platform/local/platform.yaml (configurable)"
+	@echo ""
 	@echo "Demo Operations:"
+	@echo "  make show-urls            - Show service URLs (NodePort - resilient access)"
 	@echo "  make port-forward-all     - Start all port-forwards (admin UIs)"
 	@echo "  make port-forward-stop    - Stop all port-forwards"
 	@echo "  make demo-status          - Show status of all deployed services"
@@ -159,16 +163,25 @@ test-helm:
 # ==============================================================================
 
 FLOE_NAMESPACE := floe
+# Two-Tier Architecture: Platform config file for K8s deployment
+# Uses K8s service names (floe-infra-minio, floe-infra-polaris, etc.)
+PLATFORM_FILE := platform/k8s-local/platform.yaml
 
 # Deploy infrastructure layer (MinIO, Polaris, PostgreSQL, Jaeger, Marquez)
+# Two-Tier Architecture: Injects platform.yaml as ConfigMap for apps to consume
 deploy-local-infra:
-	@echo "⎈ Deploying floe-infrastructure to Kubernetes..."
+	@echo "⎈ Deploying floe-infrastructure to Kubernetes (Two-Tier Architecture)..."
+	@echo "   Platform config: $(PLATFORM_FILE)"
 	@helm dependency update charts/floe-infrastructure/
 	helm upgrade --install floe-infra charts/floe-infrastructure/ \
 		--namespace $(FLOE_NAMESPACE) --create-namespace \
 		--values charts/floe-infrastructure/values-local.yaml \
+		--set platformConfig.enabled=true \
+		--set-file platformConfig.content=$(PLATFORM_FILE) \
 		--wait --timeout 5m
 	@echo "✅ Infrastructure deployed!"
+	@echo ""
+	@echo "Platform ConfigMap created: floe-infra-platform-config"
 	@echo ""
 	@echo "Waiting for Polaris initialization..."
 	@kubectl wait --for=condition=complete job/floe-infra-polaris-init \
@@ -176,13 +189,16 @@ deploy-local-infra:
 	@echo "✅ Polaris initialized!"
 
 # Deploy Dagster orchestration layer
+# Two-Tier Architecture: Mounts platform ConfigMap from infrastructure chart
 deploy-local-dagster:
-	@echo "⎈ Deploying floe-dagster to Kubernetes..."
+	@echo "⎈ Deploying floe-dagster to Kubernetes (Two-Tier Architecture)..."
 	helm upgrade --install floe-dagster charts/floe-dagster/ \
 		--namespace $(FLOE_NAMESPACE) \
 		--values charts/floe-dagster/values-local.yaml \
 		--wait --timeout 5m
 	@echo "✅ Dagster deployed!"
+	@echo ""
+	@echo "Platform config mounted at: /etc/floe/platform.yaml"
 	@echo ""
 	@echo "Access Dagster UI:"
 	@echo "  kubectl port-forward svc/floe-dagster-webserver 3000:80 -n $(FLOE_NAMESPACE)"
@@ -214,21 +230,15 @@ deploy-local-full: deploy-local-infra
 	@echo "✅ Full stack deployed to namespace: $(FLOE_NAMESPACE)"
 	@echo "=============================================="
 	@echo ""
-	@echo "Quick port-forward commands:"
-	@echo "  # Dagster UI"
-	@echo "  kubectl port-forward svc/floe-dagster-webserver 3000:80 -n $(FLOE_NAMESPACE)"
+	@echo "Services accessible via NodePort (resilient - survives pod restarts):"
+	@echo "  Dagster UI:      http://localhost:30000"
+	@echo "  Polaris API:     http://localhost:30181"
+	@echo "  MinIO Console:   http://localhost:30901"
+	@echo "  Jaeger UI:       http://localhost:30686"
+	@echo "  Marquez API:     http://localhost:30500"
+	@echo "  Marquez Web UI:  http://localhost:30301"
 	@echo ""
-	@echo "  # Cube REST/GraphQL API"
-	@echo "  kubectl port-forward svc/floe-cube 4000:4000 -n $(FLOE_NAMESPACE)"
-	@echo ""
-	@echo "  # Cube SQL API (for BI tools)"
-	@echo "  kubectl port-forward svc/floe-cube 15432:15432 -n $(FLOE_NAMESPACE)"
-	@echo ""
-	@echo "  # Jaeger (tracing)"
-	@echo "  kubectl port-forward svc/floe-infra-jaeger 16686:16686 -n $(FLOE_NAMESPACE)"
-	@echo ""
-	@echo "  # MinIO Console"
-	@echo "  kubectl port-forward svc/floe-infra-minio-console 9001:9001 -n $(FLOE_NAMESPACE)"
+	@echo "Run 'make show-urls' to see all service URLs"
 
 # Remove all local Kubernetes deployments
 undeploy-local:
@@ -241,6 +251,31 @@ undeploy-local:
 	@echo "  kubectl delete namespace $(FLOE_NAMESPACE)"
 	@echo ""
 	@echo "✅ Deployments removed!"
+
+# Show all service URLs (NodePort access - resilient to pod restarts)
+show-urls:
+	@echo "=============================================="
+	@echo "⎈ Floe Service URLs (NodePort Access)"
+	@echo "=============================================="
+	@echo ""
+	@echo "These URLs are resilient - they survive pod restarts!"
+	@echo "No manual port-forwarding required."
+	@echo ""
+	@echo "Application UIs:"
+	@echo "  Dagster UI:      http://localhost:30000"
+	@echo ""
+	@echo "Infrastructure Services:"
+	@echo "  Polaris API:     http://localhost:30181  (Iceberg catalog)"
+	@echo "  MinIO Console:   http://localhost:30901  (S3 storage, user: minioadmin)"
+	@echo ""
+	@echo "Observability:"
+	@echo "  Jaeger UI:       http://localhost:30686  (distributed tracing)"
+	@echo "  Marquez Web:     http://localhost:30301  (data lineage UI)"
+	@echo "  Marquez API:     http://localhost:30500  (lineage API)"
+	@echo ""
+	@echo "Verify services are running:"
+	@echo "  kubectl get svc -n $(FLOE_NAMESPACE) | grep NodePort"
+	@echo ""
 
 # Start all port-forwards in background
 # Run this after deploy-local-full to access all services
