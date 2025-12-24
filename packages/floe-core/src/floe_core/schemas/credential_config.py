@@ -11,9 +11,9 @@ from __future__ import annotations
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
+from typing_extensions import Self
 
 # Pattern for K8s secret names (RFC 1123 DNS subdomain)
 K8S_SECRET_PATTERN = r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,252}$"

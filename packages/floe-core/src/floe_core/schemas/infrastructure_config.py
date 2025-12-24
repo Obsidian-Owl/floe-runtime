@@ -11,9 +11,9 @@ Covers: 009-US2 (Enterprise Infrastructure Layer)
 from __future__ import annotations
 
 from enum import Enum
-from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from typing_extensions import Self
 
 # Pattern for valid DNS domain names
 DNS_DOMAIN_PATTERN = (
@@ -421,6 +421,12 @@ class LocalAccessPorts(BaseModel):
         ge=30000,
         le=32767,
         description="Marquez API NodePort",
+    )
+    localstack: int = Field(
+        default=30566,
+        ge=30000,
+        le=32767,
+        description="LocalStack NodePort",
     )
 
 

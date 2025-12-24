@@ -149,8 +149,13 @@ class PolarisCatalogConfig(BaseModel):
         description="Enable automatic token refresh before expiry",
     )
     access_delegation: str = Field(
-        default="vended-credentials",
-        description="Iceberg access delegation mode",
+        default="",
+        description=(
+            "Iceberg access delegation mode. Empty string (default) auto-detects: "
+            "disables vending when s3_endpoint is set (LocalStack/MinIO), "
+            "otherwise uses PyIceberg defaults. Explicit values: "
+            "'vended-credentials' for AWS STS, 'remote-signing' for remote signing."
+        ),
     )
     retry: RetryConfig = Field(
         default_factory=RetryConfig,

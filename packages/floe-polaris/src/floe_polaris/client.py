@@ -161,10 +161,19 @@ class PolarisCatalog:
         elif self.config.token:
             properties["token"] = self.config.token.get_secret_value()
 
-        # Access delegation mode - only set if non-empty
-        # Empty string disables credential vending (used for MinIO/LocalStack)
+        # Access delegation mode for vended credentials
+        # PyIceberg defaults to sending "X-Iceberg-Access-Delegation: vended-credentials"
+        # which causes Polaris to use STS AssumeRole for temporary credentials.
+        # For LocalStack/MinIO where STS doesn't work, we must EXPLICITLY set
+        # the header to empty string to disable vending.
+        # See: https://github.com/apache/iceberg-python/issues/1441
         if self.config.access_delegation:
+            # Explicit mode (e.g., "vended-credentials", "remote-signing")
             properties["header.X-Iceberg-Access-Delegation"] = self.config.access_delegation
+        elif self.config.s3_endpoint:
+            # When using S3-compatible storage (LocalStack/MinIO), disable vending
+            # by explicitly setting empty header to override PyIceberg's default
+            properties["header.X-Iceberg-Access-Delegation"] = ""
 
         # S3 FileIO properties (for S3-compatible storage like LocalStack/MinIO)
         # These override any server-side configuration from the REST catalog

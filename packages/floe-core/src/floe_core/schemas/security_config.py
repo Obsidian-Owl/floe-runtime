@@ -13,9 +13,9 @@ Covers: 009-US2 (Enterprise Security Layer)
 from __future__ import annotations
 
 from enum import Enum
-from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from typing_extensions import Self
 
 from floe_core.schemas.credential_config import SecretReference
 

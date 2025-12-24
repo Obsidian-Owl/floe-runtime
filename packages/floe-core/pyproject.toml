@@ -28,6 +28,7 @@ dependencies = [
     "structlog>=24.4",
     "rich>=13.9",  # Preflight output formatting
     "detect-secrets>=1.5",  # Credential detection in floe.yaml
+    "typing_extensions>=4.0",  # Self type for Python 3.10 compatibility
 ]
 
 [project.optional-dependencies]
