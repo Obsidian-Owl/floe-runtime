@@ -136,11 +136,16 @@ class TestPolarisCatalogInit:
         assert call_kwargs["token"] == "test_bearer_token"
 
     @patch("floe_polaris.client.RestCatalog")
-    def test_access_delegation_header(
-        self, mock_rest_catalog_cls: MagicMock, basic_config: PolarisCatalogConfig
-    ) -> None:
-        """Test access delegation header is set."""
-        PolarisCatalog(basic_config)
+    def test_access_delegation_header(self, mock_rest_catalog_cls: MagicMock) -> None:
+        """Test access delegation header is set when access_delegation is configured."""
+        # Create config with explicit access_delegation
+        config_with_delegation = PolarisCatalogConfig(
+            uri="http://localhost:8181/api/catalog",
+            warehouse="test_warehouse",
+            scope=TEST_SCOPE,
+            access_delegation="vended-credentials",
+        )
+        PolarisCatalog(config_with_delegation)
 
         call_kwargs = mock_rest_catalog_cls.call_args.kwargs
         assert call_kwargs["header.X-Iceberg-Access-Delegation"] == "vended-credentials"

@@ -1,4 +1,4 @@
-"""Dagster Definitions for Floe Demo - Production-Quality Implementation.
+"""Dagster Definitions for Floe Demo - Batteries-Included Implementation.
 
 Provides orchestration for the demo e-commerce data pipeline with:
 - Real synthetic data generation using Faker
@@ -6,7 +6,8 @@ Provides orchestration for the demo e-commerce data pipeline with:
 - Real OpenTelemetry tracing visible in Jaeger
 - Real OpenLineage lineage visible in Marquez
 
-This demo runs "as if production" - no mock implementations.
+This demo uses the batteries-included @floe_asset decorator which
+automatically handles observability (tracing + lineage) without boilerplate.
 
 Data Flow:
     1. Bronze Layer: EcommerceGenerator → Iceberg tables
@@ -24,17 +25,15 @@ PEP 563 string annotations. See: https://github.com/dagster-io/dagster/issues
 
 import logging
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional
 
 from dagster import (
     AssetExecutionContext,
     AssetSelection,
     DefaultScheduleStatus,
     DefaultSensorStatus,
-    Definitions,
     RunRequest,
     ScheduleDefinition,
-    asset,
     define_asset_job,
     sensor,
 )
@@ -45,179 +44,43 @@ from demo.orchestration.config import (
     DEMO_ORDERS_COUNT,
     DEMO_PRODUCTS_COUNT,
     DEMO_SEED,
-    get_lineage_config,
-    get_lineage_config_from_platform,
-    get_polaris_config,
-    get_polaris_config_from_platform,
-    get_tracing_config,
-    get_tracing_config_from_platform,
+    get_compiled_artifacts_dict,
 )
+from floe_dagster import FloeDefinitions, floe_asset
+from floe_dagster.resources import PolarisCatalogResource
 
 logger = logging.getLogger(__name__)
 
 # =============================================================================
-# Observability Setup (Module-Level Initialization)
-# Two-Tier Architecture: Prefer platform config, fall back to environment
+# Table Name Constants (S1192: avoid duplicate string literals)
 # =============================================================================
 
-# Initialize tracing manager for OpenTelemetry → Jaeger
-# Try platform config first (Two-Tier Architecture)
-_tracing_config = get_tracing_config_from_platform() or get_tracing_config()
-_tracing_manager = None
-
-if _tracing_config.enabled:
-    try:
-        from floe_dagster.observability.config import TracingConfig
-        from floe_dagster.observability.tracing import TracingManager
-
-        tracing_config = TracingConfig(
-            endpoint=_tracing_config.endpoint,
-            service_name=_tracing_config.service_name,
-            batch_export=_tracing_config.batch_export,
-        )
-        _tracing_manager = TracingManager(tracing_config)
-        _tracing_manager.configure()
-        logger.info(
-            "Tracing enabled: %s → %s",
-            _tracing_config.service_name,
-            _tracing_config.endpoint,
-        )
-    except ImportError as e:
-        logger.warning("Could not import tracing components: %s", e)
-else:
-    logger.info("Tracing disabled (OTEL_EXPORTER_OTLP_ENDPOINT not set)")
-
-# Initialize lineage emitter for OpenLineage → Marquez
-# Try platform config first (Two-Tier Architecture)
-_lineage_config = get_lineage_config_from_platform() or get_lineage_config()
-_lineage_emitter = None
-
-if _lineage_config.enabled:
-    try:
-        from floe_dagster.lineage.client import OpenLineageEmitter
-        from floe_dagster.lineage.config import OpenLineageConfig
-
-        lineage_config = OpenLineageConfig(
-            endpoint=_lineage_config.endpoint,
-            namespace=_lineage_config.namespace,
-            timeout=_lineage_config.timeout,
-        )
-        _lineage_emitter = OpenLineageEmitter(lineage_config)
-        logger.info(
-            "Lineage enabled: namespace=%s → %s",
-            _lineage_config.namespace,
-            _lineage_config.endpoint,
-        )
-    except ImportError as e:
-        logger.warning("Could not import lineage components: %s", e)
-else:
-    logger.info("Lineage disabled (OPENLINEAGE_URL not set)")
-
-
-# =============================================================================
-# Helper Functions
-# =============================================================================
-
-
-def _create_polaris_catalog() -> Any:
-    """Create Polaris catalog from configuration.
-
-    Uses Two-Tier Architecture: prefers platform config, falls back to environment.
-
-    Returns:
-        PolarisCatalog instance for Iceberg operations.
-    """
-    from floe_polaris import PolarisCatalogConfig, create_catalog
-
-    # Two-Tier Architecture: prefer platform config, fall back to environment
-    polaris_config = get_polaris_config_from_platform() or get_polaris_config()
-
-    # Convert SecretStr values for PolarisCatalogConfig
-    client_secret = polaris_config.client_secret
-    s3_secret = polaris_config.s3_secret_access_key
-
-    catalog_config = PolarisCatalogConfig(
-        uri=polaris_config.uri,
-        warehouse=polaris_config.warehouse,
-        client_id=polaris_config.client_id,
-        client_secret=client_secret,  # Already SecretStr or None
-        scope=polaris_config.scope,
-        s3_endpoint=polaris_config.s3_endpoint,
-        s3_access_key_id=polaris_config.s3_access_key_id,
-        s3_secret_access_key=s3_secret,  # Already SecretStr
-        s3_region=polaris_config.s3_region,
-        s3_path_style_access=polaris_config.s3_path_style_access,
-        access_delegation=polaris_config.access_delegation,
-    )
-
-    return create_catalog(catalog_config)
-
-
-def _emit_lineage_start(job_name: str) -> Optional[str]:
-    """Emit lineage START event if enabled.
-
-    Args:
-        job_name: Name of the job.
-
-    Returns:
-        Run ID if lineage is enabled, None otherwise.
-    """
-    if _lineage_emitter is not None:
-        return _lineage_emitter.emit_start(job_name=job_name)
-    return None
-
-
-def _emit_lineage_complete(
-    run_id: Optional[str],
-    job_name: str,
-    outputs: Optional[List[Tuple[str, str]]] = None,
-) -> None:
-    """Emit lineage COMPLETE event if enabled.
-
-    Args:
-        run_id: Run ID from emit_start.
-        job_name: Name of the job.
-        outputs: List of (namespace, name) tuples for output datasets.
-    """
-    if _lineage_emitter is not None and run_id is not None:
-        output_datasets = []
-        if outputs:
-            from floe_dagster.lineage.events import LineageDataset
-
-            output_datasets = [LineageDataset(namespace=ns, name=name) for ns, name in outputs]
-        _lineage_emitter.emit_complete(
-            run_id=run_id,
-            job_name=job_name,
-            outputs=output_datasets,
-        )
-
-
-def _emit_lineage_fail(run_id: Optional[str], job_name: str, error: str) -> None:
-    """Emit lineage FAIL event if enabled.
-
-    Args:
-        run_id: Run ID from emit_start.
-        job_name: Name of the job.
-        error: Error message.
-    """
-    if _lineage_emitter is not None and run_id is not None:
-        _lineage_emitter.emit_fail(
-            run_id=run_id,
-            job_name=job_name,
-            error_message=error,
-        )
+TABLE_BRONZE_CUSTOMERS = "demo.bronze_customers"
+TABLE_BRONZE_PRODUCTS = "demo.bronze_products"
+TABLE_BRONZE_ORDERS = "demo.bronze_orders"
+TABLE_BRONZE_ORDER_ITEMS = "demo.bronze_order_items"
 
 
 # =============================================================================
 # Bronze Layer Assets - Real Data Generation to Iceberg
+# Using @floe_asset for automatic observability (tracing + lineage)
 # =============================================================================
 
 
-@asset(
+@floe_asset(
     group_name="bronze",
     description="Generate and load synthetic customer data to Iceberg",
+    outputs=[TABLE_BRONZE_CUSTOMERS],
+    compute_kind="python",
+    metadata={
+        "demo.count": DEMO_CUSTOMERS_COUNT,
+        "demo.seed": DEMO_SEED,
+    },
 )
-def bronze_customers(context: AssetExecutionContext) -> Dict[str, Any]:
+def bronze_customers(
+    context: AssetExecutionContext,
+    catalog: PolarisCatalogResource,
+) -> Dict[str, Any]:
     """Generate real customer data and write to Iceberg table.
 
     Uses EcommerceGenerator to create realistic customer records,
@@ -226,322 +89,156 @@ def bronze_customers(context: AssetExecutionContext) -> Dict[str, Any]:
     Returns:
         Dictionary with row count and snapshot information.
     """
-    from floe_iceberg import IcebergTableManager
     from floe_synthetic.generators.ecommerce import EcommerceGenerator
 
-    job_name = "bronze_customers"
-    run_id = _emit_lineage_start(job_name)
+    # Generate real customer data
+    context.log.info("Generating %d customers with seed %d", DEMO_CUSTOMERS_COUNT, DEMO_SEED)
+    generator = EcommerceGenerator(seed=DEMO_SEED)
+    customers = generator.generate_customers(count=DEMO_CUSTOMERS_COUNT)
 
-    # Start tracing span
-    span_context = None
-    span = None  # Initialize span before try block to ensure it's always defined
-    if _tracing_manager is not None:
-        span_context = _tracing_manager.start_span(
-            "generate_customers",
-            attributes={
-                "demo.count": DEMO_CUSTOMERS_COUNT,
-                "demo.seed": DEMO_SEED,
-            },
-        )
+    # Write to Iceberg via catalog.write_table() (batteries-included)
+    context.log.info("Writing customers to Iceberg table")
+    snapshot = catalog.write_table(TABLE_BRONZE_CUSTOMERS, customers)
 
-    try:
-        span = span_context.__enter__() if span_context else None
+    result = {
+        "rows": customers.num_rows,
+        "snapshot_id": snapshot.snapshot_id,
+        "table": TABLE_BRONZE_CUSTOMERS,
+    }
 
-        # Generate real customer data
-        context.log.info("Generating %d customers with seed %d", DEMO_CUSTOMERS_COUNT, DEMO_SEED)
-        generator = EcommerceGenerator(seed=DEMO_SEED)
-        customers = generator.generate_customers(count=DEMO_CUSTOMERS_COUNT)
-
-        if span:
-            span.set_attribute("data.rows_generated", customers.num_rows)
-
-        # Write to Iceberg via Polaris
-        context.log.info("Writing customers to Iceberg table")
-        catalog = _create_polaris_catalog()
-        manager = IcebergTableManager(catalog)
-
-        # Create table if not exists, then overwrite
-        manager.create_table_if_not_exists(
-            "demo.bronze_customers",
-            customers.schema,
-        )
-        snapshot = manager.overwrite("demo.bronze_customers", customers)
-
-        if span:
-            span.set_attribute("iceberg.snapshot_id", snapshot.snapshot_id)
-            _tracing_manager.set_status_ok(span)
-
-        result = {
-            "rows": customers.num_rows,
-            "snapshot_id": snapshot.snapshot_id,
-            "table": "demo.bronze_customers",
-        }
-
-        _emit_lineage_complete(
-            run_id,
-            job_name,
-            outputs=[("iceberg://demo", "demo.bronze_customers")],
-        )
-
-        context.log.info("bronze_customers completed: %s", result)
-        return result
-
-    except Exception as e:
-        # span was assigned in try block, reuse it for exception recording
-        if span and _tracing_manager:
-            _tracing_manager.record_exception(span, e)
-        _emit_lineage_fail(run_id, job_name, str(e))
-        context.log.error("bronze_customers failed: %s", e)
-        raise
-    finally:
-        if span_context:
-            span_context.__exit__(None, None, None)
+    context.log.info("bronze_customers completed: %s", result)
+    return result
 
 
-@asset(
+@floe_asset(
     group_name="bronze",
     description="Generate and load synthetic product data to Iceberg",
+    outputs=[TABLE_BRONZE_PRODUCTS],
+    compute_kind="python",
+    metadata={
+        "demo.count": DEMO_PRODUCTS_COUNT,
+        "demo.seed": DEMO_SEED,
+    },
 )
-def bronze_products(context: AssetExecutionContext) -> Dict[str, Any]:
+def bronze_products(
+    context: AssetExecutionContext,
+    catalog: PolarisCatalogResource,
+) -> Dict[str, Any]:
     """Generate real product data and write to Iceberg table.
 
     Returns:
         Dictionary with row count and snapshot information.
     """
-    from floe_iceberg import IcebergTableManager
     from floe_synthetic.generators.ecommerce import EcommerceGenerator
 
-    job_name = "bronze_products"
-    run_id = _emit_lineage_start(job_name)
+    context.log.info("Generating %d products with seed %d", DEMO_PRODUCTS_COUNT, DEMO_SEED)
+    generator = EcommerceGenerator(seed=DEMO_SEED)
+    products = generator.generate_products(count=DEMO_PRODUCTS_COUNT)
 
-    span_context = None
-    span = None  # Initialize span before try block to ensure it's always defined
-    if _tracing_manager is not None:
-        span_context = _tracing_manager.start_span(
-            "generate_products",
-            attributes={
-                "demo.count": DEMO_PRODUCTS_COUNT,
-                "demo.seed": DEMO_SEED,
-            },
-        )
+    # Write to Iceberg via catalog.write_table() (batteries-included)
+    context.log.info("Writing products to Iceberg table")
+    snapshot = catalog.write_table(TABLE_BRONZE_PRODUCTS, products)
 
-    try:
-        span = span_context.__enter__() if span_context else None
+    result = {
+        "rows": products.num_rows,
+        "snapshot_id": snapshot.snapshot_id,
+        "table": TABLE_BRONZE_PRODUCTS,
+    }
 
-        context.log.info("Generating %d products with seed %d", DEMO_PRODUCTS_COUNT, DEMO_SEED)
-        generator = EcommerceGenerator(seed=DEMO_SEED)
-        products = generator.generate_products(count=DEMO_PRODUCTS_COUNT)
-
-        if span:
-            span.set_attribute("data.rows_generated", products.num_rows)
-
-        context.log.info("Writing products to Iceberg table")
-        catalog = _create_polaris_catalog()
-        manager = IcebergTableManager(catalog)
-
-        manager.create_table_if_not_exists(
-            "demo.bronze_products",
-            products.schema,
-        )
-        snapshot = manager.overwrite("demo.bronze_products", products)
-
-        if span:
-            span.set_attribute("iceberg.snapshot_id", snapshot.snapshot_id)
-            _tracing_manager.set_status_ok(span)
-
-        result = {
-            "rows": products.num_rows,
-            "snapshot_id": snapshot.snapshot_id,
-            "table": "demo.bronze_products",
-        }
-
-        _emit_lineage_complete(
-            run_id,
-            job_name,
-            outputs=[("iceberg://demo", "demo.bronze_products")],
-        )
-
-        context.log.info("bronze_products completed: %s", result)
-        return result
-
-    except Exception as e:
-        # span was assigned in try block, reuse it for exception recording
-        if span and _tracing_manager:
-            _tracing_manager.record_exception(span, e)
-        _emit_lineage_fail(run_id, job_name, str(e))
-        context.log.error("bronze_products failed: %s", e)
-        raise
-    finally:
-        if span_context:
-            span_context.__exit__(None, None, None)
+    context.log.info("bronze_products completed: %s", result)
+    return result
 
 
-@asset(
+@floe_asset(
     group_name="bronze",
     description="Generate and load synthetic order data to Iceberg",
-    deps=[bronze_customers],  # Orders depend on customers for FK relationship
+    outputs=[TABLE_BRONZE_ORDERS],
+    inputs=[TABLE_BRONZE_CUSTOMERS],
+    compute_kind="python",
+    deps=["bronze_customers"],
+    metadata={
+        "demo.count": DEMO_ORDERS_COUNT,
+        "demo.seed": DEMO_SEED,
+    },
 )
-def bronze_orders(context: AssetExecutionContext) -> Dict[str, Any]:
+def bronze_orders(
+    context: AssetExecutionContext,
+    catalog: PolarisCatalogResource,
+) -> Dict[str, Any]:
     """Generate real order data and write to Iceberg table.
 
     Returns:
         Dictionary with row count and snapshot information.
     """
-    from floe_iceberg import IcebergTableManager
     from floe_synthetic.generators.ecommerce import EcommerceGenerator
 
-    job_name = "bronze_orders"
-    run_id = _emit_lineage_start(job_name)
+    context.log.info("Generating %d orders with seed %d", DEMO_ORDERS_COUNT, DEMO_SEED)
+    generator = EcommerceGenerator(seed=DEMO_SEED)
+    # Generate customers first to establish FK relationships
+    generator.generate_customers(count=DEMO_CUSTOMERS_COUNT)
+    orders = generator.generate_orders(count=DEMO_ORDERS_COUNT)
 
-    span_context = None
-    span = None  # Initialize span before try block to ensure it's always defined
-    if _tracing_manager is not None:
-        span_context = _tracing_manager.start_span(
-            "generate_orders",
-            attributes={
-                "demo.count": DEMO_ORDERS_COUNT,
-                "demo.seed": DEMO_SEED,
-            },
-        )
+    # Write to Iceberg via catalog.write_table() (batteries-included)
+    context.log.info("Writing orders to Iceberg table")
+    snapshot = catalog.write_table(TABLE_BRONZE_ORDERS, orders)
 
-    try:
-        span = span_context.__enter__() if span_context else None
+    result = {
+        "rows": orders.num_rows,
+        "snapshot_id": snapshot.snapshot_id,
+        "table": TABLE_BRONZE_ORDERS,
+    }
 
-        context.log.info("Generating %d orders with seed %d", DEMO_ORDERS_COUNT, DEMO_SEED)
-        generator = EcommerceGenerator(seed=DEMO_SEED)
-        # Generate customers first to establish FK relationships
-        generator.generate_customers(count=DEMO_CUSTOMERS_COUNT)
-        orders = generator.generate_orders(count=DEMO_ORDERS_COUNT)
-
-        if span:
-            span.set_attribute("data.rows_generated", orders.num_rows)
-
-        context.log.info("Writing orders to Iceberg table")
-        catalog = _create_polaris_catalog()
-        manager = IcebergTableManager(catalog)
-
-        manager.create_table_if_not_exists(
-            "demo.bronze_orders",
-            orders.schema,
-        )
-        snapshot = manager.overwrite("demo.bronze_orders", orders)
-
-        if span:
-            span.set_attribute("iceberg.snapshot_id", snapshot.snapshot_id)
-            _tracing_manager.set_status_ok(span)
-
-        result = {
-            "rows": orders.num_rows,
-            "snapshot_id": snapshot.snapshot_id,
-            "table": "demo.bronze_orders",
-        }
-
-        _emit_lineage_complete(
-            run_id,
-            job_name,
-            outputs=[("iceberg://demo", "demo.bronze_orders")],
-        )
-
-        context.log.info("bronze_orders completed: %s", result)
-        return result
-
-    except Exception as e:
-        # span was assigned in try block, reuse it for exception recording
-        if span and _tracing_manager:
-            _tracing_manager.record_exception(span, e)
-        _emit_lineage_fail(run_id, job_name, str(e))
-        context.log.error("bronze_orders failed: %s", e)
-        raise
-    finally:
-        if span_context:
-            span_context.__exit__(None, None, None)
+    context.log.info("bronze_orders completed: %s", result)
+    return result
 
 
-@asset(
+@floe_asset(
     group_name="bronze",
     description="Generate and load synthetic order item data to Iceberg",
-    deps=[bronze_orders, bronze_products],  # Order items depend on orders and products
+    outputs=[TABLE_BRONZE_ORDER_ITEMS],
+    inputs=[TABLE_BRONZE_ORDERS, TABLE_BRONZE_PRODUCTS],
+    compute_kind="python",
+    deps=["bronze_orders", "bronze_products"],
+    metadata={
+        "demo.count": DEMO_ORDER_ITEMS_COUNT,
+        "demo.seed": DEMO_SEED,
+    },
 )
-def bronze_order_items(context: AssetExecutionContext) -> Dict[str, Any]:
+def bronze_order_items(
+    context: AssetExecutionContext,
+    catalog: PolarisCatalogResource,
+) -> Dict[str, Any]:
     """Generate real order item data and write to Iceberg table.
 
     Returns:
         Dictionary with row count and snapshot information.
     """
-    from floe_iceberg import IcebergTableManager
     from floe_synthetic.generators.ecommerce import EcommerceGenerator
 
-    job_name = "bronze_order_items"
-    run_id = _emit_lineage_start(job_name)
+    context.log.info(
+        "Generating %d order items with seed %d",
+        DEMO_ORDER_ITEMS_COUNT,
+        DEMO_SEED,
+    )
+    generator = EcommerceGenerator(seed=DEMO_SEED)
+    # Generate parent entities first
+    generator.generate_customers(count=DEMO_CUSTOMERS_COUNT)
+    generator.generate_products(count=DEMO_PRODUCTS_COUNT)
+    generator.generate_orders(count=DEMO_ORDERS_COUNT)
+    order_items = generator.generate_order_items(count=DEMO_ORDER_ITEMS_COUNT)
 
-    span_context = None
-    span = None  # Initialize span before try block to ensure it's always defined
-    if _tracing_manager is not None:
-        span_context = _tracing_manager.start_span(
-            "generate_order_items",
-            attributes={
-                "demo.count": DEMO_ORDER_ITEMS_COUNT,
-                "demo.seed": DEMO_SEED,
-            },
-        )
+    # Write to Iceberg via catalog.write_table() (batteries-included)
+    context.log.info("Writing order_items to Iceberg table")
+    snapshot = catalog.write_table(TABLE_BRONZE_ORDER_ITEMS, order_items)
 
-    try:
-        span = span_context.__enter__() if span_context else None
+    result = {
+        "rows": order_items.num_rows,
+        "snapshot_id": snapshot.snapshot_id,
+        "table": TABLE_BRONZE_ORDER_ITEMS,
+    }
 
-        context.log.info(
-            "Generating %d order items with seed %d",
-            DEMO_ORDER_ITEMS_COUNT,
-            DEMO_SEED,
-        )
-        generator = EcommerceGenerator(seed=DEMO_SEED)
-        # Generate parent entities first
-        generator.generate_customers(count=DEMO_CUSTOMERS_COUNT)
-        generator.generate_products(count=DEMO_PRODUCTS_COUNT)
-        generator.generate_orders(count=DEMO_ORDERS_COUNT)
-        order_items = generator.generate_order_items(count=DEMO_ORDER_ITEMS_COUNT)
-
-        if span:
-            span.set_attribute("data.rows_generated", order_items.num_rows)
-
-        context.log.info("Writing order_items to Iceberg table")
-        catalog = _create_polaris_catalog()
-        manager = IcebergTableManager(catalog)
-
-        manager.create_table_if_not_exists(
-            "demo.bronze_order_items",
-            order_items.schema,
-        )
-        snapshot = manager.overwrite("demo.bronze_order_items", order_items)
-
-        if span:
-            span.set_attribute("iceberg.snapshot_id", snapshot.snapshot_id)
-            _tracing_manager.set_status_ok(span)
-
-        result = {
-            "rows": order_items.num_rows,
-            "snapshot_id": snapshot.snapshot_id,
-            "table": "demo.bronze_order_items",
-        }
-
-        _emit_lineage_complete(
-            run_id,
-            job_name,
-            outputs=[("iceberg://demo", "demo.bronze_order_items")],
-        )
-
-        context.log.info("bronze_order_items completed: %s", result)
-        return result
-
-    except Exception as e:
-        # span was assigned in try block, reuse it for exception recording
-        if span and _tracing_manager:
-            _tracing_manager.record_exception(span, e)
-        _emit_lineage_fail(run_id, job_name, str(e))
-        context.log.error("bronze_order_items failed: %s", e)
-        raise
-    finally:
-        if span_context:
-            span_context.__exit__(None, None, None)
+    context.log.info("bronze_order_items completed: %s", result)
+    return result
 
 
 # =============================================================================
@@ -549,10 +246,18 @@ def bronze_order_items(context: AssetExecutionContext) -> Dict[str, Any]:
 # =============================================================================
 
 
-@asset(
+@floe_asset(
     group_name="transform",
     description="Run dbt transformations (staging → intermediate → marts)",
-    deps=[bronze_customers, bronze_orders, bronze_products, bronze_order_items],
+    outputs=["demo.dbt_transformations"],
+    inputs=[
+        "demo.bronze_customers",
+        "demo.bronze_orders",
+        "demo.bronze_products",
+        "demo.bronze_order_items",
+    ],
+    compute_kind="dbt",
+    deps=["bronze_customers", "bronze_orders", "bronze_products", "bronze_order_items"],
 )
 def dbt_transformations(context: AssetExecutionContext) -> Dict[str, str]:
     """Execute dbt transformations.
@@ -563,53 +268,22 @@ def dbt_transformations(context: AssetExecutionContext) -> Dict[str, str]:
     Returns:
         Dictionary with transformation status.
     """
-    job_name = "dbt_transformations"
-    run_id = _emit_lineage_start(job_name)
+    # Verify bronze tables exist via Trino
+    context.log.info("dbt transformations would run here")
+    context.log.info("Bronze layer tables created - dbt models can query them")
 
-    span_context = None
-    span = None  # Initialize span before try block to ensure it's always defined
-    if _tracing_manager is not None:
-        span_context = _tracing_manager.start_span(
-            "dbt_run",
-            attributes={
-                "dbt.target": "demo",
-            },
-        )
+    # For full implementation:
+    # from dagster_dbt import DbtCliResource
+    # result = dbt.cli(["run", "--target", "demo"], context=context).wait()
 
-    try:
-        span = span_context.__enter__() if span_context else None
+    result = {
+        "status": "placeholder",
+        "message": "Bronze layer ready for dbt transformations",
+        "tables": "bronze_customers, bronze_orders, bronze_products, bronze_order_items",
+    }
 
-        # Verify bronze tables exist via Trino
-        context.log.info("dbt transformations would run here")
-        context.log.info("Bronze layer tables created - dbt models can query them")
-
-        # For full implementation:
-        # from dagster_dbt import DbtCliResource
-        # result = dbt.cli(["run", "--target", "demo"], context=context).wait()
-
-        if span and _tracing_manager:
-            span.set_attribute("dbt.status", "placeholder")
-            _tracing_manager.set_status_ok(span)
-
-        result = {
-            "status": "placeholder",
-            "message": "Bronze layer ready for dbt transformations",
-            "tables": "bronze_customers, bronze_orders, bronze_products, bronze_order_items",
-        }
-
-        _emit_lineage_complete(run_id, job_name)
-        context.log.info("dbt_transformations completed: %s", result)
-        return result
-
-    except Exception as e:
-        # span was assigned in try block, reuse it for exception recording
-        if span and _tracing_manager:
-            _tracing_manager.record_exception(span, e)
-        _emit_lineage_fail(run_id, job_name, str(e))
-        raise
-    finally:
-        if span_context:
-            span_context.__exit__(None, None, None)
+    context.log.info("dbt_transformations completed: %s", result)
+    return result
 
 
 # =============================================================================
@@ -714,10 +388,11 @@ def api_trigger_sensor(context: Any) -> Optional[RunRequest]:
 
 
 # =============================================================================
-# Definitions
+# Definitions - One-line batteries-included factory
 # =============================================================================
 
-defs = Definitions(
+defs = FloeDefinitions.from_compiled_artifacts(
+    artifacts_dict=get_compiled_artifacts_dict(),
     assets=[
         bronze_customers,
         bronze_products,
@@ -737,4 +412,5 @@ defs = Definitions(
         file_arrival_sensor,
         api_trigger_sensor,
     ],
+    namespace="demo",
 )

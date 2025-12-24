@@ -41,7 +41,7 @@ class TestPlatformSpecConstants:
 
     def test_platform_spec_version(self) -> None:
         """Verify platform spec version is set."""
-        assert PLATFORM_SPEC_VERSION == "1.0.0"
+        assert PLATFORM_SPEC_VERSION == "1.1.0"
 
     def test_profile_name_pattern(self) -> None:
         """Verify profile name pattern is defined."""
