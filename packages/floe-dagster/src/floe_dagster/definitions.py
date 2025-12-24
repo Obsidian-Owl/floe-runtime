@@ -202,6 +202,19 @@ class FloeDefinitions:
                     e,
                 )
 
+        # Create DbtCliResource (batteries-included for demo)
+        try:
+            from floe_dagster.resources.dbt import create_dbt_cli_resource
+
+            dbt_resource = create_dbt_cli_resource(artifacts)
+            resources["dbt"] = dbt_resource
+            logger.info("DbtCliResource initialized")
+        except Exception as e:
+            logger.warning(
+                "Failed to create DbtCliResource: %s. dbt resource will not be available.",
+                e,
+            )
+
         # Combine all assets
         all_assets: list[Any] = list(assets or [])
 
