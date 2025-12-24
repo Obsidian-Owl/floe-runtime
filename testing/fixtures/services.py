@@ -753,3 +753,129 @@ def running_full_services(
     docker_services_full.start()
     yield docker_services_full
     docker_services_full.stop()
+
+
+# =============================================================================
+# Two-Tier Configuration Architecture Validation
+# =============================================================================
+
+
+def is_platform_config_loaded() -> bool:
+    """Check if platform.yaml is being loaded (not falling back to env vars).
+
+    The Two-Tier Architecture requires platform.yaml to be loaded instead of
+    falling back to environment variables. This function validates that the
+    platform config is properly resolved.
+
+    Returns:
+        True if platform config is loaded from platform.yaml, False if fallback.
+
+    Usage in tests:
+        >>> from testing.fixtures.services import is_platform_config_loaded
+        >>> assert is_platform_config_loaded(), "Platform config not loaded!"
+    """
+    try:
+        from floe_core.compiler.platform_resolver import PlatformResolver
+
+        resolver = PlatformResolver()
+        platform = resolver.load()
+        return platform is not None
+    except ImportError:
+        # floe_core not available
+        return False
+    except Exception:
+        # PlatformNotFoundError or other loading errors
+        return False
+
+
+def get_platform_config_source() -> str:
+    """Get description of where platform config is loaded from.
+
+    Useful for debugging and test assertions.
+
+    Returns:
+        String describing the config source (e.g., "platform/local/platform.yaml")
+        or "environment variables (fallback)" if platform.yaml not found.
+    """
+    try:
+        from floe_core.compiler.platform_resolver import PlatformResolver
+
+        resolver = PlatformResolver()
+        # Try to find the path without loading
+        env = os.environ.get("FLOE_PLATFORM_ENV", "local")
+        for search_path in resolver._search_paths:
+            candidate = search_path / env / "platform.yaml"
+            if candidate.exists():
+                return str(candidate)
+        return "environment variables (fallback)"
+    except Exception:
+        return "environment variables (fallback)"
+
+
+@pytest.fixture(scope="session")
+def platform_config_validation() -> dict[str, Any]:
+    """Fixture that validates Two-Tier Configuration is properly loaded.
+
+    Use this fixture in integration tests to verify that platform.yaml
+    is being used instead of falling back to environment variables.
+
+    Returns:
+        Dictionary with validation results:
+            - loaded: bool - Whether platform.yaml was successfully loaded
+            - source: str - Description of config source
+            - env: str - FLOE_PLATFORM_ENV value
+            - platform_spec: PlatformSpec or None
+
+    Example:
+        >>> def test_platform_config(platform_config_validation):
+        ...     assert platform_config_validation["loaded"], (
+        ...         f"Platform config not loaded! Source: {platform_config_validation['source']}"
+        ...     )
+    """
+    result: dict[str, Any] = {
+        "loaded": False,
+        "source": "unknown",
+        "env": os.environ.get("FLOE_PLATFORM_ENV", "not set"),
+        "platform_spec": None,
+    }
+
+    try:
+        from floe_core.compiler.platform_resolver import PlatformResolver
+
+        resolver = PlatformResolver()
+        platform = resolver.load()
+        result["loaded"] = True
+        result["platform_spec"] = platform
+        result["source"] = get_platform_config_source()
+    except ImportError:
+        result["source"] = "floe_core not available"
+    except Exception as e:
+        result["source"] = f"error: {e}"
+
+    return result
+
+
+@pytest.fixture
+def require_platform_config(platform_config_validation: dict[str, Any]) -> None:
+    """Fixture that fails the test if platform.yaml is not loaded.
+
+    Use this fixture to ensure tests only run when Two-Tier Configuration
+    is properly set up.
+
+    Raises:
+        pytest.fail: If platform.yaml is not loaded.
+
+    Example:
+        >>> @pytest.mark.integration
+        ... def test_catalog_connection(require_platform_config):
+        ...     '''This test requires platform.yaml to be loaded.'''
+        ...     pass
+    """
+    if not platform_config_validation["loaded"]:
+        pytest.fail(
+            f"Two-Tier Configuration not properly set up!\n"
+            f"  FLOE_PLATFORM_ENV: {platform_config_validation['env']}\n"
+            f"  Source: {platform_config_validation['source']}\n"
+            f"  Expected: platform.yaml loaded via FLOE_PLATFORM_ENV\n"
+            f"  Action: Ensure platform/{platform_config_validation['env']}/platform.yaml exists"
+        )

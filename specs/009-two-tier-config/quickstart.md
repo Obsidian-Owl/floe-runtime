@@ -110,14 +110,10 @@ compute:
       threads: 4
 
 observability:
-  tracing:
-    enabled: true
-    endpoint: http://localhost:4317
-    protocol: grpc
-  lineage:
-    enabled: true
-    endpoint: http://localhost:5000
-    namespace: local
+  traces: true
+  otlp_endpoint: http://localhost:4317
+  lineage: true
+  lineage_endpoint: http://localhost:5000
 ```
 
 ### Step 2: Create Secrets
@@ -161,7 +157,7 @@ storage:
     bucket: prod-iceberg-data
     credentials:
       mode: iam_role
-      role_arn: arn:aws:iam::123456789:role/FloeStorageRole
+      role_arn: arn:aws:iam::123456789012:role/FloeStorageRole
 
 catalogs:
   default:
