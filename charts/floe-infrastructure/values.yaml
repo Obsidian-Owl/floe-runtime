@@ -232,3 +232,22 @@ polarisInit:
     - "demo.gold"
   storageLocation: "s3://iceberg-data/"
   oauthClientId: "demo_client"
+
+# Seed data initialization for demo
+# Creates demo.raw_* tables with synthetic e-commerce data
+# Runs AFTER polaris-init (hook-weight: 10 > 5)
+seedData:
+  enabled: false  # Disabled by default, enable in values-local.yaml
+  image:
+    repository: "ghcr.io/obsidian-owl/floe-demo"
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  # AWS credentials for S3 access
+  awsAccessKeyId: ""
+  awsSecretAccessKey: ""
+  # Data volume configuration
+  seed: 42
+  customersCount: 1000
+  productsCount: 100
+  ordersCount: 5000
+  orderItemsCount: 10000
