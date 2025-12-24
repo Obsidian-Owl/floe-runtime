@@ -1,7 +1,7 @@
 # floe-runtime Makefile
 # Provides consistent commands that mirror CI exactly
 
-.PHONY: check lint typecheck security test test-unit test-contract test-integration test-helm helm-lint format install hooks docker-up docker-down docker-logs deploy-local-infra deploy-local-dagster deploy-local-cube deploy-local-full undeploy-local port-forward-all port-forward-stop show-urls demo-status demo-logs help
+.PHONY: check lint typecheck security test test-unit test-contract test-integration test-helm helm-lint format install hooks docker-up docker-down docker-logs deploy-local-infra deploy-local-dagster deploy-local-cube deploy-local-full undeploy-local port-forward-all port-forward-stop show-urls demo-status demo-cleanup demo-logs help
 
 # Default target
 help:
@@ -230,15 +230,19 @@ deploy-local-full: deploy-local-infra
 	@echo "✅ Full stack deployed to namespace: $(FLOE_NAMESPACE)"
 	@echo "=============================================="
 	@echo ""
-	@echo "Services accessible via NodePort (resilient - survives pod restarts):"
+	@echo "Services accessible via NodePort:"
 	@echo "  Dagster UI:      http://localhost:30000"
-	@echo "  Polaris API:     http://localhost:30181"
-	@echo "  MinIO Console:   http://localhost:30901"
+	@echo "  Cube REST API:   http://localhost:30400"
+	@echo "  Cube SQL API:    psql -h localhost -p 30432 -U cube -d cube"
+	@echo "  Marquez UI:      http://localhost:30301"
 	@echo "  Jaeger UI:       http://localhost:30686"
-	@echo "  Marquez API:     http://localhost:30500"
-	@echo "  Marquez Web UI:  http://localhost:30301"
+	@echo "  LocalStack S3:   http://localhost:30566"
+	@echo "  Polaris API:     http://localhost:30181"
 	@echo ""
-	@echo "Run 'make show-urls' to see all service URLs"
+	@echo "Quick test: curl http://localhost:30400/cubejs-api/v1/meta"
+	@echo ""
+	@echo "Run 'make demo-status' to check pod status"
+	@echo "Run 'make demo-cleanup' to remove completed run pods"
 
 # Remove all local Kubernetes deployments
 undeploy-local:
@@ -327,6 +331,12 @@ demo-status:
 	@echo ""
 	@echo "Jobs:"
 	@kubectl get jobs -n $(FLOE_NAMESPACE) 2>/dev/null || true
+
+# Clean up completed Dagster run pods (can accumulate over time)
+demo-cleanup:
+	@echo "⎈ Cleaning up completed Dagster run pods..."
+	@kubectl delete pods -n $(FLOE_NAMESPACE) --field-selector=status.phase==Succeeded 2>/dev/null || echo "No completed pods to clean"
+	@echo "✅ Cleanup complete"
 
 # Show logs from demo user deployment (tail)
 demo-logs:

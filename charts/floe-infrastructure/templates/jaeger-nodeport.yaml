@@ -1,0 +1,30 @@
+{{/*
+Jaeger Query UI NodePort Service
+
+Creates a NodePort service for external access to Jaeger UI on Docker Desktop.
+The Jaeger allInOne subchart creates headless ClusterIP services by default,
+so we need a separate NodePort for local development access.
+
+Covers: 008-US1 (Deploy complete stack to Kubernetes)
+*/}}
+{{- if and .Values.jaeger.enabled .Values.localAccess.nodeports.jaeger }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-jaeger-query-nodeport
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "floe-infrastructure.labels" . | nindent 4 }}
+    app.kubernetes.io/component: jaeger
+spec:
+  type: NodePort
+  ports:
+    - port: 16686
+      targetPort: 16686
+      nodePort: {{ .Values.localAccess.nodeports.jaeger }}
+      protocol: TCP
+      name: query
+  selector:
+    app.kubernetes.io/name: jaeger
+    app.kubernetes.io/component: all-in-one
+{{- end }}

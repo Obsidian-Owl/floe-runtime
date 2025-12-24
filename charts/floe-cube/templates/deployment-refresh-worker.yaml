@@ -82,7 +82,7 @@ spec:
             {{- toYaml .Values.refreshWorker.resources | nindent 12 }}
           volumeMounts:
             - name: schema
-              mountPath: {{ .Values.floe.schemaPath }}
+              mountPath: {{ .Values.floe.schemaMountPath | default "/cube/conf/schema" }}
               readOnly: true
             {{- if .Values.floe.compiledArtifacts.enabled }}
             - name: compiled-artifacts

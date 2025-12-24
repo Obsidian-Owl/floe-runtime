@@ -7,43 +7,6 @@
     "PYTEST_TIMEOUT": "300",
     "PYTHON_VERSION": "3.10"
   },
-  "permissions": {
-    "allow": [
-      "Bash(python -m pytest:*)",
-      "Bash(python -m black:*)",
-      "Bash(python -m isort:*)",
-      "Bash(python -m mypy:*)",
-      "Bash(python -m bandit:*)",
-      "Bash(dbt:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "Bash(git status:*)",
-      "Bash(git diff:*)",
-      "Bash(git log:*)",
-      "Bash(grep:*)",
-      "Bash(find:*)",
-      "Bash(tree:*)",
-      "Bash(ls:*)",
-      "Read(**)",
-      "mcp__context7__resolve-library-id",
-      "mcp__context7__get-library-docs",
-      "mcp__sonarqube__search_my_sonarqube_projects"
-    ],
-    "deny": [
-      "Bash(rm -rf:*)",
-      "Bash(sudo:*)",
-      "Bash(curl:*)",
-      "Read(.env)",
-      "Read(.env.*)",
-      "Read(**/.env*)",
-      "Read(secrets/**)",
-      "Edit(.env*)",
-      "Edit(secrets/**)",
-      "Write(.env*)",
-      "Write(secrets/**)"
-    ]
-  },
   "model": "claude-sonnet-4-5-20250929",
   "hooks": {
     "PostToolUse": [

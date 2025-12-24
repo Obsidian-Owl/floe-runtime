@@ -1,20 +1,387 @@
 """Dagster definitions entry point.
 
 T047: [US1] Create Dagster definitions entry point
+T098: [US6] Create FloeDefinitions.from_compiled_artifacts() factory
+T099: [US7] Auto-load platform.yaml via FLOE_PLATFORM_FILE
 
 This module provides the main entry point for loading Dagster definitions
-from CompiledArtifacts configuration.
+from CompiledArtifacts configuration, with batteries-included observability.
+
+Key Features:
+    - FloeDefinitions.from_compiled_artifacts(): One-line Definitions factory
+    - Automatic platform.yaml loading via FLOE_PLATFORM_FILE env var
+    - Automatic ObservabilityOrchestrator initialization
+    - Automatic PolarisCatalogResource creation
+    - Support for custom assets, jobs, and schedules
+
+Two-Tier Configuration Architecture:
+    Data engineers call FloeDefinitions.from_compiled_artifacts() with NO configuration.
+    Platform engineers configure platform.yaml and mount it via ConfigMap.
+    The factory automatically:
+    1. Loads platform.yaml from FLOE_PLATFORM_FILE (K8s ConfigMap mount)
+    2. Resolves catalog profiles (Polaris, Glue, Unity, etc.)
+    3. Resolves observability config (tracing + lineage endpoints)
+    4. Wires all resources into Dagster Definitions
 """
 
 from __future__ import annotations
 
 import json
+import logging
+import os
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dagster import Definitions
 
 from floe_dagster.assets import FloeAssetFactory
+from floe_dagster.decorators import ORCHESTRATOR_RESOURCE_KEY
+from floe_dagster.observability import ObservabilityOrchestrator
+from floe_dagster.resources.catalog import PolarisCatalogResource
+
+if TYPE_CHECKING:
+    from dagster import (
+        AssetsDefinition,
+        JobDefinition,
+        ScheduleDefinition,
+        SensorDefinition,
+    )
+    from dagster._core.definitions.unresolved_asset_job_definition import (
+        UnresolvedAssetJobDefinition,
+    )
+
+    from floe_core.schemas.platform_spec import PlatformSpec
+
+logger = logging.getLogger(__name__)
+
+# Default platform file path (K8s ConfigMap mount location)
+DEFAULT_PLATFORM_FILE_PATH = "/etc/floe/platform.yaml"
+
+# Environment variable for direct platform file path
+PLATFORM_FILE_ENV_VAR = "FLOE_PLATFORM_FILE"
+
+
+class FloeDefinitions:
+    """Factory for creating Dagster Definitions with batteries-included observability.
+
+    FloeDefinitions provides a one-line factory method that automatically:
+    - Loads CompiledArtifacts from file or dict
+    - Initializes ObservabilityOrchestrator (tracing + lineage)
+    - Creates PolarisCatalogResource from resolved catalog config
+    - Wires all resources into Dagster Definitions
+
+    This is the PRIMARY API for data engineers using floe-dagster.
+
+    Example:
+        >>> # In definitions.py at project root
+        >>> from floe_dagster import floe_asset, FloeDefinitions
+        >>>
+        >>> @floe_asset(group_name="bronze", outputs=["demo.bronze_customers"])
+        ... def bronze_customers(context, catalog):
+        ...     # Pure business logic - observability handled automatically
+        ...     return {"rows": 1000}
+        >>>
+        >>> defs = FloeDefinitions.from_compiled_artifacts(
+        ...     assets=[bronze_customers],
+        ...     schedules=[my_schedule],
+        ... )
+    """
+
+    @classmethod
+    def from_compiled_artifacts(
+        cls,
+        artifacts_path: str | Path = ".floe/compiled_artifacts.json",
+        *,
+        artifacts_dict: dict[str, Any] | None = None,
+        assets: list[AssetsDefinition] | None = None,
+        jobs: list[JobDefinition | UnresolvedAssetJobDefinition] | None = None,
+        schedules: list[ScheduleDefinition] | None = None,
+        sensors: list[SensorDefinition] | None = None,
+        namespace: str = "floe",
+    ) -> Definitions:
+        """Create Dagster Definitions with batteries-included observability.
+
+        This is the primary entry point for floe-dagster projects. It:
+        1. Loads CompiledArtifacts (from file or dict)
+        2. Initializes ObservabilityOrchestrator for tracing + lineage
+        3. Creates PolarisCatalogResource from resolved catalog config
+        4. Wires everything into Dagster Definitions
+
+        Assets decorated with @floe_asset automatically get observability
+        instrumentation when using the resources provided by this factory.
+
+        Args:
+            artifacts_path: Path to compiled_artifacts.json file.
+                           Ignored if artifacts_dict is provided.
+            artifacts_dict: CompiledArtifacts dictionary. If provided,
+                           takes precedence over artifacts_path.
+            assets: List of asset definitions (including @floe_asset decorated).
+            jobs: List of job definitions.
+            schedules: List of schedule definitions.
+            sensors: List of sensor definitions.
+            namespace: OpenLineage namespace (default: "floe").
+
+        Returns:
+            Dagster Definitions with all resources wired.
+
+        Raises:
+            FileNotFoundError: If artifacts file doesn't exist and no dict provided.
+
+        Example:
+            >>> # Minimal usage - auto-loads from platform.yaml
+            >>> defs = FloeDefinitions.from_compiled_artifacts()
+            >>>
+            >>> # With custom assets and schedules
+            >>> defs = FloeDefinitions.from_compiled_artifacts(
+            ...     assets=[bronze_customers, bronze_products],
+            ...     schedules=[hourly_schedule],
+            ... )
+            >>>
+            >>> # With explicit artifacts dict (for testing)
+            >>> defs = FloeDefinitions.from_compiled_artifacts(
+            ...     artifacts_dict=my_artifacts,
+            ...     assets=[test_asset],
+            ... )
+        """
+        # Load artifacts with priority:
+        # 1. Explicit artifacts_dict (highest priority)
+        # 2. Platform.yaml via FLOE_PLATFORM_FILE (Two-Tier Architecture)
+        # 3. Compiled artifacts file (legacy/fallback)
+        if artifacts_dict is not None:
+            artifacts = artifacts_dict
+            logger.debug("Using explicit artifacts_dict")
+        else:
+            # Try platform.yaml first (Two-Tier Architecture)
+            platform = cls._load_platform_config()
+            if platform is not None:
+                artifacts = cls._build_artifacts_from_platform(platform)
+                logger.info("Loaded configuration from platform.yaml (Two-Tier Architecture)")
+            else:
+                # Fall back to compiled_artifacts.json file
+                path = Path(artifacts_path)
+                if not path.exists():
+                    raise FileNotFoundError(
+                        f"CompiledArtifacts not found at {artifacts_path}. "
+                        f"Either set {PLATFORM_FILE_ENV_VAR} to a platform.yaml path, "
+                        "or run 'floe compile' to generate compiled_artifacts.json."
+                    )
+                with open(path) as f:
+                    artifacts = json.load(f)
+                logger.debug("Loaded artifacts from %s", artifacts_path)
+
+        # Initialize observability orchestrator
+        orchestrator = ObservabilityOrchestrator.from_compiled_artifacts(
+            artifacts, namespace=namespace
+        )
+        logger.info(
+            "ObservabilityOrchestrator initialized",
+            extra={"namespace": namespace},
+        )
+
+        # Build resources dict
+        resources: dict[str, Any] = {
+            # Inject orchestrator for @floe_asset decorator
+            ORCHESTRATOR_RESOURCE_KEY: orchestrator,
+        }
+
+        # Create PolarisCatalogResource if catalog config available
+        resolved_catalog = artifacts.get("resolved_catalog", {})
+        catalogs = artifacts.get("catalogs", {})
+        if resolved_catalog or catalogs:
+            try:
+                catalog_resource = PolarisCatalogResource.from_compiled_artifacts(artifacts)
+                resources["catalog"] = catalog_resource
+                logger.info(
+                    "PolarisCatalogResource initialized",
+                    extra={"warehouse": catalog_resource.warehouse},
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to create PolarisCatalogResource: %s. "
+                    "Catalog resource will not be available.",
+                    e,
+                )
+
+        # Combine all assets
+        all_assets: list[Any] = list(assets or [])
+
+        # Create Definitions
+        return Definitions(
+            assets=all_assets if all_assets else None,
+            jobs=jobs,
+            schedules=schedules,
+            sensors=sensors,
+            resources=resources,
+        )
+
+    @classmethod
+    def from_dict(
+        cls,
+        artifacts: dict[str, Any],
+        *,
+        assets: list[AssetsDefinition] | None = None,
+        jobs: list[JobDefinition | UnresolvedAssetJobDefinition] | None = None,
+        schedules: list[ScheduleDefinition] | None = None,
+        sensors: list[SensorDefinition] | None = None,
+        namespace: str = "floe",
+    ) -> Definitions:
+        """Create Definitions from artifacts dictionary.
+
+        Convenience method that wraps from_compiled_artifacts.
+
+        Args:
+            artifacts: CompiledArtifacts dictionary.
+            assets: List of asset definitions.
+            jobs: List of job definitions.
+            schedules: List of schedule definitions.
+            sensors: List of sensor definitions.
+            namespace: OpenLineage namespace.
+
+        Returns:
+            Dagster Definitions with all resources wired.
+        """
+        return cls.from_compiled_artifacts(
+            artifacts_dict=artifacts,
+            assets=assets,
+            jobs=jobs,
+            schedules=schedules,
+            sensors=sensors,
+            namespace=namespace,
+        )
+
+    @classmethod
+    def _load_platform_config(cls) -> PlatformSpec | None:
+        """Load platform configuration from platform.yaml.
+
+        Two-Tier Architecture: Loads platform.yaml for infrastructure configuration.
+        The platform config is resolved in this order:
+
+        1. FLOE_PLATFORM_FILE: Direct path to platform.yaml (K8s ConfigMap mount)
+        2. FLOE_PLATFORM_ENV: Environment name to search for platform.yaml
+        3. Default search: Look in standard locations (./platform/local, etc.)
+
+        Returns:
+            PlatformSpec instance, or None if not available.
+
+        Note:
+            This method gracefully degrades - if platform.yaml is not found,
+            it returns None rather than raising an error. This allows
+            fallback to explicit artifacts_dict or artifacts_path.
+        """
+        try:
+            from floe_core.compiler.platform_resolver import PlatformResolver
+
+            # Priority 1: Direct file path (K8s ConfigMap mount pattern)
+            platform_file = os.environ.get(PLATFORM_FILE_ENV_VAR)
+            if platform_file:
+                platform_path = Path(platform_file)
+                if platform_path.exists():
+                    logger.info(
+                        "Loading platform config from %s: %s",
+                        PLATFORM_FILE_ENV_VAR,
+                        platform_file,
+                    )
+                    resolver = PlatformResolver()
+                    return resolver.load(path=platform_path)
+                logger.warning(
+                    "%s set but file not found: %s",
+                    PLATFORM_FILE_ENV_VAR,
+                    platform_file,
+                )
+
+            # Priority 2-3: Use standard PlatformResolver (FLOE_PLATFORM_ENV or search)
+            resolver = PlatformResolver()
+            return resolver.load()
+        except ImportError:
+            logger.debug("floe_core not available, platform config unavailable")
+            return None
+        except Exception as e:
+            logger.debug("Platform config not found: %s", e)
+            return None
+
+    @classmethod
+    def _build_artifacts_from_platform(
+        cls,
+        platform: PlatformSpec,
+        profile_name: str = "default",
+    ) -> dict[str, Any]:
+        """Build CompiledArtifacts-compatible dictionary from PlatformSpec.
+
+        Transforms platform.yaml profiles into the dictionary format expected
+        by FloeDefinitions.from_compiled_artifacts().
+
+        Args:
+            platform: Loaded PlatformSpec from platform.yaml.
+            profile_name: Name of profile to use (default: "default").
+
+        Returns:
+            Dictionary suitable for FloeDefinitions.from_compiled_artifacts().
+
+        Note:
+            Credentials are stored as secret_ref patterns for runtime resolution.
+            Actual secret values are never stored in this dict.
+        """
+        resolved_catalog: dict[str, Any] = {}
+        observability_config: dict[str, Any] = {}
+
+        # Build resolved_catalog from catalog profile
+        try:
+            catalog = platform.get_catalog_profile(profile_name)
+            resolved_catalog = {
+                "uri": catalog.get_uri(),
+                "warehouse": catalog.warehouse,
+                "credentials": {
+                    "client_id": (catalog.credentials.client_id if catalog.credentials else None),
+                    "scope": (
+                        catalog.credentials.scope if catalog.credentials else "PRINCIPAL_ROLE:ALL"
+                    ),
+                },
+            }
+
+            # Handle secret references for client_secret
+            if catalog.credentials and catalog.credentials.client_secret:
+                secret_ref = catalog.credentials.client_secret
+                resolved_catalog["credentials"]["client_secret"] = {
+                    "secret_ref": secret_ref.secret_ref
+                }
+
+            # Add storage config if available
+            try:
+                storage = platform.get_storage_profile(profile_name)
+                resolved_catalog["s3_endpoint"] = storage.get_endpoint()
+                resolved_catalog["s3_region"] = storage.region
+                resolved_catalog["s3_path_style_access"] = storage.path_style_access
+            except KeyError:
+                pass  # Storage profile is optional
+        except KeyError:
+            logger.warning(
+                "Catalog profile '%s' not found in platform.yaml",
+                profile_name,
+            )
+
+        # Build observability config
+        if platform.observability:
+            obs = platform.observability
+            observability_config = {
+                "tracing": {
+                    "enabled": obs.traces,
+                    "endpoint": obs.otlp_endpoint,
+                    "service_name": obs.attributes.get("service.name", "floe"),
+                    "batch_export": True,
+                },
+                "lineage": {
+                    "enabled": obs.lineage,
+                    "endpoint": obs.lineage_endpoint,
+                    "namespace": obs.attributes.get("namespace", "floe"),
+                    "timeout": 5.0,
+                },
+            }
+
+        return {
+            "version": "2.0.0",
+            "resolved_catalog": resolved_catalog,
+            "observability": observability_config,
+        }
 
 
 def load_definitions_from_artifacts(
@@ -24,6 +391,11 @@ def load_definitions_from_artifacts(
 
     Reads CompiledArtifacts JSON file and creates complete Dagster
     Definitions including dbt assets and resources.
+
+    Note:
+        This is the legacy API. For new projects, use
+        FloeDefinitions.from_compiled_artifacts() which provides
+        batteries-included observability.
 
     Args:
         artifacts_path: Path to compiled_artifacts.json file.
@@ -56,6 +428,11 @@ def load_definitions_from_dict(artifacts: dict[str, Any]) -> Definitions:
     """Load Dagster Definitions from CompiledArtifacts dictionary.
 
     Useful for testing or programmatic configuration.
+
+    Note:
+        This is the legacy API. For new projects, use
+        FloeDefinitions.from_dict() which provides
+        batteries-included observability.
 
     Args:
         artifacts: CompiledArtifacts dictionary.

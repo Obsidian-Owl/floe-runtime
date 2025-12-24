@@ -605,8 +605,7 @@ services:
       - "3000:3000"
     environment:
       DAGSTER_HOME: /opt/dagster
-      # Two-Tier Architecture: Use platform.yaml for configuration
-      # demo/orchestration/config.py loads via PlatformResolver
+      # Two-Tier Architecture: FloeDefinitions auto-loads platform.yaml via FLOE_PLATFORM_ENV
       FLOE_PLATFORM_ENV: local
       # PostgreSQL connection string for Dagster storage
       DAGSTER_PG_CONN_STRING: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/dagster
@@ -682,8 +681,7 @@ services:
     container_name: floe-dagster-daemon
     environment:
       DAGSTER_HOME: /opt/dagster
-      # Two-Tier Architecture: Use platform.yaml for configuration
-      # demo/orchestration/config.py loads via PlatformResolver
+      # Two-Tier Architecture: FloeDefinitions auto-loads platform.yaml via FLOE_PLATFORM_ENV
       FLOE_PLATFORM_ENV: local
       # PostgreSQL connection string for Dagster storage
       DAGSTER_PG_CONN_STRING: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/dagster
