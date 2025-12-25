@@ -1,0 +1,431 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://floe.dev/schemas/compiled-artifacts-v2.json",
+  "title": "CompiledArtifacts v2",
+  "description": "Extended immutable output contract from compilation with orchestration auto-discovery support. This is the sole integration point between floe-core (compiler) and downstream packages (floe-dagster, floe-dbt, floe-cube, floe-polaris). Contract Rules: Model is immutable (frozen=True), Unknown fields are rejected (extra='forbid'), 3-version backward compatibility maintained, JSON Schema exported for cross-language validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "metadata",
+    "compute",
+    "transforms"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "default": "2.0.0",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$",
+      "description": "Contract version (semver). v2.0.0 indicates orchestration auto-discovery support."
+    },
+    "metadata": {
+      "$ref": "#/$defs/ArtifactMetadata",
+      "description": "Compilation metadata for tracking artifact provenance"
+    },
+    "compute": {
+      "$ref": "#/$defs/ComputeConfig",
+      "description": "Resolved compute target configuration"
+    },
+    "transforms": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/TransformConfig"
+      },
+      "description": "List of transform configurations"
+    },
+    "consumption": {
+      "$ref": "#/$defs/ConsumptionConfig",
+      "description": "Cube semantic layer configuration"
+    },
+    "governance": {
+      "$ref": "#/$defs/GovernanceConfig",
+      "description": "Data governance configuration"
+    },
+    "observability": {
+      "$ref": "#/$defs/ObservabilityConfig",
+      "description": "Observability configuration"
+    },
+    "catalog": {
+      "anyOf": [
+        {"$ref": "#/$defs/CatalogConfig"},
+        {"type": "null"}
+      ],
+      "description": "Iceberg catalog configuration (resolved from profile)"
+    },
+    "orchestration": {
+      "anyOf": [
+        {"$ref": "https://floe.dev/schemas/orchestration-config.json"},
+        {"type": "null"}
+      ],
+      "description": "Compiled orchestration configuration with resolved environment variables and validated references. When present, indicates auto-discovery and declarative orchestration should be used."
+    },
+    "dbt_manifest_path": {
+      "type": ["string", "null"],
+      "description": "Resolved path to dbt manifest.json (if available from transforms or orchestration.dbt)"
+    },
+    "dbt_project_path": {
+      "type": ["string", "null"],
+      "description": "Resolved path to dbt project directory (if detected from transforms or orchestration.dbt)"
+    },
+    "dbt_profiles_path": {
+      "type": "string",
+      "default": ".floe/profiles",
+      "description": "Path to profiles directory (required by dagster-dbt)"
+    },
+    "lineage_namespace": {
+      "type": ["string", "null"],
+      "description": "OpenLineage namespace (SaaS enrichment or derived from pipeline name)"
+    },
+    "environment_context": {
+      "anyOf": [
+        {"$ref": "#/$defs/EnvironmentContext"},
+        {"type": "null"}
+      ],
+      "description": "Optional SaaS environment context"
+    },
+    "column_classifications": {
+      "type": ["object", "null"],
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "$ref": "#/$defs/ColumnClassification"
+        }
+      },
+      "description": "Extracted column classifications from dbt manifest or governance policies"
+    }
+  },
+  "$defs": {
+    "ArtifactMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Compilation metadata for tracking artifact provenance.",
+      "required": [
+        "compiled_at",
+        "floe_core_version",
+        "source_hash"
+      ],
+      "properties": {
+        "compiled_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when compilation occurred (UTC)"
+        },
+        "floe_core_version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Version of floe-core that produced artifacts"
+        },
+        "source_hash": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 hash of source floe.yaml content"
+        }
+      }
+    },
+    "ComputeConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Resolved compute target configuration from platform profile.",
+      "required": ["target"],
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/ComputeTarget"
+        },
+        "connection_secret_ref": {
+          "type": ["string", "null"],
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,252}$",
+          "description": "K8s secret name for connection credentials"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Target-specific properties resolved from platform configuration"
+        }
+      }
+    },
+    "ComputeTarget": {
+      "type": "string",
+      "enum": [
+        "duckdb",
+        "snowflake",
+        "bigquery",
+        "redshift",
+        "databricks",
+        "postgres",
+        "spark"
+      ],
+      "description": "Supported compute targets matching dbt adapter names"
+    },
+    "TransformConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Configuration for a transformation step.",
+      "required": ["type", "path"],
+      "properties": {
+        "type": {
+          "const": "dbt",
+          "description": "Transform type (currently only 'dbt' supported)"
+        },
+        "path": {
+          "type": "string",
+          "description": "Resolved path to transform source"
+        },
+        "target": {
+          "type": ["string", "null"],
+          "description": "Resolved target override for dbt"
+        }
+      }
+    },
+    "ConsumptionConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Configuration for Cube semantic layer.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Cube semantic layer"
+        },
+        "port": {
+          "type": "integer",
+          "default": 4000,
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Cube API port"
+        },
+        "api_secret_ref": {
+          "type": ["string", "null"],
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,252}$",
+          "description": "K8s secret name for Cube API key"
+        },
+        "database_type": {
+          "type": ["string", "null"],
+          "description": "Database driver type for Cube (postgres, snowflake, etc.)"
+        },
+        "dev_mode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Cube Playground in development"
+        },
+        "pre_aggregations": {
+          "$ref": "#/$defs/PreAggregationConfig",
+          "description": "Pre-aggregation configuration"
+        },
+        "security": {
+          "$ref": "#/$defs/CubeSecurityConfig",
+          "description": "Row-level security configuration"
+        }
+      }
+    },
+    "PreAggregationConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Configuration for Cube pre-aggregations.",
+      "properties": {
+        "refresh_schedule": {
+          "type": "string",
+          "default": "*/30 * * * *",
+          "description": "Cron expression for pre-aggregation refresh"
+        },
+        "timezone": {
+          "type": "string",
+          "default": "UTC",
+          "description": "Timezone for schedule evaluation"
+        }
+      }
+    },
+    "CubeSecurityConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Configuration for Cube row-level security.",
+      "properties": {
+        "row_level": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable row-level security"
+        },
+        "filter_column": {
+          "type": "string",
+          "default": "organization_id",
+          "description": "Column for row-level filtering (matches JWT claim name)"
+        }
+      }
+    },
+    "GovernanceConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Configuration for data governance.",
+      "properties": {
+        "classification_source": {
+          "type": "string",
+          "enum": ["dbt_meta", "external"],
+          "default": "dbt_meta",
+          "description": "Source for column classifications"
+        },
+        "policies": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Policy definitions"
+        },
+        "emit_lineage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Emit OpenLineage events"
+        }
+      }
+    },
+    "ObservabilityConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Configuration for observability.",
+      "properties": {
+        "traces": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable OpenTelemetry traces"
+        },
+        "metrics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable metrics collection"
+        },
+        "lineage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable OpenLineage emission"
+        },
+        "otlp_endpoint": {
+          "type": ["string", "null"],
+          "description": "OTLP exporter endpoint"
+        },
+        "lineage_endpoint": {
+          "type": ["string", "null"],
+          "description": "OpenLineage API endpoint"
+        },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Custom trace attributes"
+        }
+      }
+    },
+    "CatalogConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Resolved Iceberg catalog configuration from platform profile.",
+      "required": ["type", "uri"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["polaris", "glue", "nessie"],
+          "description": "Catalog type (polaris, glue, nessie)"
+        },
+        "uri": {
+          "type": "string",
+          "description": "Catalog endpoint URI"
+        },
+        "credential_secret_ref": {
+          "type": ["string", "null"],
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,252}$",
+          "description": "K8s secret name for credentials"
+        },
+        "warehouse": {
+          "type": ["string", "null"],
+          "description": "Default warehouse name"
+        },
+        "scope": {
+          "type": ["string", "null"],
+          "description": "OAuth2 scope (Polaris)"
+        },
+        "token_refresh_enabled": {
+          "type": ["boolean", "null"],
+          "description": "Enable OAuth2 token refresh"
+        },
+        "access_delegation": {
+          "type": ["string", "null"],
+          "description": "Iceberg access delegation header"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Catalog-specific properties"
+        }
+      }
+    },
+    "EnvironmentContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional runtime context from Control Plane (SaaS enrichment).",
+      "required": [
+        "tenant_id",
+        "tenant_slug",
+        "project_id",
+        "project_slug",
+        "environment_id",
+        "environment_type",
+        "governance_category"
+      ],
+      "properties": {
+        "tenant_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Tenant identifier"
+        },
+        "tenant_slug": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable tenant slug"
+        },
+        "project_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Project identifier"
+        },
+        "project_slug": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable project slug"
+        },
+        "environment_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Environment identifier"
+        },
+        "environment_type": {
+          "type": "string",
+          "enum": ["development", "preview", "staging", "production"],
+          "description": "Type of environment"
+        },
+        "governance_category": {
+          "type": "string",
+          "enum": ["production", "non_production"],
+          "description": "Governance category for the environment"
+        }
+      }
+    },
+    "ColumnClassification": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Classification metadata for a single column.",
+      "required": ["classification"],
+      "properties": {
+        "classification": {
+          "type": "string",
+          "description": "Classification type (e.g., 'pii', 'confidential')"
+        },
+        "pii_type": {
+          "type": ["string", "null"],
+          "description": "Specific PII type (e.g., 'email', 'phone')"
+        },
+        "sensitivity": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "default": "medium",
+          "description": "Sensitivity level"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,307 @@
+{
+  "feature": "010-orchestration-auto-discovery",
+  "created_at": "2025-12-26T09:58:47.304260Z",
+  "last_sync": "2025-12-26T09:58:47.304278Z",
+  "mappings": {
+    "T001": {
+      "bead_id": "floe-runtime-8d6h",
+      "status": "open",
+      "title": "T001: Create feature branch `010-orchestration-auto-discovery` from main branch",
+      "created_at": "2025-12-26T09:58:47.304281Z"
+    },
+    "T002": {
+      "bead_id": "floe-runtime-1rpc",
+      "status": "open",
+      "title": "T002: Update dependencies in `/Users/dmccarthy/Projects/floe-runtime/packages/flo...",
+      "created_at": "2025-12-26T09:58:47.304284Z"
+    },
+    "T003": {
+      "bead_id": "floe-runtime-m03h",
+      "status": "open",
+      "title": "T003: Verify test infrastructure supports pytest markers for requirements trackin...",
+      "created_at": "2025-12-26T09:58:47.304285Z"
+    },
+    "T004": {
+      "bead_id": "floe-runtime-j6ox",
+      "status": "open",
+      "title": "T004: Create OrchestrationConfig schema in `/Users/dmccarthy/Projects/floe-runtim...",
+      "created_at": "2025-12-26T09:58:47.304286Z"
+    },
+    "T005": {
+      "bead_id": "floe-runtime-ui8s",
+      "status": "open",
+      "title": "T005: Create PartitionDefinition schema in `/Users/dmccarthy/Projects/floe-runtim...",
+      "created_at": "2025-12-26T09:58:47.304288Z"
+    },
+    "T006": {
+      "bead_id": "floe-runtime-mxx1",
+      "status": "open",
+      "title": "T006: Create JobDefinition schema in `/Users/dmccarthy/Projects/floe-runtime/pack...",
+      "created_at": "2025-12-26T09:58:47.304288Z"
+    },
+    "T007": {
+      "bead_id": "floe-runtime-9p3h",
+      "status": "open",
+      "title": "T007: Create ScheduleDefinition schema in `/Users/dmccarthy/Projects/floe-runtime...",
+      "created_at": "2025-12-26T09:58:47.304289Z"
+    },
+    "T008": {
+      "bead_id": "floe-runtime-dtwc",
+      "status": "open",
+      "title": "T008: Create SensorDefinition schema in `/Users/dmccarthy/Projects/floe-runtime/p...",
+      "created_at": "2025-12-26T09:58:47.304290Z"
+    },
+    "T009": {
+      "bead_id": "floe-runtime-uzty",
+      "status": "open",
+      "title": "T009: Create AssetConfig schema in `/Users/dmccarthy/Projects/floe-runtime/packag...",
+      "created_at": "2025-12-26T09:58:47.304291Z"
+    },
+    "T010": {
+      "bead_id": "floe-runtime-26s2",
+      "status": "open",
+      "title": "T010: Create BackfillDefinition schema in `/Users/dmccarthy/Projects/floe-runtime...",
+      "created_at": "2025-12-26T09:58:47.304292Z"
+    },
+    "T011": {
+      "bead_id": "floe-runtime-mt3y",
+      "status": "open",
+      "title": "T011: Create DbtConfig schema in `/Users/dmccarthy/Projects/floe-runtime/packages...",
+      "created_at": "2025-12-26T09:58:47.304293Z"
+    },
+    "T012": {
+      "bead_id": "floe-runtime-xssl",
+      "status": "open",
+      "title": "T012: Extend FloeSpec with orchestration field in `/Users/dmccarthy/Projects/floe...",
+      "created_at": "2025-12-26T09:58:47.304294Z"
+    },
+    "T013": {
+      "bead_id": "floe-runtime-c80q",
+      "status": "open",
+      "title": "T013: Create schema validation tests in `/Users/dmccarthy/Projects/floe-runtime/t...",
+      "created_at": "2025-12-26T09:58:47.304295Z"
+    },
+    "T014": {
+      "bead_id": "floe-runtime-vvo0",
+      "status": "open",
+      "title": "T014: Create partition definition validation tests in `/Users/dmccarthy/Projects/...",
+      "created_at": "2025-12-26T09:58:47.304296Z"
+    },
+    "T015": {
+      "bead_id": "floe-runtime-rins",
+      "status": "open",
+      "title": "T015: Create dbt loader in `/Users/dmccarthy/Projects/floe-runtime/packages/floe-...",
+      "created_at": "2025-12-26T09:58:47.304297Z"
+    },
+    "T016": {
+      "bead_id": "floe-runtime-hf7x",
+      "status": "open",
+      "title": "T016: Wire dbt loader to existing create_dbt_assets_with_per_model_observability ...",
+      "created_at": "2025-12-26T09:58:47.304298Z"
+    },
+    "T017": {
+      "bead_id": "floe-runtime-g7e4",
+      "status": "open",
+      "title": "T017: Create dbt loader tests with manifest validation in `/Users/dmccarthy/Proje...",
+      "created_at": "2025-12-26T09:58:47.304299Z"
+    },
+    "T018": {
+      "bead_id": "floe-runtime-7nuv",
+      "status": "open",
+      "title": "T018: Enhance FloeDefinitions.from_compiled_artifacts for dbt auto-loading in `/U...",
+      "created_at": "2025-12-26T09:58:47.304300Z"
+    },
+    "T019": {
+      "bead_id": "floe-runtime-cwug",
+      "status": "open",
+      "title": "T019: Test dbt auto-loading integration in `/Users/dmccarthy/Projects/floe-runtim...",
+      "created_at": "2025-12-26T09:58:47.304301Z"
+    },
+    "T020": {
+      "bead_id": "floe-runtime-9u0o",
+      "status": "open",
+      "title": "T020: Create job loader in `/Users/dmccarthy/Projects/floe-runtime/packages/floe-...",
+      "created_at": "2025-12-26T09:58:47.304302Z"
+    },
+    "T021": {
+      "bead_id": "floe-runtime-f4j5",
+      "status": "open",
+      "title": "T021: Create schedule loader in `/Users/dmccarthy/Projects/floe-runtime/packages/...",
+      "created_at": "2025-12-26T09:58:47.304303Z"
+    },
+    "T022": {
+      "bead_id": "floe-runtime-hn4z",
+      "status": "open",
+      "title": "T022: Create partition loader in `/Users/dmccarthy/Projects/floe-runtime/packages...",
+      "created_at": "2025-12-26T09:58:47.304303Z"
+    },
+    "T023": {
+      "bead_id": "floe-runtime-pwbx",
+      "status": "open",
+      "title": "T023: [P] Create job loader tests in `/Users/dmccarthy/Projects/floe-runtime/test...",
+      "created_at": "2025-12-26T09:58:47.304305Z"
+    },
+    "T024": {
+      "bead_id": "floe-runtime-h8rw",
+      "status": "open",
+      "title": "T024: [P] Create schedule loader tests in `/Users/dmccarthy/Projects/floe-runtime...",
+      "created_at": "2025-12-26T09:58:47.304305Z"
+    },
+    "T025": {
+      "bead_id": "floe-runtime-d3uq",
+      "status": "open",
+      "title": "T025: [P] Create partition loader tests in `/Users/dmccarthy/Projects/floe-runtim...",
+      "created_at": "2025-12-26T09:58:47.304306Z"
+    },
+    "T026": {
+      "bead_id": "floe-runtime-3aaf",
+      "status": "open",
+      "title": "T026: Enhance FloeDefinitions for job/schedule auto-loading in `/Users/dmccarthy/...",
+      "created_at": "2025-12-26T09:58:47.304307Z"
+    },
+    "T027": {
+      "bead_id": "floe-runtime-z339",
+      "status": "open",
+      "title": "T027: Test declarative orchestration integration in `/Users/dmccarthy/Projects/fl...",
+      "created_at": "2025-12-26T09:58:47.304308Z"
+    },
+    "T028": {
+      "bead_id": "floe-runtime-1o9r",
+      "status": "open",
+      "title": "T028: Create asset loader in `/Users/dmccarthy/Projects/floe-runtime/packages/flo...",
+      "created_at": "2025-12-26T09:58:47.304309Z"
+    },
+    "T029": {
+      "bead_id": "floe-runtime-yeba",
+      "status": "open",
+      "title": "T029: Create asset loader tests in `/Users/dmccarthy/Projects/floe-runtime/tests/...",
+      "created_at": "2025-12-26T09:58:47.304310Z"
+    },
+    "T030": {
+      "bead_id": "floe-runtime-py7u",
+      "status": "open",
+      "title": "T030: Enhance FloeDefinitions for asset module auto-loading in `/Users/dmccarthy/...",
+      "created_at": "2025-12-26T09:58:47.304311Z"
+    },
+    "T031": {
+      "bead_id": "floe-runtime-d7hu",
+      "status": "open",
+      "title": "T031: Test asset module auto-discovery integration in `/Users/dmccarthy/Projects/...",
+      "created_at": "2025-12-26T09:58:47.304312Z"
+    },
+    "T032": {
+      "bead_id": "floe-runtime-dz4w",
+      "status": "open",
+      "title": "T032: Create sensor loader in `/Users/dmccarthy/Projects/floe-runtime/packages/fl...",
+      "created_at": "2025-12-26T09:58:47.304313Z"
+    },
+    "T033": {
+      "bead_id": "floe-runtime-cldo",
+      "status": "open",
+      "title": "T033: Create sensor loader tests in `/Users/dmccarthy/Projects/floe-runtime/tests...",
+      "created_at": "2025-12-26T09:58:47.304315Z"
+    },
+    "T034": {
+      "bead_id": "floe-runtime-pjcg",
+      "status": "open",
+      "title": "T034: Enhance FloeDefinitions for sensor auto-loading in `/Users/dmccarthy/Projec...",
+      "created_at": "2025-12-26T09:58:47.304316Z"
+    },
+    "T035": {
+      "bead_id": "floe-runtime-2pfb",
+      "status": "open",
+      "title": "T035: Test event-driven sensor integration in `/Users/dmccarthy/Projects/floe-run...",
+      "created_at": "2025-12-26T09:58:47.304317Z"
+    },
+    "T036": {
+      "bead_id": "floe-runtime-6w83",
+      "status": "open",
+      "title": "T036: Extend job loader for ops job type in `/Users/dmccarthy/Projects/floe-runti...",
+      "created_at": "2025-12-26T09:58:47.304318Z"
+    },
+    "T037": {
+      "bead_id": "floe-runtime-6fv7",
+      "status": "open",
+      "title": "T037: Create ops job tests in `/Users/dmccarthy/Projects/floe-runtime/tests/unit/...",
+      "created_at": "2025-12-26T09:58:47.304318Z"
+    },
+    "T038": {
+      "bead_id": "floe-runtime-kmv5",
+      "status": "open",
+      "title": "T038: Test ops job integration in `/Users/dmccarthy/Projects/floe-runtime/tests/i...",
+      "created_at": "2025-12-26T09:58:47.304319Z"
+    },
+    "T039": {
+      "bead_id": "floe-runtime-846l",
+      "status": "open",
+      "title": "T039: Remove wrapper assets from `/Users/dmccarthy/Projects/floe-runtime/demo/dat...",
+      "created_at": "2025-12-26T09:58:47.304320Z"
+    },
+    "T040": {
+      "bead_id": "floe-runtime-5rdr",
+      "status": "open",
+      "title": "T040: Create bronze assets module in `/Users/dmccarthy/Projects/floe-runtime/demo...",
+      "created_at": "2025-12-26T09:58:47.304321Z"
+    },
+    "T041": {
+      "bead_id": "floe-runtime-4man",
+      "status": "open",
+      "title": "T041: Create ops assets module in `/Users/dmccarthy/Projects/floe-runtime/demo/da...",
+      "created_at": "2025-12-26T09:58:47.304322Z"
+    },
+    "T042": {
+      "bead_id": "floe-runtime-7xjk",
+      "status": "open",
+      "title": "T042: Add orchestration section to `/Users/dmccarthy/Projects/floe-runtime/demo/d...",
+      "created_at": "2025-12-26T09:58:47.304323Z"
+    },
+    "T043": {
+      "bead_id": "floe-runtime-7uyt",
+      "status": "open",
+      "title": "T043: Simplify definitions.py to single factory call in `/Users/dmccarthy/Project...",
+      "created_at": "2025-12-26T09:58:47.304324Z"
+    },
+    "T044": {
+      "bead_id": "floe-runtime-0ylo",
+      "status": "open",
+      "title": "T044: Create demo refactoring test in `/Users/dmccarthy/Projects/floe-runtime/tes...",
+      "created_at": "2025-12-26T09:58:47.304325Z"
+    },
+    "T045": {
+      "bead_id": "floe-runtime-v7b0",
+      "status": "open",
+      "title": "T045: Create FloeDefinitions auto-loading tests in `/Users/dmccarthy/Projects/flo...",
+      "created_at": "2025-12-26T09:58:47.304326Z"
+    },
+    "T046": {
+      "bead_id": "floe-runtime-4kxf",
+      "status": "open",
+      "title": "T046: Create orchestration end-to-end test in `/Users/dmccarthy/Projects/floe-run...",
+      "created_at": "2025-12-26T09:58:47.304327Z"
+    },
+    "T047": {
+      "bead_id": "floe-runtime-gizd",
+      "status": "open",
+      "title": "T047: Update loader __init__.py files for clean imports in `/Users/dmccarthy/Proj...",
+      "created_at": "2025-12-26T09:58:47.304328Z"
+    },
+    "T048": {
+      "bead_id": "floe-runtime-sz5t",
+      "status": "open",
+      "title": "T048: Create JSON schema export for IDE support in `/Users/dmccarthy/Projects/flo...",
+      "created_at": "2025-12-26T09:58:47.304329Z"
+    },
+    "T049": {
+      "bead_id": "floe-runtime-6qgg",
+      "status": "open",
+      "title": "T049: Add environment variable interpolation support in `/Users/dmccarthy/Project...",
+      "created_at": "2025-12-26T09:58:47.304330Z"
+    },
+    "T050": {
+      "bead_id": "floe-runtime-wq2s",
+      "status": "open",
+      "title": "T050: Update type hints and docstrings across all new modules for mypy compliance",
+      "created_at": "2025-12-26T09:58:47.304330Z"
+    }
+  }
+}

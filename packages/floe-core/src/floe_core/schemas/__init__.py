@@ -30,6 +30,8 @@ Legacy Models:
 
 from __future__ import annotations
 
+from floe_core.schemas.asset_config import AssetConfig
+from floe_core.schemas.backfill_definition import BackfillDefinition
 from floe_core.schemas.catalog import CatalogConfig
 from floe_core.schemas.catalog_profile import (
     AccessDelegation,
@@ -98,6 +100,7 @@ from floe_core.schemas.infrastructure_config import (
     TlsConfig,
     TlsProvider,
 )
+from floe_core.schemas.job_definition import BatchJob, JobDefinition, OpsJob
 from floe_core.schemas.observability import (
     AlertRule,
     AlertSeverity,
@@ -114,12 +117,25 @@ from floe_core.schemas.observability import (
     TraceSamplingConfig,
     TracingConfig,
 )
+from floe_core.schemas.orchestration_config import (
+    DbtConfig,
+    ObservabilityLevel,
+    OrchestrationConfig,
+)
+from floe_core.schemas.partition_definition import (
+    DynamicPartition,
+    MultiPartition,
+    PartitionDefinition,
+    StaticPartition,
+    TimeWindowPartition,
+)
 from floe_core.schemas.platform_spec import (
     ENVIRONMENT_TYPES,
     PLATFORM_SPEC_VERSION,
     PROFILE_NAME_PATTERN,
     PlatformSpec,
 )
+from floe_core.schemas.schedule_definition import ScheduleDefinition
 from floe_core.schemas.security_config import (
     AtRestEncryption,
     AuditBackend,
@@ -144,6 +160,13 @@ from floe_core.schemas.security_config import (
     SessionConfig,
     VaultAuthMethod,
     VaultSecretBackend,
+)
+from floe_core.schemas.sensor_definition import (
+    AssetSensor,
+    CustomSensor,
+    FileWatcherSensor,
+    RunStatusSensor,
+    SensorDefinition,
 )
 from floe_core.schemas.storage_profile import StorageProfile, StorageType
 from floe_core.schemas.transforms import TransformConfig
@@ -265,4 +288,24 @@ __all__: list[str] = [
     "LogFormat",
     # Catalog (legacy)
     "CatalogConfig",
+    # Orchestration (Feature 010)
+    "OrchestrationConfig",
+    "DbtConfig",
+    "ObservabilityLevel",
+    "PartitionDefinition",
+    "TimeWindowPartition",
+    "StaticPartition",
+    "MultiPartition",
+    "DynamicPartition",
+    "JobDefinition",
+    "BatchJob",
+    "OpsJob",
+    "ScheduleDefinition",
+    "SensorDefinition",
+    "FileWatcherSensor",
+    "AssetSensor",
+    "RunStatusSensor",
+    "CustomSensor",
+    "AssetConfig",
+    "BackfillDefinition",
 ]

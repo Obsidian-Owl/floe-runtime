@@ -1,0 +1,619 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://floe.dev/schemas/orchestration-config.json",
+  "title": "OrchestrationConfig",
+  "description": "Orchestration configuration for floe.yaml. Enables declarative pipeline configuration that eliminates 200+ lines of boilerplate by auto-discovering assets from modules and dbt manifests.\n\n⚠️  CRITICAL: This is DATA ENGINEER configuration only. MUST NOT contain infrastructure details:\n❌ Forbidden: Endpoints (OTLP, S3, HTTP), credentials, bucket names, regions\n✅ Allowed: Asset modules, schedules, LOCAL file paths, logical references\n\nInfrastructure details belong in platform.yaml (platform engineer responsibility).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "asset_modules": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)*$"
+      },
+      "description": "Python module paths for asset auto-discovery. Modules must be valid Python import paths (e.g., 'demo.assets.bronze', 'my_package.data.gold').",
+      "examples": [
+        ["demo.assets.bronze", "demo.assets.gold", "demo.assets.ops"]
+      ]
+    },
+    "dbt": {
+      "$ref": "#/$defs/DbtConfig",
+      "description": "dbt integration configuration for per-model observability support"
+    },
+    "partitions": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/PartitionDefinition"
+      },
+      "description": "Named partition definitions that can be referenced by asset configurations. Keys must be valid identifiers.",
+      "propertyNames": {
+        "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$"
+      },
+      "examples": [
+        {
+          "daily_partition": {
+            "type": "time_window",
+            "start": "2024-01-01",
+            "cron_schedule": "0 0 * * *",
+            "timezone": "UTC"
+          },
+          "regional_partition": {
+            "type": "static",
+            "partition_keys": ["us-east", "us-west", "eu-central"]
+          }
+        }
+      ]
+    },
+    "assets": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/AssetConfig"
+      },
+      "description": "Pattern-based asset configurations using glob patterns. Keys support glob syntax: *, ?, [abc], {a,b,c}.",
+      "examples": [
+        {
+          "bronze_*": {
+            "partitions": "daily_partition",
+            "automation_condition": "eager",
+            "group_name": "bronze"
+          },
+          "customer_*": {
+            "partitions": "monthly_partition",
+            "automation_condition": "on_cron"
+          }
+        }
+      ]
+    },
+    "jobs": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/JobDefinition"
+      },
+      "description": "Job definitions for grouping assets or operations. Job names must be valid identifiers.",
+      "propertyNames": {
+        "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$"
+      }
+    },
+    "schedules": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/ScheduleDefinition"
+      },
+      "description": "Schedule definitions for cron-based job execution. Schedule names must be valid identifiers.",
+      "propertyNames": {
+        "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$"
+      }
+    },
+    "sensors": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/SensorDefinition"
+      },
+      "description": "Sensor definitions for event-driven job execution. Sensor names must be valid identifiers.",
+      "propertyNames": {
+        "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$"
+      }
+    },
+    "backfills": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/BackfillDefinition"
+      },
+      "description": "Backfill definitions for historical data processing. Backfill names must be valid identifiers.",
+      "propertyNames": {
+        "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$"
+      }
+    }
+  },
+  "$defs": {
+    "DbtConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Configuration for dbt integration with per-model observability support.",
+      "required": ["manifest_path"],
+      "properties": {
+        "manifest_path": {
+          "type": "string",
+          "description": "Path to dbt manifest.json file. Supports environment variable interpolation: ${DBT_MANIFEST_PATH:default_value}",
+          "examples": ["target/manifest.json", "${DBT_MANIFEST_PATH:target/manifest.json}"]
+        },
+        "observability_level": {
+          "type": "string",
+          "enum": ["per_model", "job_level"],
+          "default": "per_model",
+          "description": "Level of observability granularity: per_model creates individual assets for each dbt model, job_level treats dbt as a single job"
+        },
+        "project_dir": {
+          "type": ["string", "null"],
+          "description": "dbt project directory path. If not specified, inferred from manifest path."
+        },
+        "profiles_dir": {
+          "type": ["string", "null"],
+          "description": "dbt profiles directory path. If not specified, uses .floe/profiles"
+        },
+        "target": {
+          "type": ["string", "null"],
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+          "description": "dbt target name. Must be a valid identifier."
+        }
+      }
+    },
+    "PartitionDefinition": {
+      "oneOf": [
+        {"$ref": "#/$defs/TimeWindowPartition"},
+        {"$ref": "#/$defs/StaticPartition"},
+        {"$ref": "#/$defs/MultiPartition"},
+        {"$ref": "#/$defs/DynamicPartition"}
+      ],
+      "description": "Partition definition with discriminated union types for various partitioning strategies"
+    },
+    "TimeWindowPartition": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Time-based partitioning with configurable frequency and timezone support",
+      "required": ["type", "start", "cron_schedule"],
+      "properties": {
+        "type": {
+          "const": "time_window",
+          "description": "Partition type discriminator"
+        },
+        "start": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "Start date in YYYY-MM-DD format",
+          "examples": ["2024-01-01", "2023-12-31"]
+        },
+        "cron_schedule": {
+          "type": "string",
+          "pattern": "^([0-9*,-/]+\\s){4,5}[0-9*,-/]+$",
+          "description": "Cron expression defining partition frequency (5 or 6 fields). Must match time window frequency.",
+          "examples": ["0 0 * * *", "0 6 * * 1", "*/15 * * * *"]
+        },
+        "timezone": {
+          "type": "string",
+          "default": "UTC",
+          "description": "Timezone for partition boundaries (IANA timezone name)",
+          "examples": ["UTC", "America/New_York", "Europe/London"]
+        },
+        "end": {
+          "type": ["string", "null"],
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "End date in YYYY-MM-DD format (optional)"
+        },
+        "fmt": {
+          "type": ["string", "null"],
+          "description": "Date format for partition keys using strftime format",
+          "examples": ["%Y-%m-%d", "%Y%m%d", "%Y/%m/%d"]
+        }
+      }
+    },
+    "StaticPartition": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Static partitioning with predefined partition keys",
+      "required": ["type", "partition_keys"],
+      "properties": {
+        "type": {
+          "const": "static",
+          "description": "Partition type discriminator"
+        },
+        "partition_keys": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "List of static partition key values. Must be non-empty with unique values.",
+          "examples": [["us-east", "us-west", "eu-central"], ["development", "staging", "production"]]
+        }
+      }
+    },
+    "MultiPartition": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Multi-dimensional partitioning combining multiple partition definitions",
+      "required": ["type", "partitions"],
+      "properties": {
+        "type": {
+          "const": "multi",
+          "description": "Partition type discriminator"
+        },
+        "partitions": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/PartitionDefinition"
+          },
+          "minProperties": 1,
+          "description": "Named sub-partition definitions",
+          "propertyNames": {
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$"
+          }
+        }
+      }
+    },
+    "DynamicPartition": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Dynamic partitioning with runtime partition generation",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "const": "dynamic",
+          "description": "Partition type discriminator"
+        },
+        "fn": {
+          "type": ["string", "null"],
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)*\\.[a-zA-Z][a-zA-Z0-9_]*$",
+          "description": "Function reference for dynamic partition generation (module.function format)",
+          "examples": ["demo.partitions.get_active_customers", "my_module.utils.generate_partitions"]
+        }
+      }
+    },
+    "AssetConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Configuration applied to assets matching the pattern key",
+      "properties": {
+        "partitions": {
+          "type": ["string", "null"],
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+          "description": "Reference to named partition definition. Must exist in the partitions dictionary."
+        },
+        "automation_condition": {
+          "type": ["string", "null"],
+          "enum": ["eager", "on_cron", "on_missing", null],
+          "description": "Asset automation condition: eager (immediate), on_cron (scheduled), on_missing (when dependencies missing)"
+        },
+        "backfill_policy": {
+          "type": ["string", "null"],
+          "enum": ["lazy", "eager", null],
+          "description": "Backfill policy for the asset"
+        },
+        "compute_kind": {
+          "type": ["string", "null"],
+          "description": "Compute resource kind identifier"
+        },
+        "group_name": {
+          "type": ["string", "null"],
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+          "description": "Asset group override (must be valid identifier)"
+        }
+      }
+    },
+    "JobDefinition": {
+      "oneOf": [
+        {"$ref": "#/$defs/BatchJob"},
+        {"$ref": "#/$defs/OpsJob"}
+      ],
+      "description": "Job definition with discriminated union for batch and ops jobs"
+    },
+    "BatchJob": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Batch job for executing asset selections",
+      "required": ["type", "selection"],
+      "properties": {
+        "type": {
+          "const": "batch",
+          "description": "Job type discriminator"
+        },
+        "selection": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "description": "Asset selection expressions: group:name, asset:name, +asset (upstream), asset+ (downstream)",
+          "examples": [["group:bronze"], ["asset:customer_data", "+orders"], ["revenue_*+"]]
+        },
+        "description": {
+          "type": ["string", "null"],
+          "maxLength": 500,
+          "description": "Job description (max 500 characters)"
+        },
+        "tags": {
+          "type": ["object", "null"],
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Job metadata tags as key-value pairs"
+        }
+      }
+    },
+    "OpsJob": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Operations job for executing custom functions",
+      "required": ["type", "target_function"],
+      "properties": {
+        "type": {
+          "const": "ops",
+          "description": "Job type discriminator"
+        },
+        "target_function": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)*\\.[a-zA-Z][a-zA-Z0-9_]*$",
+          "description": "Module.function reference to execute (must be importable)",
+          "examples": ["demo.ops.vacuum.vacuum_old_snapshots", "my_package.maintenance.cleanup_tables"]
+        },
+        "args": {
+          "type": ["object", "null"],
+          "description": "Function arguments as key-value pairs (must be JSON serializable). MUST NOT contain endpoints, credentials, or infrastructure details - those belong in platform.yaml."
+        },
+        "description": {
+          "type": ["string", "null"],
+          "maxLength": 500,
+          "description": "Job description (max 500 characters)"
+        },
+        "tags": {
+          "type": ["object", "null"],
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Job metadata tags as key-value pairs"
+        }
+      }
+    },
+    "ScheduleDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Cron-based schedule for automatic job execution",
+      "required": ["job", "cron_schedule"],
+      "properties": {
+        "job": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+          "description": "Reference to job name (must exist in jobs dictionary)"
+        },
+        "cron_schedule": {
+          "type": "string",
+          "pattern": "^([0-9*,-/]+\\s){4,5}[0-9*,-/]+$",
+          "description": "Cron expression for schedule frequency (5 or 6 fields). Supports environment variable interpolation.",
+          "examples": ["0 6 * * *", "*/30 * * * *", "${BRONZE_CRON:0 6 * * *}"]
+        },
+        "timezone": {
+          "type": "string",
+          "default": "UTC",
+          "description": "Schedule timezone (IANA timezone name)",
+          "examples": ["UTC", "America/New_York", "Europe/London"]
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether schedule is active. Supports environment variable interpolation."
+        },
+        "partition_selector": {
+          "type": ["string", "null"],
+          "enum": ["latest", "all", null],
+          "description": "Partition selection for partitioned jobs: latest (most recent), all (all partitions)"
+        },
+        "description": {
+          "type": ["string", "null"],
+          "maxLength": 500,
+          "description": "Schedule description (max 500 characters)"
+        }
+      }
+    },
+    "SensorDefinition": {
+      "oneOf": [
+        {"$ref": "#/$defs/FileWatcherSensor"},
+        {"$ref": "#/$defs/AssetSensor"},
+        {"$ref": "#/$defs/RunStatusSensor"},
+        {"$ref": "#/$defs/CustomSensor"}
+      ],
+      "description": "Sensor definition with discriminated union for different sensor types"
+    },
+    "FileWatcherSensor": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "File system watcher sensor that triggers jobs when files appear",
+      "required": ["type", "job", "path"],
+      "properties": {
+        "type": {
+          "const": "file_watcher",
+          "description": "Sensor type discriminator"
+        },
+        "job": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+          "description": "Reference to job name (must exist in jobs dictionary)"
+        },
+        "path": {
+          "type": "string",
+          "description": "LOCAL directory or file path to watch (relative to project root or absolute local path). MUST NOT contain S3, HTTP, or external endpoints - those belong in platform.yaml. Supports environment variable interpolation.",
+          "examples": ["./incoming/", "/tmp/data/", "${DATA_LANDING_PATH:./data/}"]
+        },
+        "pattern": {
+          "type": ["string", "null"],
+          "description": "Regex pattern to match file names",
+          "examples": ["customers_*.csv", ".*\\.json$", "data_[0-9]{8}\\.parquet"]
+        },
+        "poll_interval_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 30,
+          "description": "Polling frequency in seconds"
+        },
+        "description": {
+          "type": ["string", "null"],
+          "maxLength": 500,
+          "description": "Sensor description (max 500 characters)"
+        }
+      }
+    },
+    "AssetSensor": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Asset materialization sensor that triggers jobs when watched assets are updated",
+      "required": ["type", "job", "watched_assets"],
+      "properties": {
+        "type": {
+          "const": "asset_sensor",
+          "description": "Sensor type discriminator"
+        },
+        "job": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+          "description": "Reference to job name (must exist in jobs dictionary)"
+        },
+        "watched_assets": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "description": "Asset names to watch for materialization events",
+          "examples": [["bronze_customers", "bronze_orders"], ["external_data"]]
+        },
+        "poll_interval_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 30,
+          "description": "Polling frequency in seconds"
+        },
+        "description": {
+          "type": ["string", "null"],
+          "maxLength": 500,
+          "description": "Sensor description (max 500 characters)"
+        }
+      }
+    },
+    "RunStatusSensor": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Job run status sensor that triggers jobs based on other job status changes",
+      "required": ["type", "job", "watched_jobs", "status"],
+      "properties": {
+        "type": {
+          "const": "run_status",
+          "description": "Sensor type discriminator"
+        },
+        "job": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+          "description": "Reference to job name (must exist in jobs dictionary)"
+        },
+        "watched_jobs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$"
+          },
+          "minItems": 1,
+          "description": "Job names to watch for status changes (must exist in jobs dictionary)",
+          "examples": [["bronze_refresh", "gold_pipeline"], ["data_validation"]]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["SUCCESS", "FAILURE", "STARTED"],
+          "description": "Job status to watch for"
+        },
+        "poll_interval_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 30,
+          "description": "Polling frequency in seconds"
+        },
+        "description": {
+          "type": ["string", "null"],
+          "maxLength": 500,
+          "description": "Sensor description (max 500 characters)"
+        }
+      }
+    },
+    "CustomSensor": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Custom sensor with user-defined logic function",
+      "required": ["type", "job", "target_function"],
+      "properties": {
+        "type": {
+          "const": "custom",
+          "description": "Sensor type discriminator"
+        },
+        "job": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+          "description": "Reference to job name (must exist in jobs dictionary)"
+        },
+        "target_function": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)*\\.[a-zA-Z][a-zA-Z0-9_]*$",
+          "description": "Module.function reference for sensor logic (must be importable and callable)",
+          "examples": ["demo.sensors.check_external_api", "my_package.monitors.data_quality_check"]
+        },
+        "args": {
+          "type": ["object", "null"],
+          "description": "Function arguments as key-value pairs (must be JSON serializable). MUST NOT contain endpoints, credentials, or infrastructure details - those belong in platform.yaml."
+        },
+        "poll_interval_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 30,
+          "description": "Polling frequency in seconds"
+        },
+        "description": {
+          "type": ["string", "null"],
+          "maxLength": 500,
+          "description": "Sensor description (max 500 characters)"
+        }
+      }
+    },
+    "BackfillDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Historical backfill configuration for processing past data partitions",
+      "required": ["job", "partition_range"],
+      "properties": {
+        "job": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+          "description": "Reference to job name (must exist in jobs dictionary and reference partitioned assets)"
+        },
+        "partition_range": {
+          "type": "object",
+          "required": ["start", "end"],
+          "additionalProperties": false,
+          "properties": {
+            "start": {
+              "type": "string",
+              "description": "Start partition key (format depends on partition definition)"
+            },
+            "end": {
+              "type": "string",
+              "description": "End partition key (must be >= start)"
+            }
+          },
+          "description": "Partition range with start and end keys matching the job's asset partition format",
+          "examples": [
+            {"start": "2024-01-01", "end": "2024-12-31"},
+            {"start": "us-east", "end": "us-west"}
+          ]
+        },
+        "batch_size": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 10,
+          "description": "Maximum partitions processed per execution"
+        },
+        "description": {
+          "type": ["string", "null"],
+          "maxLength": 500,
+          "description": "Backfill description (max 500 characters)"
+        },
+        "tags": {
+          "type": ["object", "null"],
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Backfill metadata tags as key-value pairs"
+        }
+      }
+    }
+  }
+}

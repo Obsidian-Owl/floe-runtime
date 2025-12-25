@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://floe.dev/schemas/floe-spec-v2.json",
+  "title": "FloeSpec v2",
+  "description": "Extended FloeSpec configuration model for floe.yaml with orchestration auto-discovery support. Maintains compatibility with existing FloeSpec while adding optional orchestration configuration.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "version",
+    "compute"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^[a-zA-Z][a-zA-Z0-9_-]{0,99}$",
+      "description": "Pipeline name (1-100 chars, alphanumeric with hyphens/underscores)",
+      "examples": ["customer-analytics", "data-warehouse", "ml_pipeline"]
+    },
+    "version": {
+      "type": "string",
+      "description": "Pipeline version (semver format)",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$",
+      "examples": ["1.0.0", "2.1.3", "1.0.0-beta.1"]
+    },
+    "storage": {
+      "type": "string",
+      "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$",
+      "default": "default",
+      "description": "Logical storage profile reference (e.g., 'default', 'archive')",
+      "examples": ["default", "archive", "high_performance"]
+    },
+    "catalog": {
+      "type": "string",
+      "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$",
+      "default": "default",
+      "description": "Logical catalog profile reference (e.g., 'default', 'analytics')",
+      "examples": ["default", "analytics", "production"]
+    },
+    "compute": {
+      "type": "string",
+      "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$",
+      "default": "default",
+      "description": "Logical compute profile reference (e.g., 'default', 'snowflake')",
+      "examples": ["default", "snowflake", "bigquery", "duckdb"]
+    },
+    "transforms": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/TransformConfig"
+      },
+      "default": [],
+      "description": "List of transformation steps"
+    },
+    "consumption": {
+      "$ref": "#/$defs/ConsumptionConfig",
+      "description": "Semantic layer configuration"
+    },
+    "governance": {
+      "$ref": "#/$defs/GovernanceConfig",
+      "description": "Data governance configuration"
+    },
+    "observability": {
+      "$ref": "#/$defs/ObservabilityConfig",
+      "description": "Observability configuration"
+    },
+    "orchestration": {
+      "$ref": "https://floe.dev/schemas/orchestration-config.json",
+      "description": "Orchestration configuration for auto-discovery and declarative pipeline definition. When specified, enables elimination of 200+ lines of boilerplate through asset module auto-discovery and dbt integration."
+    }
+  },
+  "$defs": {
+    "TransformConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Configuration for a transformation step. Currently supports 'dbt' type. Future versions will add 'python' and 'flink' via discriminated unions.",
+      "required": ["type", "path"],
+      "properties": {
+        "type": {
+          "const": "dbt",
+          "description": "Transform type (currently only 'dbt' supported)"
+        },
+        "path": {
+          "type": "string",
+          "description": "Path to transform source relative to floe.yaml",
+          "examples": ["./dbt", "transforms/dbt", "sql_models"]
+        },
+        "target": {
+          "type": ["string", "null"],
+          "description": "Optional target override for dbt",
+          "examples": ["dev", "staging", "prod"]
+        }
+      }
+    },
+    "ConsumptionConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Configuration for Cube semantic layer.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Cube semantic layer"
+        },
+        "port": {
+          "type": "integer",
+          "default": 4000,
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Cube API port"
+        },
+        "api_secret_ref": {
+          "type": ["string", "null"],
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,252}$",
+          "description": "K8s secret name for Cube API key"
+        },
+        "database_type": {
+          "type": ["string", "null"],
+          "description": "Database driver type (postgres, snowflake, bigquery, etc.)",
+          "examples": ["postgres", "snowflake", "bigquery", "duckdb"]
+        },
+        "dev_mode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Cube Playground in development"
+        },
+        "pre_aggregations": {
+          "$ref": "#/$defs/PreAggregationConfig",
+          "description": "Pre-aggregation configuration"
+        },
+        "security": {
+          "$ref": "#/$defs/CubeSecurityConfig",
+          "description": "Row-level security configuration"
+        }
+      }
+    },
+    "PreAggregationConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Configuration for Cube pre-aggregations.",
+      "properties": {
+        "refresh_schedule": {
+          "type": "string",
+          "default": "*/30 * * * *",
+          "pattern": "^([0-9*,-/]+\\s){4}[0-9*,-/]+$",
+          "description": "Cron expression for pre-aggregation refresh",
+          "examples": ["*/30 * * * *", "0 * * * *", "0 0 * * *"]
+        },
+        "timezone": {
+          "type": "string",
+          "default": "UTC",
+          "description": "Timezone for schedule evaluation",
+          "examples": ["UTC", "America/New_York", "Europe/London"]
+        }
+      }
+    },
+    "CubeSecurityConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Configuration for Cube row-level security. This is USER-MANAGED row-level security, NOT SaaS tenant isolation. Users define their own filter columns and claims for their use cases.",
+      "properties": {
+        "row_level": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable row-level security"
+        },
+        "filter_column": {
+          "type": "string",
+          "default": "organization_id",
+          "description": "Column for row-level filtering (matches JWT claim name)",
+          "examples": ["organization_id", "tenant_id", "department", "region"]
+        }
+      }
+    },
+    "GovernanceConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Configuration for data governance.",
+      "properties": {
+        "classification_source": {
+          "type": "string",
+          "enum": ["dbt_meta", "external"],
+          "default": "dbt_meta",
+          "description": "Source for column classifications: 'dbt_meta' extracts from dbt model meta tags, 'external' uses external classification service"
+        },
+        "policies": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Policy definitions (masking rules, etc.)",
+          "examples": [
+            {
+              "pii_masking": {"enabled": true, "algorithm": "hash"},
+              "retention": {"days": 2555}
+            }
+          ]
+        },
+        "emit_lineage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Emit OpenLineage events for governance tracking"
+        }
+      }
+    },
+    "ObservabilityConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Configuration for observability feature flags. Endpoints and infrastructure details are configured in platform.yaml by platform engineers. Data engineers only control feature enablement.",
+      "properties": {
+        "traces": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable OpenTelemetry traces (endpoints configured in platform.yaml)"
+        },
+        "metrics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable metrics collection (endpoints configured in platform.yaml)"
+        },
+        "lineage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable OpenLineage emission (endpoints configured in platform.yaml)"
+        },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Custom trace attributes for pipeline identification",
+          "examples": [
+            {
+              "service.name": "my-pipeline",
+              "environment": "production",
+              "team": "data-engineering"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

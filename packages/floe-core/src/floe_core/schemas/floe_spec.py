@@ -27,6 +27,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from floe_core.schemas.consumption import ConsumptionConfig
 from floe_core.schemas.governance import GovernanceConfig
 from floe_core.schemas.observability import ObservabilityConfig
+from floe_core.schemas.orchestration_config import OrchestrationConfig
 from floe_core.schemas.transforms import TransformConfig
 from floe_core.security import CredentialDetectedError, detect_credentials_in_string
 
@@ -55,6 +56,7 @@ class FloeSpec(BaseModel):
         consumption: Semantic layer configuration.
         governance: Data governance configuration.
         observability: Observability configuration.
+        orchestration: Declarative orchestration configuration (Feature 010).
 
     Example:
         >>> # Data engineer creates floe.yaml with logical references
@@ -114,6 +116,10 @@ class FloeSpec(BaseModel):
     observability: ObservabilityConfig = Field(
         default_factory=ObservabilityConfig,
         description="Observability configuration",
+    )
+    orchestration: OrchestrationConfig | None = Field(
+        default=None,
+        description="Declarative orchestration configuration (Feature 010)",
     )
 
     @classmethod
