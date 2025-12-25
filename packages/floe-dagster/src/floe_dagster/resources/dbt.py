@@ -55,9 +55,12 @@ def create_dbt_cli_resource(
         project_path = Path(artifacts["dbt_project_path"])
     elif "DBT_PROJECT_DIR" in os.environ:
         project_path = Path(os.environ["DBT_PROJECT_DIR"])
+    elif "DBT_PROFILES_DIR" in os.environ:
+        # Use profiles dir as project dir (demo has dbt_project.yml in same dir as profiles.yml)
+        project_path = Path(os.environ["DBT_PROFILES_DIR"])
     else:
-        # Default to demo/dbt for demo project
-        project_path = Path("demo/dbt")
+        # Default to demo for demo project
+        project_path = Path("demo")
 
     # Determine profiles directory
     if profiles_dir is not None:
@@ -67,8 +70,8 @@ def create_dbt_cli_resource(
     elif "DBT_PROFILES_DIR" in os.environ:
         profiles_path = Path(os.environ["DBT_PROFILES_DIR"])
     else:
-        # Default to demo/dbt (profiles.yml is in project root for demo)
-        profiles_path = Path("demo/dbt")
+        # Default to demo (profiles.yml is in project root for demo)
+        profiles_path = Path("demo")
 
     # Resolve to absolute paths
     project_abs = project_path.resolve()

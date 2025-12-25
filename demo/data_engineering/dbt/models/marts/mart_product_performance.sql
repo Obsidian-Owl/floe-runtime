@@ -1,7 +1,10 @@
 {{
   config(
-    materialized='table',
-    schema='gold',
+    materialized='external',
+    location='s3://temp-dbt/gold/mart_product_performance',
+    format='parquet',
+    polaris_namespace='demo.gold',
+    polaris_table='mart_product_performance',
     tags=['marts', 'gold', 'product_analytics']
   )
 }}

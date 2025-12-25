@@ -12,6 +12,6 @@ Covers: 007-FR-031 (Medallion architecture orchestration)
 
 from __future__ import annotations
 
-from demo.orchestration.definitions import defs
+from demo.data_engineering.orchestration.definitions import defs
 
 __all__ = ["defs"]

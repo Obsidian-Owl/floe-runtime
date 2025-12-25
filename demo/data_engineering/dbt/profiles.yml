@@ -17,3 +17,13 @@ floe_demo:
         s3_secret_access_key: "{{ env_var('AWS_SECRET_ACCESS_KEY', 'test') }}"
       # Thread count for parallel execution
       threads: 4
+      # Polaris plugin for Iceberg table writes
+      plugins:
+        - module: 'demo.dbt.plugins.polaris'
+          config:
+            catalog_uri: 'http://floe-infra-polaris:8181/api/catalog/v1'
+            warehouse: 'demo_catalog'
+            s3_endpoint: 'http://floe-infra-localstack:4566'
+            s3_region: 'us-east-1'
+            s3_access_key_id: 'test'
+            s3_secret_access_key: 'test'

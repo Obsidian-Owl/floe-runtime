@@ -49,6 +49,7 @@ import pyarrow as pa
 from pydantic import Field, PrivateAttr
 from pydantic import SecretStr as PydanticSecretStr
 
+from floe_core.schemas.credential_config import SecretReference
 from floe_iceberg.config import SnapshotInfo
 from floe_iceberg.tables import IcebergTableManager
 
@@ -491,18 +492,30 @@ class PolarisCatalogResource(CatalogResource):
         # Extract credentials section
         credentials = resolved_catalog.get("credentials", {})
 
-        # Handle secret_ref pattern in credentials
-        client_id = credentials.get("client_id")
-        if isinstance(client_id, dict) and "secret_ref" in client_id:
-            client_id = f"secret_ref:{client_id['secret_ref']}"
+        # Handle secret_ref pattern in credentials with runtime resolution
+        client_id_raw = credentials.get("client_id")
+        client_id: str | None = None
+        if isinstance(client_id_raw, SecretReference):
+            # SecretReference Pydantic model - resolve to actual value
+            client_id = client_id_raw.resolve().get_secret_value()
+        elif isinstance(client_id_raw, dict) and "secret_ref" in client_id_raw:
+            # Dict format from YAML - create SecretReference and resolve
+            secret_ref = SecretReference(secret_ref=client_id_raw["secret_ref"])
+            client_id = secret_ref.resolve().get_secret_value()
+        elif client_id_raw:
+            client_id = str(client_id_raw)
 
-        client_secret_value = credentials.get("client_secret")
+        client_secret_raw = credentials.get("client_secret")
         client_secret: str | None = None
-        if isinstance(client_secret_value, dict) and "secret_ref" in client_secret_value:
-            # Store as secret_ref pattern for runtime resolution
-            client_secret = f"secret_ref:{client_secret_value['secret_ref']}"
-        elif client_secret_value:
-            client_secret = str(client_secret_value)
+        if isinstance(client_secret_raw, SecretReference):
+            # SecretReference Pydantic model - resolve to actual SecretStr
+            client_secret = client_secret_raw.resolve().get_secret_value()
+        elif isinstance(client_secret_raw, dict) and "secret_ref" in client_secret_raw:
+            # Dict format from YAML - create SecretReference and resolve
+            secret_ref = SecretReference(secret_ref=client_secret_raw["secret_ref"])
+            client_secret = secret_ref.resolve().get_secret_value()
+        elif client_secret_raw:
+            client_secret = str(client_secret_raw)
 
         return cls(
             uri=resolved_catalog.get("uri", ""),

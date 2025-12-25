@@ -199,12 +199,12 @@ database:
 schema:
   Orders.js: |
     cube(`Orders`, {
-      // Query raw orders from Iceberg via DuckDB parquet reader
+      // Query bronze orders from Iceberg via DuckDB parquet reader
       // Actual schema: id, customer_id, status, region, amount, created_at
       // Production would query: floe_demo.marts.mart_revenue via Trino
       sql: `
         SELECT *
-        FROM read_parquet('s3://iceberg-data/demo/raw_orders/data/*.parquet')
+        FROM read_parquet('s3://iceberg-bronze/demo/bronze_orders/data/*.parquet')
       `,
 
       measures: {
@@ -262,12 +262,12 @@ schema:
 
   Customers.js: |
     cube(`Customers`, {
-      // Query raw customers from Iceberg via DuckDB parquet reader
+      // Query bronze customers from Iceberg via DuckDB parquet reader
       // Actual schema: customer_id, name, email, region, created_at
       // Production would query: floe_demo.marts.mart_customer_segments via Trino
       sql: `
         SELECT *
-        FROM read_parquet('s3://iceberg-data/demo/raw_customers/data/*.parquet')
+        FROM read_parquet('s3://iceberg-bronze/demo/bronze_customers/data/*.parquet')
       `,
 
       measures: {
@@ -308,11 +308,11 @@ schema:
 
   Products.js: |
     cube(`Products`, {
-      // Query raw products from Iceberg via DuckDB parquet reader
+      // Query bronze products from Iceberg via DuckDB parquet reader
       // Actual schema: product_id, name, category, price, sku
       sql: `
         SELECT *
-        FROM read_parquet('s3://iceberg-data/demo/raw_products/data/*.parquet')
+        FROM read_parquet('s3://iceberg-bronze/demo/bronze_products/data/*.parquet')
       `,
 
       measures: {

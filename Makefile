@@ -165,7 +165,7 @@ test-helm:
 FLOE_NAMESPACE := floe
 # Two-Tier Architecture: Platform config file for K8s deployment
 # Uses K8s service names (floe-infra-minio, floe-infra-polaris, etc.)
-PLATFORM_FILE := platform/k8s-local/platform.yaml
+PLATFORM_FILE := demo/platform/platform.yaml
 
 # Deploy infrastructure layer (MinIO, Polaris, PostgreSQL, Jaeger, Marquez)
 # Two-Tier Architecture: Injects platform.yaml as ConfigMap for apps to consume

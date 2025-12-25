@@ -39,8 +39,9 @@ from dagster import (
     define_asset_job,
     sensor,
 )
+from dagster_dbt import DbtCliResource
 
-from demo.orchestration.constants import (
+from demo.data_engineering.orchestration.constants import (
     TABLE_BRONZE_CUSTOMERS,
     TABLE_BRONZE_ORDER_ITEMS,
     TABLE_BRONZE_ORDERS,
@@ -136,22 +137,72 @@ def bronze_order_items(
 
 
 @floe_asset(
-    group_name="transform",
-    description="Run dbt transformations (staging → intermediate → marts)",
-    outputs=["demo.dbt_transformations"],
+    group_name="silver",
+    description="Run dbt staging models (Bronze → Silver)",
     inputs=[
         TABLE_BRONZE_CUSTOMERS,
         TABLE_BRONZE_ORDERS,
         TABLE_BRONZE_PRODUCTS,
         TABLE_BRONZE_ORDER_ITEMS,
     ],
+    outputs=[
+        "demo.silver_customers",
+        "demo.silver_orders",
+        "demo.silver_products",
+        "demo.silver_order_items",
+    ],
     compute_kind="dbt",
     deps=["bronze_customers", "bronze_orders", "bronze_products", "bronze_order_items"],
 )
-def dbt_transformations(context: AssetExecutionContext) -> Dict[str, str]:
-    """Execute dbt transformations (placeholder for full dbt integration)."""
-    context.log.info("Bronze layer tables ready for dbt transformations")
-    return {"status": "placeholder", "message": "Bronze layer ready for dbt transformations"}
+def silver_staging(
+    context: AssetExecutionContext,
+    dbt: DbtCliResource,
+) -> Dict[str, Any]:
+    """Run dbt staging models to create Silver layer."""
+    context.log.info("Running dbt staging models...")
+
+    # Run dbt models in staging folder
+    dbt_run = dbt.cli(["run", "--select", "staging.*"], context=context)
+
+    return {
+        "models_run": len(dbt_run.result.results),
+        "success": dbt_run.success,
+        "run_results": dbt_run.result.to_dict(),
+    }
+
+
+@floe_asset(
+    group_name="gold",
+    description="Run dbt marts (Silver → Gold)",
+    inputs=[
+        "demo.silver_customers",
+        "demo.silver_orders",
+        "demo.silver_products",
+        "demo.silver_order_items",
+    ],
+    outputs=[
+        "demo.gold_customer_orders",
+        "demo.gold_revenue",
+        "demo.gold_product_performance",
+    ],
+    compute_kind="dbt",
+    deps=["silver_staging"],
+)
+def gold_marts(
+    context: AssetExecutionContext,
+    dbt: DbtCliResource,
+) -> Dict[str, Any]:
+    """Run dbt marts to create Gold layer."""
+    context.log.info("Running dbt marts...")
+
+    # Run dbt models in marts folder
+    dbt_run = dbt.cli(["run", "--select", "marts.*"], context=context)
+
+    return {
+        "models_run": len(dbt_run.result.results),
+        "success": dbt_run.success,
+        "run_results": dbt_run.result.to_dict(),
+    }
 
 
 # =============================================================================
@@ -166,8 +217,8 @@ demo_bronze_job = define_asset_job(
 
 demo_pipeline_job = define_asset_job(
     name="demo_pipeline",
-    selection=AssetSelection.groups("bronze", "transform"),
-    description="Full demo pipeline: bronze layer → dbt transformations",
+    selection=AssetSelection.groups("bronze", "silver", "gold"),
+    description="Full demo pipeline: bronze → silver → gold",
 )
 
 
@@ -179,7 +230,7 @@ bronze_refresh_schedule = ScheduleDefinition(
     name="bronze_refresh_schedule",
     job=demo_bronze_job,
     cron_schedule="*/5 * * * *",
-    default_status=DefaultScheduleStatus.RUNNING,
+    default_status=DefaultScheduleStatus.STOPPED,
     description="Refresh bronze layer from raw tables every 5 minutes",
 )
 
@@ -226,7 +277,8 @@ defs = FloeDefinitions.from_compiled_artifacts(
         bronze_products,
         bronze_orders,
         bronze_order_items,
-        dbt_transformations,
+        silver_staging,
+        gold_marts,
     ],
     jobs=[demo_bronze_job, demo_pipeline_job],
     schedules=[bronze_refresh_schedule, transform_pipeline_schedule],

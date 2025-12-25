@@ -64,6 +64,12 @@ COPY demo/ ./demo/
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-editable --all-packages
 
+# Layer 5: Generate dbt manifest for FloeAssetFactory
+# The manifest.json is required for @dbt_assets decorator and per-model observability
+WORKDIR /app/demo/data_engineering/dbt
+RUN /app/.venv/bin/dbt deps && /app/.venv/bin/dbt compile --target dev || true
+WORKDIR /app
+
 # =============================================================================
 # Stage 2: Runtime - Minimal production image
 # =============================================================================
@@ -107,7 +113,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD python -c "import socket; s=socket.socket(); s.connect(('localhost', 3030)); s.close()" || exit 1
 
 # Default command: Dagster gRPC code server
-# Serves the demo.orchestration.definitions module
+# Serves the demo.data_engineering.orchestration.definitions module
 # NOTE: Using CMD instead of ENTRYPOINT so K8s Run Launcher can override
 # the command when executing pipeline runs (dagster api execute_run ...)
-CMD ["dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "3030", "-m", "demo.orchestration.definitions"]
+CMD ["dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "3030", "-m", "demo.data_engineering.orchestration.definitions"]

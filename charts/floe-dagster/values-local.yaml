@@ -62,6 +62,13 @@ dagster:
         value: "floe-demo"
       - name: OPENLINEAGE_NAMESPACE
         value: "demo"
+      # Set DAGSTER_HOME to writable location (/tmp instead of /opt/dagster)
+      - name: DAGSTER_HOME
+        value: "/tmp/dagster_home"
+
+  # Disable telemetry to avoid permission errors on /opt/dagster
+  telemetry:
+    enabled: false
 
   # User deployments configuration
   # Image: ghcr.io/obsidian-owl/floe-demo:latest
@@ -74,8 +81,8 @@ dagster:
           repository: "ghcr.io/obsidian-owl/floe-demo"
           tag: "latest"
           pullPolicy: IfNotPresent  # Cache locally to avoid repeated downloads
-        # Note: Don't specify dagsterApiGrpcArgs - the Dockerfile ENTRYPOINT
-        # already includes the full command: dagster api grpc -h 0.0.0.0 -p 3030 -m demo.orchestration.definitions
+        # Note: Don't specify dagsterApiGrpcArgs - the Dockerfile CMD
+        # already includes: dagster api grpc -h 0.0.0.0 -p 3030 -m demo.data_engineering.orchestration.definitions
         port: 3030
         # Two-Tier Architecture: Mount platform ConfigMap
         # Name pattern: {infra-release-name}-platform-config
@@ -170,7 +177,8 @@ dagster:
     config:
       k8sRunLauncher:
         envSecrets: []
-        envConfigMaps: []
+        envConfigMaps:
+          - name: dagster-run-env
 
 # Floe-specific configuration
 floe:

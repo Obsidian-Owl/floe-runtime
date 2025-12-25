@@ -18,6 +18,7 @@ from dagster import AssetsDefinition, Definitions
 from dagster_dbt import DbtCliResource, dbt_assets
 
 from floe_dagster.lineage import (
+    LineageDataset,
     LineageDatasetBuilder,
     OpenLineageConfig,
     OpenLineageEmitter,
@@ -289,3 +290,177 @@ class FloeAssetFactory:
             "project_dir": artifacts.get("dbt_project_path", "."),
             "profiles_dir": artifacts.get("dbt_profiles_path", ".floe/profiles"),
         }
+
+    @classmethod
+    def create_dbt_assets_with_per_model_observability(
+        cls,
+        artifacts: dict[str, Any],
+    ) -> AssetsDefinition:
+        """Create dbt assets with per-model observability (Level 1).
+
+        Unlike create_dbt_assets() which provides job-level observability,
+        this method hooks into the dbt event stream to create individual
+        spans and lineage events for each dbt model execution.
+
+        This enables full traceability: Bronze → Silver → Gold with
+        per-model granularity visible in Jaeger and Marquez.
+
+        Args:
+            artifacts: CompiledArtifacts dictionary containing dbt configuration.
+
+        Returns:
+            AssetsDefinition containing all dbt model assets with per-model observability.
+
+        Raises:
+            FileNotFoundError: If manifest.json doesn't exist.
+            ValueError: If dbt_manifest_path is not specified.
+        """
+        manifest_path = artifacts.get("dbt_manifest_path")
+        if not manifest_path:
+            raise ValueError(
+                "dbt_manifest_path not specified in CompiledArtifacts. "
+                "Run 'dbt compile' to generate manifest.json."
+            )
+
+        manifest_file = Path(manifest_path)
+        if not manifest_file.exists():
+            raise FileNotFoundError(
+                f"dbt manifest.json not found at {manifest_path}. Run 'dbt compile' to generate it."
+            )
+
+        translator = FloeTranslator()
+        lineage_config = OpenLineageConfig.from_artifacts(artifacts)
+        lineage_emitter = OpenLineageEmitter(lineage_config)
+        tracing_config = TracingConfig.from_artifacts(artifacts)
+        tracing_manager = TracingManager(tracing_config)
+        tracing_manager.configure()
+
+        compute = artifacts.get("compute", {})
+        namespace_prefix = cls._build_namespace_prefix(compute)
+        dataset_builder = LineageDatasetBuilder(
+            namespace_prefix=namespace_prefix,
+            include_classifications=True,
+        )
+
+        manifest_dict = cls._load_manifest(manifest_file)
+
+        @dbt_assets(manifest=manifest_file, dagster_dbt_translator=translator)
+        def floe_dbt_assets_per_model(  # type: ignore[no-untyped-def]  # pragma: no cover
+            context, dbt: DbtCliResource
+        ) -> Iterator[Any]:
+            """Execute dbt models with per-model observability."""
+            model_spans: dict[str, Any] = {}
+            model_run_ids: dict[str, str] = {}
+
+            try:
+                for event in dbt.cli(["build"], context=context).stream():
+                    if hasattr(event, "node_info") and event.node_info:
+                        model_id = event.node_info.unique_id
+                        model_name = event.node_info.node_name
+
+                        if hasattr(event, "event_type_value"):
+                            event_type = event.event_type_value
+
+                            if event_type == "NodeStart":
+                                span = tracing_manager.start_span(
+                                    f"dbt.{model_name}",
+                                    attributes={
+                                        "dbt.model": model_name,
+                                        "dbt.unique_id": model_id,
+                                        "dbt.resource_type": event.node_info.resource_type,
+                                    },
+                                ).__enter__()
+                                model_spans[model_id] = span
+
+                                model_node = manifest_dict.get("nodes", {}).get(model_id, {})
+                                input_datasets = cls._build_input_datasets(
+                                    manifest_dict, model_id, dataset_builder
+                                )
+                                output_dataset = dataset_builder.build_from_dbt_node(model_node)
+
+                                run_id = lineage_emitter.emit_start(
+                                    job_name=f"dbt.{model_name}",
+                                    inputs=input_datasets,
+                                    outputs=[output_dataset] if output_dataset else [],
+                                )
+                                model_run_ids[model_id] = run_id
+
+                            elif event_type == "NodeFinished":
+                                span = model_spans.get(model_id)
+                                if span:
+                                    if hasattr(event, "node_info") and hasattr(
+                                        event.node_info, "meta"
+                                    ):
+                                        for key, value in event.node_info.meta.items():
+                                            span.set_attribute(f"dbt.meta.{key}", str(value))
+
+                                    tracing_manager.set_status_ok(span)
+                                    span.__exit__(None, None, None)
+
+                                run_id = model_run_ids.get(model_id)
+                                if run_id:
+                                    model_node = manifest_dict.get("nodes", {}).get(model_id, {})
+                                    input_datasets = cls._build_input_datasets(
+                                        manifest_dict, model_id, dataset_builder
+                                    )
+                                    output_dataset = dataset_builder.build_from_dbt_node(model_node)
+
+                                    lineage_emitter.emit_complete(
+                                        run_id=run_id,
+                                        job_name=f"dbt.{model_name}",
+                                        inputs=input_datasets,
+                                        outputs=[output_dataset] if output_dataset else [],
+                                    )
+
+                    yield event
+
+            except Exception as e:
+                for _model_id, span in model_spans.items():
+                    tracing_manager.record_exception(span, e)
+                    span.__exit__(type(e), e, e.__traceback__)
+
+                for model_id, run_id in model_run_ids.items():
+                    lineage_emitter.emit_fail(
+                        run_id=run_id,
+                        job_name=model_id,
+                        error_message=str(e),
+                    )
+                raise
+
+        return floe_dbt_assets_per_model
+
+    @classmethod
+    def _build_input_datasets(
+        cls,
+        manifest: dict[str, Any],
+        model_id: str,
+        dataset_builder: LineageDatasetBuilder,
+    ) -> list[LineageDataset]:
+        """Build input datasets for a dbt model from its dependencies.
+
+        Args:
+            manifest: Full dbt manifest dictionary.
+            model_id: Model unique_id to get inputs for.
+            dataset_builder: Builder for creating LineageDataset objects.
+
+        Returns:
+            List of LineageDataset objects representing model inputs.
+        """
+        inputs = []
+        dependencies = cls._get_dependencies(manifest, model_id)
+
+        for dep_id in dependencies:
+            if dep_id.startswith("model."):
+                dep_node = manifest.get("nodes", {}).get(dep_id, {})
+                if dep_node:
+                    dataset = dataset_builder.build_from_dbt_node(dep_node)
+                    if dataset:
+                        inputs.append(dataset)
+            elif dep_id.startswith("source."):
+                source_node = manifest.get("sources", {}).get(dep_id, {})
+                if source_node:
+                    dataset = dataset_builder.build_from_dbt_node(source_node)
+                    if dataset:
+                        inputs.append(dataset)
+
+        return inputs

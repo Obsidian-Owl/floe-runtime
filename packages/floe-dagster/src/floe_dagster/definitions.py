@@ -32,12 +32,12 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from dagster import Definitions
+from dagster import Definitions, IOManager, io_manager
 
 from floe_dagster.assets import FloeAssetFactory
 from floe_dagster.decorators import ORCHESTRATOR_RESOURCE_KEY
 from floe_dagster.observability import ObservabilityOrchestrator
-from floe_dagster.resources.catalog import PolarisCatalogResource
+from floe_dagster.resources import PolarisCatalogResource, create_dbt_cli_resource
 
 if TYPE_CHECKING:
     from dagster import (
@@ -56,6 +56,33 @@ logger = logging.getLogger(__name__)
 
 # Default platform file path (K8s ConfigMap mount location)
 DEFAULT_PLATFORM_FILE_PATH = "/etc/floe/platform.yaml"
+
+
+class NoOpIOManager(IOManager):
+    """IO manager that does nothing - for assets that persist their own data.
+
+    Use this for assets that handle their own persistence (e.g., writing to Iceberg
+    via CatalogResource). The assets can still return metadata dicts for observability,
+    but this IO manager won't attempt to store them to disk.
+
+    This avoids permission errors when running in Kubernetes pods where the default
+    storage location (/opt/dagster) may not be writable.
+    """
+
+    def handle_output(self, context: Any, obj: Any) -> None:
+        """Do nothing - asset already persisted its data."""
+        pass
+
+    def load_input(self, context: Any) -> Any:
+        """Return None - assets don't pass data via IO manager."""
+        return None
+
+
+@io_manager
+def noop_io_manager() -> NoOpIOManager:
+    """Factory for NoOpIOManager."""
+    return NoOpIOManager()
+
 
 # Environment variable for direct platform file path
 PLATFORM_FILE_ENV_VAR = "FLOE_PLATFORM_FILE"
@@ -182,6 +209,8 @@ class FloeDefinitions:
         resources: dict[str, Any] = {
             # Inject orchestrator for @floe_asset decorator
             ORCHESTRATOR_RESOURCE_KEY: orchestrator,
+            # Use NoOpIOManager - assets persist to Iceberg themselves, don't need IO manager
+            "io_manager": noop_io_manager,
         }
 
         # Create PolarisCatalogResource if catalog config available
@@ -204,8 +233,6 @@ class FloeDefinitions:
 
         # Create DbtCliResource (batteries-included for demo)
         try:
-            from floe_dagster.resources.dbt import create_dbt_cli_resource
-
             dbt_resource = create_dbt_cli_resource(artifacts)
             resources["dbt"] = dbt_resource
             logger.info("DbtCliResource initialized")
