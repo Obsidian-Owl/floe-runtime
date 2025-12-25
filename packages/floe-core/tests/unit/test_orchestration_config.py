@@ -112,27 +112,23 @@ class TestOrchestrationConfig:
 
     def test_orchestration_config_asset_modules_must_be_valid_paths(self) -> None:
         """OrchestrationConfig asset_modules must match module path pattern."""
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(ValueError) as exc_info:
             OrchestrationConfig(asset_modules=["demo.assets.bronze", "invalid-module-name"])
 
-        assert "asset_modules" in str(exc_info.value) or "Invalid module path" in str(
-            exc_info.value
-        )
+        assert "Invalid module path" in str(exc_info.value)
 
     def test_orchestration_config_partition_keys_must_be_identifiers(self) -> None:
         """OrchestrationConfig partition keys must be valid identifiers."""
         from floe_core.schemas.partition_definition import StaticPartition
 
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(ValueError) as exc_info:
             OrchestrationConfig(
                 partitions={
                     "invalid-partition": StaticPartition(type="static", partition_keys=["a", "b"])
                 }
             )
 
-        assert "invalid-partition" in str(exc_info.value) or "Invalid identifier" in str(
-            exc_info.value
-        )
+        assert "Invalid identifier" in str(exc_info.value)
 
     def test_orchestration_config_is_frozen(self) -> None:
         """OrchestrationConfig should be immutable (frozen)."""

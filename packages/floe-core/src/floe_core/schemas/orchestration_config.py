@@ -11,23 +11,21 @@ from __future__ import annotations
 
 import re
 from enum import Enum
-from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field
 
-if TYPE_CHECKING:
-    from .asset_config import AssetConfig
-    from .backfill_definition import BackfillDefinition
-    from .job_definition import JobDefinition
-    from .partition_definition import PartitionDefinition
-    from .schedule_definition import ScheduleDefinition
-    from .sensor_definition import SensorDefinition
+from .asset_config import AssetConfig
+from .backfill_definition import BackfillDefinition
+from .job_definition import JobDefinition
+from .partition_definition import PartitionDefinition
+from .schedule_definition import ScheduleDefinition
+from .sensor_definition import SensorDefinition
 
 # Constants for repeated validation patterns
 IDENTIFIER_PATTERN = r"^[a-zA-Z][a-zA-Z0-9_]*$"
 """Regex pattern for valid identifiers."""
 
-MODULE_PATH_PATTERN = r"^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)*$"
+MODULE_PATH_PATTERN = r"^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)*$"
 """Regex pattern for Python module paths."""
 
 

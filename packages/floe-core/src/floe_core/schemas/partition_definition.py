@@ -24,9 +24,7 @@ DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
 CRON_PATTERN = r"^([0-9*,-/]+\s){4,5}[0-9*,-/]+$"
 """Regex pattern for cron expressions (5 or 6 fields)."""
 
-FUNCTION_PATH_PATTERN = (
-    r"^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)*\\.[a-zA-Z][a-zA-Z0-9_]*$"
-)
+FUNCTION_PATH_PATTERN = r"^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)*\.[a-zA-Z][a-zA-Z0-9_]*$"
 """Regex pattern for module.function references."""
 
 
