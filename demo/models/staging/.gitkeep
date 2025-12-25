@@ -1,7 +1,0 @@
-# Staging models (stg_*) - Silver layer
-# Clean and type raw source data
-# See plan.md for model specifications:
-# - stg_customers.sql
-# - stg_orders.sql
-# - stg_order_items.sql
-# - stg_products.sql
