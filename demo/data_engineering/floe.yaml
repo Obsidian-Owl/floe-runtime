@@ -43,6 +43,7 @@ orchestration:
   dbt:
     manifest_path: "demo/data_engineering/dbt/target/manifest.json"
     project_dir: "demo/data_engineering/dbt"
+    profiles_dir: "demo/data_engineering/dbt"
 
   # Jobs - declarative asset selection
   jobs:
