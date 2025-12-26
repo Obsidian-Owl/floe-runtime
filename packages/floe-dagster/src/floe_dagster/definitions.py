@@ -329,14 +329,16 @@ class FloeDefinitions:
         # Auto-load schedules from orchestration config
         if orchestration and orchestration.get("schedules"):
             try:
-                from floe_core.schemas.schedule_definition import ScheduleDefinition
+                from floe_core.schemas.schedule_definition import (
+                    ScheduleDefinition as FloeScheduleDefinition,
+                )
                 from floe_dagster.loaders.schedule_loader import load_schedules
 
                 schedule_configs = orchestration["schedules"]
                 schedule_definitions = {}
 
                 for schedule_name, schedule_config in schedule_configs.items():
-                    schedule_definitions[schedule_name] = ScheduleDefinition(**schedule_config)
+                    schedule_definitions[schedule_name] = FloeScheduleDefinition(**schedule_config)
 
                 dagster_jobs = {job.name: job for job in (jobs or [])}
                 loaded_schedules = load_schedules(schedule_definitions, dagster_jobs)
