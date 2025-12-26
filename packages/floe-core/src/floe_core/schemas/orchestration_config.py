@@ -9,8 +9,10 @@ of boilerplate by enabling auto-discovery of assets from modules and dbt manifes
 
 from __future__ import annotations
 
+import os
 import re
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -27,6 +29,51 @@ IDENTIFIER_PATTERN = r"^[a-zA-Z][a-zA-Z0-9_]*$"
 
 MODULE_PATH_PATTERN = r"^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)*$"
 """Regex pattern for Python module paths."""
+
+ENV_VAR_PATTERN = r"\$\{([A-Z_][A-Z0-9_]*(?::-[^}]*)?)}"
+"""Regex pattern for environment variable interpolation: ${VAR} or ${VAR:-default}."""
+
+
+def interpolate_env_vars(value: str) -> str:
+    """Interpolate environment variables in a string.
+
+    T049: [010-orchestration-auto-discovery] Environment variable interpolation
+
+    Supports syntax:
+    - ${VAR}: Replace with environment variable (error if not found)
+    - ${VAR:-default}: Replace with environment variable or default value
+
+    Args:
+        value: String potentially containing ${VAR} or ${VAR:-default} patterns
+
+    Returns:
+        String with environment variables interpolated
+
+    Raises:
+        ValueError: If required environment variable is not found
+
+    Example:
+        >>> os.environ["DEPLOYMENT_ENV"] = "staging"
+        >>> interpolate_env_vars("${DEPLOYMENT_ENV}")
+        'staging'
+        >>> interpolate_env_vars("${MISSING:-local}")
+        'local'
+    """
+
+    def replace_env_var(match: re.Match[str]) -> str:
+        var_expr = match.group(1)
+
+        if ":-" in var_expr:
+            var_name, default_value = var_expr.split(":-", 1)
+            return os.environ.get(var_name, default_value)
+
+        var_name = var_expr
+        if var_name not in os.environ:
+            msg = f"Environment variable '{var_name}' not found"
+            raise ValueError(msg)
+        return os.environ[var_name]
+
+    return re.sub(ENV_VAR_PATTERN, replace_env_var, value)
 
 
 class ObservabilityLevel(str, Enum):
@@ -182,7 +229,7 @@ class OrchestrationConfig(BaseModel):
         ),
     )
 
-    def __init__(self, **data):
+    def __init__(self, **data: Any) -> None:
         # Validate module paths match pattern
         asset_modules = data.get("asset_modules", [])
         for module_path in asset_modules:
@@ -200,3 +247,41 @@ class OrchestrationConfig(BaseModel):
                         raise ValueError(msg)
 
         super().__init__(**data)
+
+    @classmethod
+    def export_json_schema(cls, output_path: str | None = None) -> dict[str, Any]:
+        """Export JSON Schema for IDE autocomplete support.
+
+        T048: [010-orchestration-auto-discovery] JSON schema export for IDE support
+
+        Exports Pydantic schema as JSON Schema Draft 2020-12 format for:
+        - VS Code YAML extension autocomplete
+        - JetBrains IDE autocomplete
+        - floe.yaml validation
+
+        Args:
+            output_path: Optional path to write schema file. If None, returns schema dict.
+
+        Returns:
+            JSON Schema dictionary
+
+        Example:
+            >>> schema = OrchestrationConfig.export_json_schema()
+            >>> schema["$schema"]
+            'https://json-schema.org/draft/2020-12/schema'
+
+            >>> OrchestrationConfig.export_json_schema("schemas/orchestration.schema.json")
+            {'$schema': '...', 'title': 'OrchestrationConfig', ...}
+        """
+        import json
+
+        schema = cls.model_json_schema()
+
+        schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
+        schema["$id"] = "https://floe-runtime.dev/schemas/orchestration.schema.json"
+
+        if output_path:
+            with open(output_path, "w") as f:
+                json.dump(schema, f, indent=2)
+
+        return schema
