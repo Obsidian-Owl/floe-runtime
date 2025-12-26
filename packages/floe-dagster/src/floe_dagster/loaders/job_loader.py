@@ -147,9 +147,8 @@ def _create_ops_job(
         tags=job_def.tags or {},
     )
     def generated_ops_job():
-        if job_def.args:
-            op_function(**job_def.args)
-        else:
-            op_function()
+        # Call op without args - op defaults or run config handle parameters
+        # Dagster doesn't allow literal values in job composition
+        op_function()
 
     return generated_ops_job
