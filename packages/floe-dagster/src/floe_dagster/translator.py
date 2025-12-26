@@ -167,7 +167,7 @@ class FloeTranslator(DagsterDbtTranslator):
         # Add dbt tags as dagster tags
         dbt_tags = dbt_resource_props.get("tags", [])
         for tag in dbt_tags:
-            tags[f"dbt:{tag}"] = "true"
+            tags[f"dbt/{tag}"] = "true"
 
         # Add materialization as tag
         config = dbt_resource_props.get("config", {})
