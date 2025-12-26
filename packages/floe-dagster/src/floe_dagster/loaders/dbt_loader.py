@@ -55,7 +55,10 @@ def load_dbt_assets(dbt_config: DbtConfig) -> AssetsDefinition | None:
 
     from floe_dagster.assets import FloeAssetFactory
 
-    return FloeAssetFactory.create_dbt_assets(artifacts)
+    if dbt_config.observability_level.value == "per_model":
+        return FloeAssetFactory.create_dbt_assets_with_per_model_observability(artifacts)
+    else:
+        return FloeAssetFactory.create_dbt_assets(artifacts)
 
 
 def _build_artifacts_from_config(dbt_config: DbtConfig) -> dict:
