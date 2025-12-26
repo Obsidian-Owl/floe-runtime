@@ -242,6 +242,25 @@ class FloeDefinitions:
                 e,
             )
 
+        # Auto-load dbt assets from orchestration config
+        orchestration = artifacts.get("orchestration")
+        if orchestration and orchestration.get("dbt"):
+            try:
+                from floe_core.schemas.orchestration_config import DbtConfig
+                from floe_dagster.loaders.dbt_loader import load_dbt_assets
+
+                dbt_config = DbtConfig(**orchestration["dbt"])
+                dbt_assets = load_dbt_assets(dbt_config)
+                if dbt_assets:
+                    assets = list(assets or [])
+                    assets.append(dbt_assets)
+                    logger.info("Auto-loaded dbt assets from orchestration config")
+            except Exception as e:
+                logger.warning(
+                    "Failed to auto-load dbt assets: %s. dbt assets will not be available.",
+                    e,
+                )
+
         # Combine all assets
         all_assets: list[Any] = list(assets or [])
 
