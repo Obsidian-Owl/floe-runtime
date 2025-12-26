@@ -605,11 +605,11 @@ class FloeDefinitions:
 
             logger.warning("floe.yaml not found, orchestration config unavailable")
             return None
-        except ImportError:
-            logger.debug("floe_core not available, floe.yaml loading unavailable")
+        except ImportError as e:
+            logger.warning("floe_core not available, floe.yaml loading unavailable: %s", e)
             return None
         except Exception as e:
-            logger.debug("Failed to load floe.yaml: %s", e)
+            logger.error("Failed to load floe.yaml: %s", e, exc_info=True)
             return None
 
     @classmethod
