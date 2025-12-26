@@ -18,9 +18,7 @@ from pydantic import BaseModel, ConfigDict, Discriminator, Field
 IDENTIFIER_PATTERN = r"^[a-zA-Z][a-zA-Z0-9_]*$"
 """Regex pattern for valid identifiers."""
 
-FUNCTION_PATH_PATTERN = (
-    r"^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)*\\.[a-zA-Z][a-zA-Z0-9_]*$"
-)
+FUNCTION_PATH_PATTERN = r"^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)*\.[a-zA-Z][a-zA-Z0-9_]*$"
 """Regex pattern for module.function references."""
 
 

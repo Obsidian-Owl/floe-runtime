@@ -177,18 +177,22 @@ def _create_run_status_sensor(
     sensor_def: SensorDefinition,
     job: DagsterJobDefinition,
 ) -> DagsterSensorDefinition:
-    """Create a run status sensor."""
-    from dagster import DagsterRunStatus, RunRequest, sensor
+    """Create a run status sensor.
+
+    Note: This implementation polls for run status changes. For production use,
+    consider using Dagster's @run_status_sensor_definition for event-driven behavior.
+    """
+    from dagster import DagsterRunStatus, RunRequest, RunsFilter, SkipReason, sensor
 
     watched_jobs = sensor_def.watched_jobs
     status = sensor_def.status
     poll_interval = sensor_def.poll_interval_seconds
 
     status_map = {
-        "success": DagsterRunStatus.SUCCESS,
-        "failure": DagsterRunStatus.FAILURE,
-        "started": DagsterRunStatus.STARTED,
-        "canceled": DagsterRunStatus.CANCELED,
+        "SUCCESS": DagsterRunStatus.SUCCESS,
+        "FAILURE": DagsterRunStatus.FAILURE,
+        "STARTED": DagsterRunStatus.STARTED,
+        "CANCELED": DagsterRunStatus.CANCELED,
     }
     dagster_status = status_map.get(status.value)
 
@@ -199,15 +203,42 @@ def _create_run_status_sensor(
     @sensor(
         name=name,
         job=job,
-        run_status_sensor=dagster_status,
         minimum_interval_seconds=poll_interval,
         description=f"Run status sensor for {status.value} on {watched_jobs}",
     )
     def _run_status_sensor(context):
-        if context.dagster_run.job_name in watched_jobs:
+        runs = context.instance.get_runs(
+            filters=RunsFilter(
+                statuses=[dagster_status],
+            ),
+            limit=10,
+        )
+
+        cursor = context.cursor or "0"
+        last_check_time = float(cursor)
+
+        new_runs = []
+        max_timestamp = last_check_time
+
+        for run in runs:
+            if run.job_name not in watched_jobs:
+                continue
+
+            run_time = run.create_time.timestamp() if run.create_time else 0
+            if run_time > last_check_time:
+                new_runs.append(run)
+                max_timestamp = max(max_timestamp, run_time)
+
+        if not new_runs:
+            return SkipReason(f"No new {status.value} runs for {watched_jobs}")
+
+        context.update_cursor(str(max_timestamp))
+
+        for run in new_runs:
             yield RunRequest(
-                run_key=f"run_{context.dagster_run.run_id}",
+                run_key=f"run_{run.run_id}",
                 run_config={},
+                tags={"triggered_by_run": run.run_id, "triggered_by_job": run.job_name},
             )
 
     return _run_status_sensor
