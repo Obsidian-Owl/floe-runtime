@@ -72,13 +72,35 @@ def _create_batch_job(
     Returns:
         Dagster JobDefinition for asset selection.
     """
-    from dagster import define_asset_job
+    from dagster import AssetSelection, define_asset_job
 
-    selection_expr = ",".join(job_def.selection)
+    # Parse selection list and build AssetSelection
+    # Supports: "group:bronze", "key:my_asset", "tag:my_tag=value"
+    selection = None
+    for sel_str in job_def.selection:
+        if sel_str.startswith("group:"):
+            group_name = sel_str[6:]  # Remove "group:" prefix
+            group_sel = AssetSelection.groups(group_name)
+            selection = group_sel if selection is None else selection | group_sel
+        elif sel_str.startswith("key:"):
+            key_name = sel_str[4:]  # Remove "key:" prefix
+            key_sel = AssetSelection.keys(key_name)
+            selection = key_sel if selection is None else selection | key_sel
+        elif sel_str.startswith("tag:"):
+            tag_expr = sel_str[4:]  # Remove "tag:" prefix
+            if "=" in tag_expr:
+                tag_key, tag_value = tag_expr.split("=", 1)
+                tag_sel = AssetSelection.tag(tag_key, tag_value)
+            else:
+                tag_sel = AssetSelection.tag(tag_expr, "true")
+            selection = tag_sel if selection is None else selection | tag_sel
+        else:
+            # Assume it's a full asset selection string
+            pass
 
     job_kwargs = {
         "name": job_name,
-        "selection": selection_expr,
+        "selection": selection,
     }
 
     if job_def.description:
