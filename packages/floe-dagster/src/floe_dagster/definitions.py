@@ -577,7 +577,7 @@ class FloeDefinitions:
                 )
                 if data_eng_path.exists():
                     logger.info("Loading floe.yaml from %s", data_eng_path)
-                    spec = FloeSpec.from_yaml_file(str(data_eng_path))
+                    spec = FloeSpec.from_yaml(str(data_eng_path))
                     logger.info("Successfully loaded floe.yaml: %s", spec.name)
                     return spec
 
@@ -590,7 +590,7 @@ class FloeDefinitions:
                 )
                 if namespace_path.exists():
                     logger.info("Loading floe.yaml from %s", namespace_path)
-                    spec = FloeSpec.from_yaml_file(str(namespace_path))
+                    spec = FloeSpec.from_yaml(str(namespace_path))
                     logger.info("Successfully loaded floe.yaml: %s", spec.name)
                     return spec
 
@@ -599,7 +599,7 @@ class FloeDefinitions:
             logger.info("Checking for floe.yaml at: %s (exists=%s)", floe_path, floe_path.exists())
             if floe_path.exists():
                 logger.info("Loading floe.yaml from current directory")
-                spec = FloeSpec.from_yaml_file(str(floe_path))
+                spec = FloeSpec.from_yaml(str(floe_path))
                 logger.info("Successfully loaded floe.yaml: %s", spec.name)
                 return spec
 
