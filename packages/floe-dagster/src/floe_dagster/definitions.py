@@ -547,9 +547,10 @@ class FloeDefinitions:
         Two-Tier Architecture: Loads floe.yaml for orchestration/business logic.
         Searches for floe.yaml in this order:
 
-        1. {namespace}/floe.yaml (if namespace provided)
-        2. floe.yaml in current directory
-        3. None if not found
+        1. {namespace}/data_engineering/floe.yaml (if namespace provided)
+        2. {namespace}/floe.yaml (if namespace provided)
+        3. floe.yaml in current directory
+        4. None if not found
 
         Args:
             namespace: Optional namespace for namespace-specific floe.yaml discovery.
@@ -565,11 +566,18 @@ class FloeDefinitions:
         try:
             from floe_core.schemas.floe_spec import FloeSpec
 
-            # Try namespace-specific path first
+            # Try namespace-specific paths first
             if namespace:
+                # Try {namespace}/data_engineering/floe.yaml (common demo pattern)
+                data_eng_path = Path(namespace) / "data_engineering" / "floe.yaml"
+                if data_eng_path.exists():
+                    logger.info("Loading floe.yaml from %s", data_eng_path)
+                    return FloeSpec.from_yaml_file(str(data_eng_path))
+
+                # Try {namespace}/floe.yaml
                 namespace_path = Path(namespace) / "floe.yaml"
                 if namespace_path.exists():
-                    logger.info("Loading floe.yaml from namespace: %s", namespace_path)
+                    logger.info("Loading floe.yaml from %s", namespace_path)
                     return FloeSpec.from_yaml_file(str(namespace_path))
 
             # Try current directory
