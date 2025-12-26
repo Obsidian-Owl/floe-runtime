@@ -82,13 +82,11 @@ def _create_time_window_partition(
         "cron_schedule": partition_def.cron_schedule,
         "start": partition_def.start,
         "timezone": partition_def.timezone,
+        "fmt": partition_def.fmt or "%Y-%m-%d",
     }
 
     if partition_def.end:
         kwargs["end"] = partition_def.end
-
-    if partition_def.fmt:
-        kwargs["fmt"] = partition_def.fmt
 
     return TimeWindowPartitionsDefinition(**kwargs)
 
