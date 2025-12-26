@@ -51,6 +51,7 @@ def load_schedules(
     if not schedules:
         return []
 
+    from dagster import DefaultScheduleStatus
     from dagster import ScheduleDefinition as DagsterScheduleDef
 
     dagster_schedules: list[DagsterScheduleDefinition] = []
@@ -76,7 +77,11 @@ def load_schedules(
             schedule_kwargs["description"] = schedule_def.description
 
         if schedule_def.partition_selector:
-            schedule_kwargs["default_status"] = "RUNNING" if schedule_def.enabled else "STOPPED"
+            schedule_kwargs["default_status"] = (
+                DefaultScheduleStatus.RUNNING
+                if schedule_def.enabled
+                else DefaultScheduleStatus.STOPPED
+            )
 
         dagster_schedule = DagsterScheduleDef(**schedule_kwargs)
         dagster_schedules.append(dagster_schedule)

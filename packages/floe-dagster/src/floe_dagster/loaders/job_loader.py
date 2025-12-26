@@ -74,7 +74,7 @@ def _create_batch_job(
     """
     from dagster import define_asset_job
 
-    selection_expr = " or ".join(job_def.selection)
+    selection_expr = "*".join(job_def.selection)
 
     job_kwargs = {
         "name": job_name,
