@@ -1,7 +1,7 @@
 # floe-runtime Makefile
 # Provides consistent commands that mirror CI exactly
 
-.PHONY: check lint typecheck security test test-unit test-contract test-integration test-helm helm-lint format install hooks docker-up docker-down docker-logs deploy-local-infra deploy-local-dagster deploy-local-cube deploy-local-full undeploy-local port-forward-all port-forward-stop show-urls demo-status demo-cleanup demo-logs demo-image-build demo-image-push help
+.PHONY: check lint typecheck security test test-unit test-contract test-integration test-helm helm-lint format install hooks docker-up docker-down docker-logs deploy-local-infra deploy-local-dagster deploy-local-cube deploy-local-full undeploy-local port-forward-all port-forward-stop show-urls demo-status demo-cleanup demo-logs demo-image-build demo-image-push demo-clean demo-validate demo-quickstart help
 
 # Default target
 help:
@@ -38,6 +38,9 @@ help:
 	@echo "    PLATFORM_FILE=platform/local/platform.yaml (configurable)"
 	@echo ""
 	@echo "Demo Operations:"
+	@echo "  make demo-quickstart      - 🚀 One-command: clean, build, deploy, validate"
+	@echo "  make demo-clean           - Clean deployment (keep images)"
+	@echo "  make demo-validate        - Validate deployment health"
 	@echo "  make show-urls            - Show service URLs (NodePort - resilient access)"
 	@echo "  make port-forward-all     - Start all port-forwards (admin UIs)"
 	@echo "  make port-forward-stop    - Stop all port-forwards"
@@ -374,3 +377,19 @@ demo-image-push: demo-image-build
 	@echo ""
 	@echo "To deploy updated image:"
 	@echo "  kubectl rollout restart deployment/floe-dagster-dagster-user-deployments-floe-demo -n $(FLOE_NAMESPACE)"
+
+# Clean demo environment (complete reset)
+demo-clean:
+	@./scripts/clean-demo.sh
+
+# Clean demo environment including Docker images
+demo-clean-all:
+	@./scripts/clean-demo.sh --all
+
+# Validate demo deployment health
+demo-validate:
+	@./scripts/validate-demo.sh
+
+# Quickstart: clean + build + deploy + validate
+demo-quickstart:
+	@./scripts/quickstart.sh

@@ -24,15 +24,17 @@ Production-like deployment using Helm charts on Docker Desktop Kubernetes.
 ## Quick Start
 
 ```bash
-# One command deploys the complete stack
+# One command: clean + build + deploy + validate
+make demo-quickstart
+
+# Or deploy to existing environment
 make deploy-local-full
 
-# Wait ~3-5 minutes for initialization
-# Check pod status
-make demo-status
+# Validate deployment health
+make demo-validate
 ```
 
-That's it! All services are now accessible via NodePort.
+The quickstart script performs a complete fresh deployment in ~5-8 minutes and validates all components are healthy.
 
 ## Service URLs (NodePort Access)
 
@@ -45,21 +47,23 @@ These URLs are **resilient** - they survive pod restarts without needing port-fo
 | **Cube SQL API** | `psql -h localhost -p 30432 -U cube` | Postgres wire protocol |
 | **Marquez UI** | http://localhost:30301 | Data lineage visualization |
 | **Jaeger UI** | http://localhost:30686 | Distributed tracing |
-| **MinIO Console** | http://localhost:30901 | S3 storage (user: `minioadmin`) |
-| **Polaris API** | http://localhost:30181 | Iceberg catalog |
-| **LocalStack** | http://localhost:30566 | S3/STS emulation |
+| **LocalStack** | http://localhost:30566 | S3/STS emulation + Web UI |
+| **Polaris API** | http://localhost:30181 | Iceberg REST catalog |
 
 ## Verify Deployment
 
 ```bash
-# Check all pods are Running
-kubectl get pods -n floe
+# Comprehensive health check (recommended)
+make demo-validate
+# Checks: pods, services, infrastructure, Iceberg data
 
-# Quick API test
+# Or manual checks
+kubectl get pods -n floe  # All should be Running
+
+# Quick API tests
 curl -s http://localhost:30400/cubejs-api/v1/meta | jq '.cubes[].name'
 # Expected: "Orders", "Customers"
 
-# Dagster health
 curl -s http://localhost:30000/server_info | jq
 ```
 
@@ -111,10 +115,14 @@ print(cur.fetchone())
 # Clean up completed Dagster run pods (accumulate over time)
 make demo-cleanup
 
-# Remove all deployments
-make undeploy-local
+# Full cleanup (keeps Docker images for faster rebuild)
+make demo-clean
 
-# Or delete the entire namespace
+# Complete cleanup including Docker images
+make demo-clean-all
+
+# Or manually remove deployments
+make undeploy-local
 kubectl delete namespace floe
 ```
 

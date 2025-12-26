@@ -28,7 +28,8 @@ dependencies = [
     "openlineage-python>=1.24",
     "opentelemetry-api>=1.28",
     "opentelemetry-sdk>=1.28",
-    "opentelemetry-exporter-otlp>=1.28",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.28",  # gRPC exporter for Jaeger
+    "httpx>=0.27",  # Required for OpenLineage HTTP transport
     "structlog>=24.0",
     "floe-core",
     "floe-dbt",

@@ -217,6 +217,13 @@ class FloeDefinitions:
             extra={"namespace": namespace},
         )
 
+        # Configure structured logging with trace context injection
+        if orchestrator.tracing_manager is not None:
+            from floe_dagster.observability.logging import configure_logging
+
+            configure_logging(__name__, tracing_manager=orchestrator.tracing_manager)
+            logger.debug("Structured logging configured with trace context injection")
+
         # Build resources dict
         resources: dict[str, Any] = {
             # Inject orchestrator for @floe_asset decorator
