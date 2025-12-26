@@ -25,6 +25,7 @@ from floe_core.schemas import (
     ConsumptionConfig,
     GovernanceConfig,
     ObservabilityConfig,
+    OrchestrationConfig,
     StorageProfile,
     TransformConfig,
 )
@@ -197,6 +198,7 @@ class CompiledArtifacts(BaseModel):
         consumption: Cube semantic layer configuration.
         governance: Data governance configuration.
         observability: Observability configuration.
+        orchestration: Orchestration configuration for auto-discovery.
         catalog: Optional Iceberg catalog configuration (legacy).
         resolved_profiles: Resolved platform profiles from platform.yaml.
         dbt_manifest_path: Path to dbt manifest.json (if available).
@@ -252,6 +254,10 @@ class CompiledArtifacts(BaseModel):
     observability: ObservabilityConfig = Field(
         default_factory=ObservabilityConfig,
         description="Observability configuration",
+    )
+    orchestration: OrchestrationConfig | None = Field(
+        default=None,
+        description="Orchestration configuration for auto-discovery",
     )
 
     # Optional configurations (legacy)

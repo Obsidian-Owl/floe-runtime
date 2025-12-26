@@ -50,6 +50,7 @@ if TYPE_CHECKING:
         UnresolvedAssetJobDefinition,
     )
 
+    from floe_core.schemas.floe_spec import FloeSpec
     from floe_core.schemas.platform_spec import PlatformSpec
 
 logger = logging.getLogger(__name__)
@@ -172,7 +173,7 @@ class FloeDefinitions:
         """
         # Load artifacts with priority:
         # 1. Explicit artifacts_dict (highest priority)
-        # 2. Platform.yaml via FLOE_PLATFORM_FILE (Two-Tier Architecture)
+        # 2. Platform.yaml + floe.yaml (Two-Tier Architecture)
         # 3. Compiled artifacts file (legacy/fallback)
         if artifacts_dict is not None:
             artifacts = artifacts_dict
@@ -181,8 +182,19 @@ class FloeDefinitions:
             # Try platform.yaml first (Two-Tier Architecture)
             platform = cls._load_platform_config()
             if platform is not None:
-                artifacts = cls._build_artifacts_from_platform(platform)
-                logger.info("Loaded configuration from platform.yaml (Two-Tier Architecture)")
+                # Also load floe.yaml for orchestration config
+                floe_spec = cls._load_floe_spec(namespace=namespace)
+                artifacts = cls._build_artifacts_from_platform(platform, floe_spec=floe_spec)
+                if floe_spec:
+                    logger.info(
+                        "Loaded configuration from platform.yaml + floe.yaml "
+                        "(Two-Tier Architecture)"
+                    )
+                else:
+                    logger.info(
+                        "Loaded configuration from platform.yaml (Two-Tier Architecture, "
+                        "orchestration unavailable)"
+                    )
             else:
                 # Fall back to compiled_artifacts.json file
                 path = Path(artifacts_path)
@@ -232,8 +244,21 @@ class FloeDefinitions:
                 )
 
         # Create DbtCliResource (batteries-included for demo)
+        # Extract dbt paths from orchestration config if available
+        dbt_project_dir = None
+        dbt_profiles_dir = None
+        orchestration = artifacts.get("orchestration", {})
+        if orchestration and orchestration.get("dbt"):
+            dbt_config = orchestration["dbt"]
+            dbt_project_dir = dbt_config.get("project_dir")
+            dbt_profiles_dir = dbt_config.get("profiles_dir")
+
         try:
-            dbt_resource = create_dbt_cli_resource(artifacts)
+            dbt_resource = create_dbt_cli_resource(
+                artifacts,
+                project_dir=dbt_project_dir,
+                profiles_dir=dbt_profiles_dir,
+            )
             resources["dbt"] = dbt_resource
             logger.info("DbtCliResource initialized")
         except Exception as e:
@@ -243,7 +268,6 @@ class FloeDefinitions:
             )
 
         # Auto-load dbt assets from orchestration config
-        orchestration = artifacts.get("orchestration")
         if orchestration and orchestration.get("dbt"):
             try:
                 from floe_core.schemas.orchestration_config import DbtConfig
@@ -517,18 +541,67 @@ class FloeDefinitions:
             return None
 
     @classmethod
+    def _load_floe_spec(cls, namespace: str | None = None) -> FloeSpec | None:
+        """Load floe.yaml for orchestration configuration.
+
+        Two-Tier Architecture: Loads floe.yaml for orchestration/business logic.
+        Searches for floe.yaml in this order:
+
+        1. {namespace}/floe.yaml (if namespace provided)
+        2. floe.yaml in current directory
+        3. None if not found
+
+        Args:
+            namespace: Optional namespace for namespace-specific floe.yaml discovery.
+
+        Returns:
+            FloeSpec instance, or None if not available.
+
+        Note:
+            This method gracefully degrades - if floe.yaml is not found,
+            it returns None. The orchestration config becomes unavailable but
+            the system continues to function.
+        """
+        try:
+            from floe_core.schemas.floe_spec import FloeSpec
+
+            # Try namespace-specific path first
+            if namespace:
+                namespace_path = Path(namespace) / "floe.yaml"
+                if namespace_path.exists():
+                    logger.info("Loading floe.yaml from namespace: %s", namespace_path)
+                    return FloeSpec.from_yaml_file(str(namespace_path))
+
+            # Try current directory
+            floe_path = Path("floe.yaml")
+            if floe_path.exists():
+                logger.info("Loading floe.yaml from current directory")
+                return FloeSpec.from_yaml_file(str(floe_path))
+
+            logger.debug("floe.yaml not found, orchestration config unavailable")
+            return None
+        except ImportError:
+            logger.debug("floe_core not available, floe.yaml loading unavailable")
+            return None
+        except Exception as e:
+            logger.debug("Failed to load floe.yaml: %s", e)
+            return None
+
+    @classmethod
     def _build_artifacts_from_platform(
         cls,
         platform: PlatformSpec,
+        floe_spec: FloeSpec | None = None,
         profile_name: str = "default",
     ) -> dict[str, Any]:
-        """Build CompiledArtifacts-compatible dictionary from PlatformSpec.
+        """Build CompiledArtifacts-compatible dictionary from PlatformSpec and FloeSpec.
 
-        Transforms platform.yaml profiles into the dictionary format expected
+        Transforms platform.yaml and floe.yaml into the dictionary format expected
         by FloeDefinitions.from_compiled_artifacts().
 
         Args:
             platform: Loaded PlatformSpec from platform.yaml.
+            floe_spec: Optional loaded FloeSpec from floe.yaml.
             profile_name: Name of profile to use (default: "default").
 
         Returns:
@@ -540,6 +613,7 @@ class FloeDefinitions:
         """
         resolved_catalog: dict[str, Any] = {}
         observability_config: dict[str, Any] = {}
+        orchestration_config: dict[str, Any] = {}
 
         # Build resolved_catalog from catalog profile
         try:
@@ -594,10 +668,15 @@ class FloeDefinitions:
                 },
             }
 
+        # Build orchestration config from floe_spec
+        if floe_spec and floe_spec.orchestration:
+            orchestration_config = floe_spec.orchestration.model_dump(mode="json")
+
         return {
             "version": "2.0.0",
             "resolved_catalog": resolved_catalog,
             "observability": observability_config,
+            "orchestration": orchestration_config,
         }
 
 
