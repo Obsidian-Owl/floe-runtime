@@ -570,23 +570,40 @@ class FloeDefinitions:
             if namespace:
                 # Try {namespace}/data_engineering/floe.yaml (common demo pattern)
                 data_eng_path = Path(namespace) / "data_engineering" / "floe.yaml"
+                logger.info(
+                    "Checking for floe.yaml at: %s (exists=%s)",
+                    data_eng_path,
+                    data_eng_path.exists(),
+                )
                 if data_eng_path.exists():
                     logger.info("Loading floe.yaml from %s", data_eng_path)
-                    return FloeSpec.from_yaml_file(str(data_eng_path))
+                    spec = FloeSpec.from_yaml_file(str(data_eng_path))
+                    logger.info("Successfully loaded floe.yaml: %s", spec.name)
+                    return spec
 
                 # Try {namespace}/floe.yaml
                 namespace_path = Path(namespace) / "floe.yaml"
+                logger.info(
+                    "Checking for floe.yaml at: %s (exists=%s)",
+                    namespace_path,
+                    namespace_path.exists(),
+                )
                 if namespace_path.exists():
                     logger.info("Loading floe.yaml from %s", namespace_path)
-                    return FloeSpec.from_yaml_file(str(namespace_path))
+                    spec = FloeSpec.from_yaml_file(str(namespace_path))
+                    logger.info("Successfully loaded floe.yaml: %s", spec.name)
+                    return spec
 
             # Try current directory
             floe_path = Path("floe.yaml")
+            logger.info("Checking for floe.yaml at: %s (exists=%s)", floe_path, floe_path.exists())
             if floe_path.exists():
                 logger.info("Loading floe.yaml from current directory")
-                return FloeSpec.from_yaml_file(str(floe_path))
+                spec = FloeSpec.from_yaml_file(str(floe_path))
+                logger.info("Successfully loaded floe.yaml: %s", spec.name)
+                return spec
 
-            logger.debug("floe.yaml not found, orchestration config unavailable")
+            logger.warning("floe.yaml not found, orchestration config unavailable")
             return None
         except ImportError:
             logger.debug("floe_core not available, floe.yaml loading unavailable")
