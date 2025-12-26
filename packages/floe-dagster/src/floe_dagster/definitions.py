@@ -261,6 +261,25 @@ class FloeDefinitions:
                     e,
                 )
 
+        # Auto-load assets from Python modules
+        if orchestration and orchestration.get("asset_modules"):
+            try:
+                from floe_dagster.loaders.asset_loader import load_assets_from_module_dict
+
+                loaded_assets = load_assets_from_module_dict(orchestration)
+                if loaded_assets:
+                    assets = list(assets or [])
+                    assets.extend(loaded_assets)
+                    logger.info(
+                        "Auto-loaded %d assets from asset_modules in orchestration config",
+                        len(loaded_assets),
+                    )
+            except Exception as e:
+                logger.warning(
+                    "Failed to auto-load asset modules: %s. Asset modules will not be available.",
+                    e,
+                )
+
         # Auto-load partitions from orchestration config
         loaded_partitions: dict[str, Any] = {}
         if orchestration and orchestration.get("partitions"):
