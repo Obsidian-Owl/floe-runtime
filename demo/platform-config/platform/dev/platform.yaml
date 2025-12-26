@@ -1,0 +1,201 @@
+# Cloud Development Platform Configuration
+#
+# Environment: cloud-dev
+# Purpose: AWS EKS development cluster
+# Schema Version: 1.1.0 (Enterprise features)
+#
+# Three-Tier Configuration Architecture:
+# - This file is managed by platform engineers in the platform-config repo
+# - Contains infrastructure endpoints and credential **references**
+# - Data engineers reference logical profiles by name in floe.yaml
+#
+# Usage:
+#   floe compile --platform=platform-config-v1.2.3/platform/dev/platform.yaml
+#   helm install floe-dagster --set-file floe.platformSpec.content=platform/dev/platform.yaml
+#
+# Required environment variables (from AWS Secrets Manager via External Secrets):
+#   POLARIS_CLIENT_ID      - OAuth2 client ID for Polaris
+#   POLARIS_CLIENT_SECRET  - OAuth2 client secret for Polaris
+#   AWS_ACCESS_KEY_ID      - IAM user for S3 access (or use IRSA)
+#   AWS_SECRET_ACCESS_KEY  - IAM secret key
+#
+# Infrastructure:
+#   - Storage: AWS S3 (us-east-1)
+#   - Catalog: Polaris (managed service or self-hosted)
+#   - Observability: AWS X-Ray + Managed Grafana + Marquez
+#
+# Covers: 009-US2 (Same floe.yaml works across dev/staging/prod)
+
+version: "1.1.0"
+
+# =============================================================================
+# Infrastructure Configuration (v1.1.0)
+# =============================================================================
+infrastructure:
+  network:
+    enabled: true
+    dns:
+      internal_domain: dev.floe.internal
+      strategy: kubernetes
+  cloud:
+    provider: aws
+    region: us-east-1
+    account_id: "123456789012"  # Replace with actual dev account ID
+
+# =============================================================================
+# Security Configuration (v1.1.0)
+# =============================================================================
+security:
+  authentication:
+    enabled: true
+    method: oauth2
+  authorization:
+    enabled: true
+    rbac:
+      enabled: true
+  secret_backends:
+    primary: external_secrets
+    external_secrets:
+      enabled: true
+      provider: aws_secrets_manager
+      region: us-east-1
+    kubernetes:
+      enabled: true
+      namespace: floe
+      mount_path: /var/run/secrets
+  encryption:
+    in_transit:
+      enabled: true  # TLS for all communications
+      tls_version: "1.3"
+    at_rest:
+      enabled: true
+      kms_key_id: "arn:aws:kms:us-east-1:123456789012:key/dev-key-id"
+
+# =============================================================================
+# Governance Configuration (v1.1.0)
+# =============================================================================
+governance:
+  classifications:
+    enabled: true
+    default_classification: internal
+  retention:
+    enabled: true
+    default_retention_days: 730  # 2 years
+  compliance:
+    enabled: true
+    frameworks:
+      - SOC2
+      - GDPR
+  data_quality:
+    enabled: true
+    validation_level: standard
+
+# =============================================================================
+# Storage Profiles - Medallion Architecture (Bronze/Silver/Gold)
+# =============================================================================
+storage:
+  # Bronze Layer: Raw and lightly cleaned data
+  bronze:
+    type: s3
+    region: us-east-1
+    bucket: floe-dev-iceberg-bronze
+    path_style_access: false  # Virtual-hosted style for AWS S3
+    credentials:
+      mode: iam_role  # Use IRSA (IAM Roles for Service Accounts)
+      role_arn: "arn:aws:iam::123456789012:role/floe-dev-bronze-access"
+
+  # Silver Layer: Cleaned, deduplicated, enriched data
+  silver:
+    type: s3
+    region: us-east-1
+    bucket: floe-dev-iceberg-silver
+    path_style_access: false
+    credentials:
+      mode: iam_role
+      role_arn: "arn:aws:iam::123456789012:role/floe-dev-silver-access"
+
+  # Gold Layer: Aggregated marts for analytics
+  gold:
+    type: s3
+    region: us-east-1
+    bucket: floe-dev-iceberg-gold
+    path_style_access: false
+    credentials:
+      mode: iam_role
+      role_arn: "arn:aws:iam::123456789012:role/floe-dev-gold-access"
+
+  # Default alias points to bronze
+  default:
+    type: s3
+    region: us-east-1
+    bucket: floe-dev-iceberg-bronze
+    path_style_access: false
+    credentials:
+      mode: iam_role
+      role_arn: "arn:aws:iam::123456789012:role/floe-dev-bronze-access"
+
+catalogs:
+  default:
+    type: polaris
+    # Polaris endpoint (managed service or internal EKS service)
+    uri: "https://polaris.dev.floe.internal/api/catalog"
+    warehouse: dev_catalog
+    namespace: default
+    credentials:
+      mode: oauth2
+      client_id:
+        secret_ref: polaris-client-id
+      client_secret:
+        secret_ref: polaris-client-secret
+      scope: "PRINCIPAL_ROLE:DATA_ENGINEER"
+    # Enable vended credentials for temporary S3 access via STS
+    access_delegation: vended-credentials
+    token_refresh_enabled: true
+
+compute:
+  default:
+    type: duckdb
+    properties:
+      path: ":memory:"
+      threads: 8
+    credentials:
+      mode: static
+
+# =============================================================================
+# Observability Configuration (Extended in v1.1.0)
+# =============================================================================
+observability:
+  traces: true
+  metrics: true
+  lineage: true
+  # AWS X-Ray for distributed tracing
+  otlp_endpoint: "https://xray.us-east-1.amazonaws.com"
+  # Marquez for data lineage
+  lineage_endpoint: "https://marquez.dev.floe.internal/api/v1/lineage"
+  attributes:
+    service.name: floe-dev
+    deployment.environment: dev
+    cloud.provider: aws
+    cloud.region: us-east-1
+  # Extended tracing configuration (v1.1.0)
+  tracing:
+    sampling:
+      sampling_type: probabilistic  # Sample for cost control
+      probability: 0.1  # 10% sampling
+    exporters:
+      jaeger: false
+      xray: true
+  # Extended metrics configuration (v1.1.0)
+  metrics_config:
+    scrape_interval: "60s"
+    retention_days: 30
+    exporters:
+      prometheus: true
+      cloudwatch: true
+  # Extended logging configuration (v1.1.0)
+  logging:
+    level: INFO
+    log_format: json
+    backends:
+      loki: false
+      cloudwatch: true

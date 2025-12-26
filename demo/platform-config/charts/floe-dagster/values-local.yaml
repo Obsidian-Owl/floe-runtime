@@ -1,0 +1,240 @@
+# Floe Dagster Helm Chart - Local Kubernetes Testing Values
+#
+# Three-Tier Configuration Architecture:
+# - Tier 1: floe.yaml (data engineering) - logical references only
+# - Tier 2: platform.yaml (platform engineering) - infrastructure endpoints, secret refs
+# - Tier 3: values-local.yaml (K8s/DevOps) - K8s config, secret mounts
+#
+# Platform config loaded from ConfigMap (injected from platform.yaml)
+# Credentials loaded from K8s Secrets (secret_ref in platform.yaml)
+# Same floe.yaml + demo code works across environments
+#
+# Network Access Strategy:
+# - NodePort service for resilient Dagster UI access (survives pod restarts)
+# - No manual port-forwarding required
+# - Access via localhost:<nodePort> on Docker Desktop
+#
+# Service URL (after deployment):
+#   Dagster UI:      http://localhost:30000
+#
+# Optimized for Docker Desktop Kubernetes with floe-infrastructure services.
+# Uses DuckDB (embedded) for compute via dbt-duckdb adapter.
+# Connects to Polaris (Iceberg catalog) and MinIO (S3 storage).
+#
+# Prerequisites:
+#   1. Deploy floe-infrastructure with platform.yaml:
+#      helm install floe-infra charts/floe-infrastructure -n floe \
+#        -f charts/floe-infrastructure/values-local.yaml \
+#        --set platformConfig.enabled=true \
+#        --set-file platformConfig.content=./platform/local/platform.yaml
+#   2. Wait for Polaris initialization to complete
+#
+# Usage:
+#   helm install floe-dagster charts/floe-dagster \
+#     --namespace floe \
+#     --values charts/floe-dagster/values-local.yaml
+#
+# Covers: 007-FR-001 (Helm chart for Kubernetes deployment)
+# Covers: 008-US1 (Deploy complete stack to Kubernetes)
+# Covers: 009-US2 (Three-Tier Configuration Architecture)
+
+# =============================================================================
+# Local Access Configuration
+# =============================================================================
+# Provides NodePort access for local development on Docker Desktop.
+# Access Dagster UI at: http://localhost:30000
+localAccess:
+  enabled: true
+  nodePort: 30000
+
+# =============================================================================
+# Dagster subchart configuration
+# =============================================================================
+dagster:
+  enabled: true
+
+  # Global environment variables for all Dagster components
+  # NOTE: Infrastructure endpoints are NOW in platform.yaml (ConfigMap)
+  # Only credentials and service-specific overrides remain here
+  global:
+    env:
+      # DuckDB configuration for dbt
+      - name: DBT_PROFILES_DIR
+        value: "/app/demo"
+      # Service name for observability
+      - name: OTEL_SERVICE_NAME
+        value: "floe-demo"
+      - name: OPENLINEAGE_NAMESPACE
+        value: "demo"
+      # Set DAGSTER_HOME to writable location (/tmp instead of /opt/dagster)
+      - name: DAGSTER_HOME
+        value: "/tmp/dagster_home"
+
+  # Disable telemetry to avoid permission errors on /opt/dagster
+  telemetry:
+    enabled: false
+
+  # User deployments configuration
+  # Image: ghcr.io/obsidian-owl/floe-demo:latest
+  dagster-user-deployments:
+    enabled: true
+    enableSubchart: true
+    deployments:
+      - name: "floe-demo"
+        image:
+          repository: "ghcr.io/obsidian-owl/floe-demo"
+          tag: "latest"
+          pullPolicy: IfNotPresent  # Cache locally to avoid repeated downloads
+        # Note: Don't specify dagsterApiGrpcArgs - the Dockerfile CMD
+        # already includes: dagster api grpc -h 0.0.0.0 -p 3030 -m demo.data_engineering.orchestration.definitions
+        port: 3030
+        # Two-Tier Architecture: Mount platform ConfigMap
+        # Name pattern: {infra-release-name}-platform-config
+        volumes:
+          - name: platform-config
+            configMap:
+              name: floe-infra-platform-config
+              items:
+                - key: platform.yaml
+                  path: platform.yaml
+        volumeMounts:
+          - name: platform-config
+            mountPath: /etc/floe/platform.yaml
+            subPath: platform.yaml
+            readOnly: true
+        env:
+          # Three-Tier Architecture: Point PlatformResolver to mounted config
+          - name: FLOE_PLATFORM_FILE
+            value: "/etc/floe/platform.yaml"
+
+          # ✅ TIER 3: Credentials from K8s Secrets (secret references, not values)
+          # Platform.yaml defines which secret keys to use (Tier 2)
+          # values-local.yaml defines HOW to mount them (Tier 3)
+
+          # Polaris OAuth2 credentials (from floe-demo-credentials secret)
+          - name: POLARIS_CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                name: floe-demo-credentials
+                key: polaris-client-id
+          - name: POLARIS_CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: floe-demo-credentials
+                key: polaris-client-secret
+
+          # AWS/LocalStack credentials (from floe-demo-credentials secret)
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: floe-demo-credentials
+                key: aws-access-key-id
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: floe-demo-credentials
+                key: aws-secret-access-key
+
+          # Service identification for observability
+          - name: OTEL_SERVICE_NAME
+            value: "floe-demo"
+          - name: OPENLINEAGE_NAMESPACE
+            value: "demo"
+
+  # PostgreSQL for Dagster metadata
+  # DISABLED: Use floe-infra-postgresql (shared infrastructure PostgreSQL)
+  # This avoids PVC provisioning issues on Docker Desktop
+  postgresql:
+    enabled: false  # Don't deploy separate PostgreSQL
+    # Point to infrastructure PostgreSQL
+    postgresqlHost: "floe-infra-postgresql"
+    postgresqlUsername: "postgres"
+    postgresqlPassword: "floe-postgres"
+    postgresqlDatabase: "dagster"
+
+  # Minimal resource configuration for local testing
+  dagsterWebserver:
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    # Use ClusterIP internally - NodePort provided by floe-dagster wrapper service
+    service:
+      type: ClusterIP
+      port: 80
+      annotations:
+        description: "Dagster Webserver UI - internal ClusterIP"
+
+  dagsterDaemon:
+    enabled: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    # Fast run monitoring for local development
+    # Default pollIntervalSeconds=120 causes 2+ min delays in failure detection
+    runMonitoring:
+      enabled: true
+      startTimeoutSeconds: 60     # Faster timeout for runs failing to start (default: 300)
+      pollIntervalSeconds: 10     # Check run status every 10s (default: 120)
+    # Faster sensor evaluation for local dev
+    sensors:
+      useThreads: true
+      numWorkers: 2
+    schedules:
+      useThreads: true
+      numWorkers: 2
+
+  # Use K8s run launcher for proper orchestration
+  runLauncher:
+    type: K8sRunLauncher
+    config:
+      k8sRunLauncher:
+        envSecrets: []
+        envConfigMaps:
+          - name: dagster-run-env
+
+# Floe-specific configuration
+floe:
+  compiledArtifacts:
+    enabled: false  # No CompiledArtifacts for basic testing
+
+  externalSecrets:
+    enabled: false
+
+  sealedSecrets:
+    enabled: false
+
+# Image configuration (use default Dagster images for testing)
+image:
+  repository: docker.io/dagster/dagster-celery-k8s
+  tag: ""  # Defaults to chart appVersion
+  pullPolicy: IfNotPresent
+
+# Minimal resource defaults for local testing
+resources:
+  webserver:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  daemon:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# No ingress for local testing - use port-forward
+ingress:
+  enabled: false

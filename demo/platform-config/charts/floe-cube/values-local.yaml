@@ -1,0 +1,366 @@
+# Floe Cube Helm Chart - Local Kubernetes Testing Values
+#
+# Optimized for Docker Desktop Kubernetes with floe-infrastructure services.
+# Uses DuckDB (built-in) for compute, connecting to Polaris and LocalStack (S3).
+#
+# Architecture:
+#   Cube API → DuckDB (embedded) → Polaris REST Catalog → LocalStack S3 (Iceberg data)
+#
+# Prerequisites:
+#   1. Deploy floe-infrastructure first:
+#      helm install floe-infra charts/floe-infrastructure -n floe -f charts/floe-infrastructure/values-local.yaml
+#   2. Wait for Polaris initialization to complete
+#
+# Usage:
+#   helm install floe-cube charts/floe-cube \
+#     --namespace floe \
+#     --values charts/floe-cube/values-local.yaml
+#
+# Covers: 007-FR-002 (Cube semantic layer deployment)
+# Covers: 008-US1 (Deploy complete stack to Kubernetes)
+# Covers: 008-US2 (Query via Cube REST/GraphQL/SQL)
+
+# Enable development mode (Cube playground)
+devMode: true
+
+# Cube API server configuration
+api:
+  replicaCount: 1
+
+  image:
+    repository: cubejs/cube
+    tag: "v0.36"
+    pullPolicy: IfNotPresent
+
+  # Minimal resources for local testing
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Service configuration for local access
+  service:
+    type: NodePort
+    nodePort: 30400
+
+  # Enable SQL API for BI tools (Tableau, Looker, psycopg2)
+  sqlApi:
+    enabled: true
+    port: 15432
+    nodePort: 30432
+
+  # Environment variables for DuckDB + LocalStack S3 connection
+  # Note: CUBEJS_DB_TYPE, CUBEJS_DEV_MODE, CUBEJS_EXTERNAL_DEFAULT, CUBEJS_CUBESTORE_*
+  # are set by the chart template/helpers - only add unique vars here
+  extraEnv:
+    # DuckDB S3/LocalStack connection for Iceberg files
+    # DuckDB endpoint format: host:port (no http:// prefix)
+    # Protocol determined by CUBEJS_DB_DUCKDB_S3_USE_SSL
+    - name: CUBEJS_DB_DUCKDB_S3_ENDPOINT
+      value: "floe-infra-localstack:4566"
+    - name: CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID
+      value: "test"
+    - name: CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY
+      value: "test"
+    - name: CUBEJS_DB_DUCKDB_S3_REGION
+      value: "us-east-1"
+    - name: CUBEJS_DB_DUCKDB_S3_USE_SSL
+      value: "false"
+    # Path-style URLs required for LocalStack (not virtual-hosted style)
+    - name: CUBEJS_DB_DUCKDB_S3_URL_STYLE
+      value: "path"
+    # SQL API credentials
+    - name: CUBEJS_SQL_USER
+      value: "cube"
+    - name: CUBEJS_SQL_PASSWORD
+      value: "cube_password"
+    - name: CUBEJS_LOG_LEVEL
+      value: "debug"
+    # API secret (for demo - use secrets in production)
+    - name: CUBEJS_API_SECRET
+      value: "floe-demo-secret-change-in-production"
+
+# Cube refresh worker configuration
+refreshWorker:
+  enabled: true
+  replicaCount: 1
+
+  # Faster refresh for demo
+  refreshTimer: 30
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Same environment as API (only unique vars - others set by template/helpers)
+  extraEnv:
+    # DuckDB endpoint format: host:port (no http:// prefix)
+    - name: CUBEJS_DB_DUCKDB_S3_ENDPOINT
+      value: "floe-infra-localstack:4566"
+    - name: CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID
+      value: "test"
+    - name: CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY
+      value: "test"
+    - name: CUBEJS_DB_DUCKDB_S3_REGION
+      value: "us-east-1"
+    - name: CUBEJS_DB_DUCKDB_S3_USE_SSL
+      value: "false"
+    # Path-style URLs required for LocalStack (not virtual-hosted style)
+    - name: CUBEJS_DB_DUCKDB_S3_URL_STYLE
+      value: "path"
+    - name: CUBEJS_API_SECRET
+      value: "floe-demo-secret-change-in-production"
+
+# Pre-aggregation configuration
+preAggregations:
+  # Use Cube Store for pre-aggregations (production-like)
+  external: true
+  scheduledRefresh:
+    enabled: true
+    timezone: "UTC"
+  # DuckDB doesn't support export buckets - uses batching
+  exportBucket:
+    enabled: false
+
+# Cube Store configuration (for pre-aggregations)
+# NOTE: Disabled for local demo - pre-aggregations require more resources
+cubeStore:
+  enabled: false
+  replicaCount: 1
+
+  image:
+    repository: cubejs/cubestore
+    tag: "v0.36"
+    pullPolicy: IfNotPresent
+
+  # S3 configuration for pre-aggregation storage (LocalStack)
+  s3:
+    bucket: "cube-preaggs"
+    region: "us-east-1"
+    endpoint: "http://floe-infra-localstack:4566"
+
+  # Minimal resources for local testing
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # No persistence for local testing (emptyDir)
+  persistence:
+    enabled: false
+
+  extraEnv:
+    - name: CUBESTORE_S3_BUCKET
+      value: "cube-preaggs"
+    - name: CUBESTORE_S3_ENDPOINT
+      value: "http://floe-infra-localstack:4566"
+    - name: CUBESTORE_AWS_ACCESS_KEY_ID
+      value: "test"
+    - name: CUBESTORE_AWS_SECRET_ACCESS_KEY
+      value: "test"
+    - name: CUBESTORE_S3_REGION
+      value: "us-east-1"
+
+# Floe-specific configuration
+# Note: Cube v0.36 uses /cube/conf as base path, so schema must be relative
+floe:
+  schemaPath: "schema"
+  schemaMountPath: "/cube/conf/schema"
+  dbtManifestPath: "/app/.floe/manifest.json"
+  compiledArtifacts:
+    enabled: false  # Not using CompiledArtifacts for demo
+
+# Database type (DuckDB)
+database:
+  type: duckdb
+
+# Demo Cube schema for Iceberg tables via DuckDB
+# These queries use DuckDB's parquet reader to access LocalStack S3
+#
+# ARCHITECTURE NOTE:
+# This is a SIMPLIFIED DEMO that queries bronze layer directly.
+# Production architecture would include:
+#   Bronze → dbt (Silver/Gold) → Trino → Cube
+#
+# The full Docker Compose demo includes Trino and queries gold marts.
+# This K8s demo simplifies by reading bronze parquet files directly.
+#
+# Data path: Seed Job → raw_* tables → Dagster → bronze_* tables → Cube
+schema:
+  Orders.js: |
+    cube(`Orders`, {
+      // Query bronze orders from Iceberg via DuckDB parquet reader
+      // Actual schema: id, customer_id, status, region, amount, created_at
+      // Production would query: floe_demo.marts.mart_revenue via Trino
+      sql: `
+        SELECT *
+        FROM read_parquet('s3://iceberg-bronze/demo/bronze_orders/data/*.parquet')
+      `,
+
+      measures: {
+        count: {
+          type: `count`,
+          description: `Total number of orders`
+        },
+        totalAmount: {
+          sql: `amount`,
+          type: `sum`,
+          description: `Sum of all order amounts`
+        },
+        averageAmount: {
+          sql: `amount`,
+          type: `avg`,
+          description: `Average order amount`
+        },
+        completedCount: {
+          sql: `CASE WHEN status = 'completed' THEN 1 ELSE 0 END`,
+          type: `sum`,
+          description: `Number of completed orders`
+        }
+      },
+
+      dimensions: {
+        id: {
+          sql: `id`,
+          type: `number`,
+          primaryKey: true
+        },
+        status: {
+          sql: `status`,
+          type: `string`,
+          description: `Order status (pending, shipped, delivered, cancelled)`
+        },
+        region: {
+          sql: `region`,
+          type: `string`,
+          description: `Geographic region`
+        },
+        customerId: {
+          sql: `customer_id`,
+          type: `number`
+        },
+        createdAt: {
+          sql: `created_at`,
+          type: `time`,
+          description: `Order creation timestamp`
+        }
+      },
+
+      // Pre-aggregations disabled for simplified K8s demo
+      preAggregations: {}
+    });
+
+  Customers.js: |
+    cube(`Customers`, {
+      // Query bronze customers from Iceberg via DuckDB parquet reader
+      // Actual schema: customer_id, name, email, region, created_at
+      // Production would query: floe_demo.marts.mart_customer_segments via Trino
+      sql: `
+        SELECT *
+        FROM read_parquet('s3://iceberg-bronze/demo/bronze_customers/data/*.parquet')
+      `,
+
+      measures: {
+        count: {
+          type: `count`,
+          description: `Total number of customers`
+        }
+      },
+
+      dimensions: {
+        id: {
+          sql: `customer_id`,
+          type: `number`,
+          primaryKey: true
+        },
+        name: {
+          sql: `name`,
+          type: `string`,
+          description: `Customer full name`
+        },
+        email: {
+          sql: `email`,
+          type: `string`,
+          description: `Customer email address`
+        },
+        region: {
+          sql: `region`,
+          type: `string`,
+          description: `Geographic region`
+        },
+        createdAt: {
+          sql: `created_at`,
+          type: `time`,
+          description: `Account creation timestamp`
+        }
+      }
+    });
+
+  Products.js: |
+    cube(`Products`, {
+      // Query bronze products from Iceberg via DuckDB parquet reader
+      // Actual schema: product_id, name, category, price, sku
+      sql: `
+        SELECT *
+        FROM read_parquet('s3://iceberg-bronze/demo/bronze_products/data/*.parquet')
+      `,
+
+      measures: {
+        count: {
+          type: `count`,
+          description: `Total number of products`
+        },
+        averagePrice: {
+          sql: `price`,
+          type: `avg`,
+          description: `Average product price`
+        },
+        totalValue: {
+          sql: `price`,
+          type: `sum`,
+          description: `Sum of all product prices`
+        }
+      },
+
+      dimensions: {
+        id: {
+          sql: `product_id`,
+          type: `number`,
+          primaryKey: true
+        },
+        name: {
+          sql: `name`,
+          type: `string`,
+          description: `Product name`
+        },
+        category: {
+          sql: `category`,
+          type: `string`,
+          description: `Product category`
+        },
+        sku: {
+          sql: `sku`,
+          type: `string`,
+          description: `Stock keeping unit`
+        },
+        price: {
+          sql: `price`,
+          type: `number`,
+          description: `Current product price`
+        }
+      }
+    });
+
+# No ingress for local testing - use port-forward
+ingress:
+  enabled: false

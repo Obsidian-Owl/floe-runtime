@@ -1,0 +1,71 @@
+{{/*
+Cube API Service
+
+Exposes the Cube API server:
+- REST API on port 4000 (default)
+- SQL API on port 15432 (optional, Postgres wire protocol)
+
+Covers: 007-FR-001 (Helm chart for Kubernetes deployment)
+*/}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "floe-cube.fullname" . }}-api
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "floe-cube.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+  {{- with .Values.api.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.api.service.type }}
+  ports:
+    - port: {{ .Values.api.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+      {{- if and (eq .Values.api.service.type "NodePort") .Values.api.service.nodePort }}
+      nodePort: {{ .Values.api.service.nodePort }}
+      {{- end }}
+    {{- if .Values.api.sqlApi.enabled | default false }}
+    - port: {{ .Values.api.sqlApi.port | default 15432 }}
+      targetPort: sql
+      protocol: TCP
+      name: sql
+      {{- if and (eq .Values.api.service.type "NodePort") .Values.api.sqlApi.nodePort }}
+      nodePort: {{ .Values.api.sqlApi.nodePort }}
+      {{- end }}
+    {{- end }}
+  selector:
+    {{- include "floe-cube.api.selectorLabels" . | nindent 4 }}
+---
+{{/*
+Cube Store Service (if enabled)
+
+Internal service for Cube Store router connections.
+*/}}
+{{- if .Values.cubeStore.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "floe-cube.fullname" . }}-store
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "floe-cube.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cube-store
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3030
+      targetPort: router
+      protocol: TCP
+      name: router
+    - port: 3031
+      targetPort: worker
+      protocol: TCP
+      name: worker
+  selector:
+    {{- include "floe-cube.cubeStore.selectorLabels" . | nindent 4 }}
+{{- end }}

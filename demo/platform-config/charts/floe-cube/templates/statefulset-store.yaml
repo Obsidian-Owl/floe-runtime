@@ -1,0 +1,131 @@
+{{/*
+Cube Store StatefulSet
+
+Deploys Cube Store for distributed pre-aggregation caching:
+- Router: Coordinates queries across workers
+- Workers: Store and process pre-aggregated data
+
+Cube Store provides:
+- Distributed caching for pre-aggregations
+- Columnar storage for fast analytics
+- Automatic data distribution across workers
+
+Note: For most deployments, using external storage (S3/GCS) with
+CUBEJS_EXT_DB_* is recommended over self-hosted Cube Store.
+Enable this only for air-gapped or special performance requirements.
+
+Covers: 007-FR-001 (Helm chart for Kubernetes deployment)
+Covers: 007-FR-002 (Cube semantic layer deployment)
+*/}}
+{{- if .Values.cubeStore.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "floe-cube.fullname" . }}-store
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "floe-cube.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cube-store
+spec:
+  serviceName: {{ include "floe-cube.fullname" . }}-store
+  replicas: {{ .Values.cubeStore.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "floe-cube.cubeStore.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- if .Values.cubeStore.podAnnotations }}
+        {{- toYaml .Values.cubeStore.podAnnotations | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "floe-cube.cubeStore.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 | default "{}" }}
+      containers:
+        - name: cube-store
+          image: {{ .Values.cubeStore.image.repository | default "cubejs/cubestore" }}:{{ .Values.cubeStore.image.tag | default "v0.36" }}
+          imagePullPolicy: {{ .Values.cubeStore.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: router
+              containerPort: 3030
+              protocol: TCP
+            - name: worker
+              containerPort: 3031
+              protocol: TCP
+          env:
+            - name: CUBESTORE_SERVER_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: CUBESTORE_META_PORT
+              value: "9999"
+            - name: CUBESTORE_WORKERS
+              value: {{ include "floe-cube.fullname" . }}-store-0:3031
+            - name: CUBESTORE_DATA_DIR
+              value: /cube/data
+            {{- with .Values.cubeStore.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            tcpSocket:
+              port: router
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket:
+              port: router
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.cubeStore.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /cube/data
+            {{- with .Values.cubeStore.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if .Values.cubeStore.persistence.enabled | default false }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "floe-cube.cubeStore.selectorLabels" . | nindent 10 }}
+      spec:
+        accessModes:
+          - {{ .Values.cubeStore.persistence.accessMode | default "ReadWriteOnce" }}
+        {{- if .Values.cubeStore.persistence.storageClass }}
+        storageClassName: {{ .Values.cubeStore.persistence.storageClass }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.cubeStore.persistence.size | default "10Gi" }}
+  {{- else }}
+  # Ephemeral storage (data lost on pod restart)
+  # Use cubeStore.persistence.enabled=true for production
+      volumes:
+        - name: data
+          emptyDir: {}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,115 @@
+{{/*
+Helm Test: Deployment Smoke Tests
+
+Verifies that the Dagster deployment is healthy:
+1. Webserver responds to health checks
+2. Daemon is running with healthy threads
+3. Schedules are registered and running
+
+Run with: helm test <release-name> -n <namespace>
+*/}}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "floe-dagster.fullname" . }}-test-deployment
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "floe-dagster.labels" . | nindent 4 }}
+    app.kubernetes.io/component: test
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  restartPolicy: Never
+  containers:
+    - name: smoke-test
+      image: curlimages/curl:latest
+      imagePullPolicy: IfNotPresent
+      command:
+        - sh
+        - -c
+        - |
+          set -e
+          echo "=== Floe Dagster Deployment Smoke Tests ==="
+          echo ""
+
+          # Configuration
+          WEBSERVER_URL="http://{{ .Release.Name }}-dagster-webserver:80"
+          MAX_RETRIES=30
+          RETRY_DELAY=2
+
+          # Test 1: Webserver health check
+          echo "Test 1: Checking Dagster webserver health..."
+          ATTEMPTS=0
+          while [ $ATTEMPTS -lt $MAX_RETRIES ]; do
+            if curl -sf "$WEBSERVER_URL/server_info" > /dev/null 2>&1; then
+              echo "  ✓ Webserver is healthy"
+              break
+            fi
+            ATTEMPTS=$((ATTEMPTS + 1))
+            echo "  Attempt $ATTEMPTS/$MAX_RETRIES: Webserver not ready, waiting ${RETRY_DELAY}s..."
+            sleep $RETRY_DELAY
+          done
+
+          if [ $ATTEMPTS -ge $MAX_RETRIES ]; then
+            echo "  ✗ Webserver did not respond after $((MAX_RETRIES * RETRY_DELAY))s"
+            exit 1
+          fi
+
+          # Test 2: Daemon health check via GraphQL
+          echo ""
+          echo "Test 2: Checking Dagster daemon health..."
+          ATTEMPTS=0
+          while [ $ATTEMPTS -lt $MAX_RETRIES ]; do
+            HEALTH=$(curl -sf "$WEBSERVER_URL/graphql" \
+              -H "Content-Type: application/json" \
+              -d '{"query":"{ instance { daemonHealth { allDaemonStatuses { daemonType healthy } } } }"}' 2>/dev/null || echo '{}')
+
+            if echo "$HEALTH" | grep -q '"healthy":true'; then
+              echo "  ✓ Daemon threads are healthy"
+              # Show daemon status
+              echo "$HEALTH" | grep -o '"daemonType":"[^"]*"' | head -5 | while read line; do
+                TYPE=$(echo "$line" | cut -d'"' -f4)
+                echo "    - $TYPE: running"
+              done
+              break
+            fi
+            ATTEMPTS=$((ATTEMPTS + 1))
+            echo "  Attempt $ATTEMPTS/$MAX_RETRIES: Daemon not fully healthy, waiting ${RETRY_DELAY}s..."
+            sleep $RETRY_DELAY
+          done
+
+          if [ $ATTEMPTS -ge $MAX_RETRIES ]; then
+            echo "  ⚠ Daemon health check timed out (may still be initializing)"
+          fi
+
+          # Test 3: Schedule verification
+          echo ""
+          echo "Test 3: Checking schedules..."
+          SCHEDULES=$(curl -sf "$WEBSERVER_URL/graphql" \
+            -H "Content-Type: application/json" \
+            -d '{"query":"{ schedulesOrError { ... on Schedules { results { name scheduleState { status } } } } }"}' 2>/dev/null || echo '{}')
+
+          if echo "$SCHEDULES" | grep -q '"status":"RUNNING"'; then
+            echo "  ✓ Found RUNNING schedules:"
+            echo "$SCHEDULES" | grep -o '"name":"[^"]*","scheduleState":{"status":"[^"]*"}' | while read line; do
+              NAME=$(echo "$line" | grep -o '"name":"[^"]*"' | cut -d'"' -f4)
+              STATUS=$(echo "$line" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+              echo "    - $NAME: $STATUS"
+            done
+          else
+            echo "  ⚠ No RUNNING schedules found"
+            echo "  Schedules may be registered but not yet started"
+          fi
+
+          echo ""
+          echo "=== Smoke tests completed ==="
+          exit 0
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi

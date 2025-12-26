@@ -1,0 +1,70 @@
+{{/*
+Cube Schema ConfigMap
+
+Mounts Cube schema files (data model definitions) into the Cube containers.
+Schemas define:
+- Cubes (data models with measures and dimensions)
+- Views (simplified cube combinations)
+- Pre-aggregations (performance optimizations)
+
+The schema can be:
+1. Provided inline via values.schema
+2. Generated from floe compile and mounted from CompiledArtifacts
+
+Covers: 007-FR-001 (Helm chart for Kubernetes deployment)
+Covers: 007-FR-002 (Cube semantic layer deployment)
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "floe-cube.schemaConfigMapName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "floe-cube.labels" . | nindent 4 }}
+    app.kubernetes.io/component: schema
+data:
+  {{- if .Values.schema }}
+  {{/*
+  Inline schema files from values.yaml.
+  Example:
+    schema:
+      orders.js: |
+        cube(`Orders`, {
+          sql: `SELECT * FROM orders`,
+          measures: { count: { type: `count` } },
+          dimensions: { status: { sql: `status`, type: `string` } }
+        });
+  */}}
+  {{- range $filename, $content := .Values.schema }}
+  {{ $filename }}: |
+{{ $content | indent 4 }}
+  {{- end }}
+  {{- else }}
+  {{/*
+  Default placeholder schema.
+  Replace with actual schema via:
+  - values.schema (inline)
+  - ConfigMap from floe compile output
+  - Volume mount from persistent storage
+  */}}
+  placeholder.js: |
+    // Placeholder Cube schema
+    // Replace with actual schema via values.schema or external ConfigMap
+    //
+    // Example:
+    // cube(`Orders`, {
+    //   sql: `SELECT * FROM orders`,
+    //   measures: {
+    //     count: { type: `count` },
+    //     revenue: { sql: `amount`, type: `sum` }
+    //   },
+    //   dimensions: {
+    //     status: { sql: `status`, type: `string` },
+    //     createdAt: { sql: `created_at`, type: `time` }
+    //   }
+    // });
+    //
+    // For floe-runtime, use:
+    //   floe compile
+    // to generate Cube schema from CompiledArtifacts
+  {{- end }}

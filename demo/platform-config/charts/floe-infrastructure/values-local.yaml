@@ -1,0 +1,263 @@
+# Local development values for floe-infrastructure
+# Optimized for Docker Desktop Kubernetes
+# Uses emptyDir instead of PVCs (Docker Desktop hostpath provisioner is unreliable)
+
+# Platform Configuration (Two-Tier Architecture)
+# This ConfigMap is mounted by Dagster pods to load platform.yaml at runtime
+platformConfig:
+  enabled: true
+  # Uses the default minimal config from the template
+  # To use custom config: --set-file platformConfig.content=./platform/local/platform.yaml
+#
+# Storage Strategy:
+# - LocalStack is enabled for AWS-compatible S3 + STS + IAM (production-aligned)
+# - MinIO is disabled (LocalStack provides S3)
+# - LocalStack enables credential vending via STS (MinIO cannot do this)
+#
+# Network Access Strategy:
+# - NodePort services for resilient external access (survives pod restarts)
+# - No manual port-forwarding required
+# - Access via localhost:<nodePort> on Docker Desktop
+#
+# Service URLs (after deployment):
+#   Dagster UI:      http://localhost:30000  (requires floe-dagster chart)
+#   Polaris API:     http://localhost:30181
+#   LocalStack:      http://localhost:30566  (S3, STS, IAM, Secrets Manager)
+#   Jaeger UI:       http://localhost:30686
+#   Marquez API:     http://localhost:30500
+#   Marquez Web:     http://localhost:30301
+
+# ==============================================================================
+# External Access Configuration (NodePort for local development)
+# ==============================================================================
+# These NodePorts provide resilient access that survives pod restarts.
+# Port pattern: 30xxx where xxx matches the last 3-4 digits of the internal port.
+localAccess:
+  enabled: true
+  nodeports:
+    dagster: 30000        # Internal 3000 → External 30000 (floe-dagster chart)
+    polaris: 30181        # Internal 8181 → External 30181
+    marquezApi: 30500     # Internal 5000 → External 30500
+    marquezWeb: 30301     # Internal 3001 → External 30301
+    localstack: 30566     # Internal 4566 → External 30566 (replaces MinIO)
+    jaeger: 30686         # Internal 16686 → External 30686
+
+# PostgreSQL - minimal resources, no persistence
+postgresql:
+  enabled: true
+  image:
+    tag: latest  # Use latest tag for compatibility
+  auth:
+    postgresPassword: "floe-postgres"
+    database: "dagster"
+  primary:
+    persistence:
+      enabled: false  # Uses emptyDir - data is ephemeral
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    # Fast health checks for local dev
+    livenessProbe:
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      failureThreshold: 3
+    readinessProbe:
+      initialDelaySeconds: 5
+      periodSeconds: 5
+      failureThreshold: 3
+
+# MinIO - DISABLED (LocalStack provides S3)
+# To use MinIO instead of LocalStack, set minio.enabled=true and localstack.enabled=false
+minio:
+  enabled: false  # Disabled - using LocalStack for S3
+
+# LocalStack - AWS service emulator (S3, STS, IAM, Secrets Manager)
+# Provides production-aligned credential vending via STS
+localstack:
+  enabled: true
+  image:
+    repository: localstack/localstack
+    tag: "3.0"
+    pullPolicy: IfNotPresent
+  services: "s3,sts,iam,secretsmanager"
+  region: "us-east-1"
+  debug: "0"
+  persistence:
+    enabled: false  # Uses emptyDir - data is ephemeral
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  # Fast health checks for local dev
+  livenessProbe:
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    failureThreshold: 3
+  # Initialization job
+  init:
+    enabled: true
+    image:
+      repository: amazon/aws-cli
+      tag: "2.15.0"
+      pullPolicy: IfNotPresent
+    # Medallion Architecture: Separate buckets per layer
+    buckets:
+      - name: iceberg-bronze    # Bronze: Raw + lightly cleaned (7yr retention)
+      - name: iceberg-silver    # Silver: Cleaned + enriched (2yr retention)
+      - name: iceberg-gold      # Gold: Aggregated marts (90d retention)
+      - name: cube-preaggs      # Cube: Pre-aggregation cache
+    iamRole:
+      name: "polaris-storage-role"
+    secretsManager:
+      enabled: true  # Store Polaris credentials in Secrets Manager
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+
+# Polaris - minimal resources
+polaris:
+  enabled: true
+  image:
+    repository: apache/polaris
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  # Fast health checks for local dev
+  livenessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    failureThreshold: 3
+
+# Jaeger - all-in-one with memory storage
+# NodePort access via localAccess.nodeports.jaeger (templates/jaeger-nodeport.yaml)
+jaeger:
+  enabled: true
+  provisionDataStore:
+    cassandra: false
+  allInOne:
+    enabled: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  storage:
+    type: memory
+  agent:
+    enabled: false
+  collector:
+    enabled: false
+  query:
+    enabled: false
+
+# Marquez - minimal resources
+# Note: Marquez requires its own PostgreSQL database. The postgres-init job
+# creates the marquez database automatically before Marquez starts.
+marquez:
+  enabled: true
+  image:
+    repository: marquezproject/marquez
+    tag: "0.49.0"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  # Web UI for lineage visualization
+  web:
+    enabled: true
+
+# Polaris initialization for demo
+# Note: These credentials are used for both bootstrap and init
+polarisInit:
+  enabled: true
+  catalogName: "demo_catalog"
+  # Medallion architecture namespaces (bronze/silver/gold)
+  namespaces:
+    - "demo.bronze"  # Raw + lightly cleaned layer
+    - "demo.silver"  # Cleaned + enriched layer
+    - "demo.gold"    # Aggregated marts layer
+  # Default storage location (bronze bucket for backward compatibility)
+  # Individual tables can override with table-specific locations
+  storageLocation: "s3://iceberg-bronze/"
+  oauthClientId: "demo_client"
+  oauthClientSecret: "demo_secret_k8s"
+  # IAM role ARN for credential vending (Polaris uses STS AssumeRole)
+  # This role is created by LocalStack init job with S3 read/write permissions
+  storageRoleArn: "arn:aws:iam::000000000000:role/polaris-storage-role"
+
+# Seed data initialization for demo
+# Creates demo.raw_* tables with synthetic e-commerce data
+# Runs AFTER polaris-init (hook-weight: 10 > 5)
+seedData:
+  enabled: true
+  image:
+    repository: "ghcr.io/obsidian-owl/floe-demo"
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  # AWS credentials for S3 access (LocalStack uses any credentials)
+  awsAccessKeyId: "minioadmin"
+  awsSecretAccessKey: "minioadmin"
+  # Data volume configuration (can be overridden)
+  seed: 42
+  customersCount: 1000
+  productsCount: 100
+  ordersCount: 5000
+  orderItemsCount: 10000
+
+# ==============================================================================
+# Demo Credentials Secret (Three-Tier Architecture)
+# ==============================================================================
+# Creates a K8s Secret with demo credentials for local development.
+# Production deployments should use External Secrets or Sealed Secrets instead.
+#
+# This secret provides:
+#   - Polaris OAuth2 credentials (matches polarisInit above)
+#   - LocalStack AWS credentials (any value works for LocalStack)
+#   - PostgreSQL credentials (matches postgresql.auth above)
+#
+# Consumed by floe-dagster chart via secretKeyRef (not plain values).
+# Covers: Three-Tier Architecture (Tier 3 - K8s Secret Management)
+demoCredentials:
+  enabled: true
+  # Polaris OAuth2 (matches polarisInit.oauthClientId/Secret)
+  polarisClientId: "demo_client"
+  polarisClientSecret: "demo_secret_k8s"
+  # LocalStack AWS (any credentials work for LocalStack)
+  awsAccessKeyId: "minioadmin"
+  awsSecretAccessKey: "minioadmin"
+  # PostgreSQL (matches postgresql.auth above)
+  postgresqlUsername: "postgres"
+  postgresqlPassword: "floe-postgres"

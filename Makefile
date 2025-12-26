@@ -141,9 +141,9 @@ docker-logs:
 # Lint Helm charts
 helm-lint:
 	@echo "⎈ Linting Helm charts..."
-	@helm lint charts/floe-infrastructure/
-	@helm lint charts/floe-dagster/
-	@helm lint charts/floe-cube/
+	@helm lint $(DEMO_CHARTS_DIR)/floe-infrastructure/
+	@helm lint $(DEMO_CHARTS_DIR)/floe-dagster/
+	@helm lint $(DEMO_CHARTS_DIR)/floe-cube/
 
 # Run Helm chart validation tests
 test-helm:
@@ -168,19 +168,20 @@ test-helm:
 # ==============================================================================
 
 FLOE_NAMESPACE := floe
-# Two-Tier Architecture: Platform config file for K8s deployment
+# Three-Tier Architecture: Platform config file for K8s deployment
 # Uses K8s service names (floe-infra-minio, floe-infra-polaris, etc.)
-PLATFORM_FILE := demo/platform/platform.yaml
+PLATFORM_FILE := demo/platform-config/platform/local/platform.yaml
+DEMO_CHARTS_DIR := demo/platform-config/charts
 
 # Deploy infrastructure layer (MinIO, Polaris, PostgreSQL, Jaeger, Marquez)
-# Two-Tier Architecture: Injects platform.yaml as ConfigMap for apps to consume
+# Three-Tier Architecture: Injects platform.yaml as ConfigMap for apps to consume
 deploy-local-infra:
-	@echo "⎈ Deploying floe-infrastructure to Kubernetes (Two-Tier Architecture)..."
+	@echo "⎈ Deploying floe-infrastructure to Kubernetes (Three-Tier Architecture)..."
 	@echo "   Platform config: $(PLATFORM_FILE)"
-	@helm dependency update charts/floe-infrastructure/
-	helm upgrade --install floe-infra charts/floe-infrastructure/ \
+	@helm dependency update $(DEMO_CHARTS_DIR)/floe-infrastructure/
+	helm upgrade --install floe-infra $(DEMO_CHARTS_DIR)/floe-infrastructure/ \
 		--namespace $(FLOE_NAMESPACE) --create-namespace \
-		--values charts/floe-infrastructure/values-local.yaml \
+		--values $(DEMO_CHARTS_DIR)/floe-infrastructure/values-local.yaml \
 		--set platformConfig.enabled=true \
 		--set-file platformConfig.content=$(PLATFORM_FILE) \
 		--wait --timeout 5m
@@ -194,12 +195,12 @@ deploy-local-infra:
 	@echo "✅ Polaris initialized!"
 
 # Deploy Dagster orchestration layer
-# Two-Tier Architecture: Mounts platform ConfigMap from infrastructure chart
+# Three-Tier Architecture: Mounts platform ConfigMap from infrastructure chart
 deploy-local-dagster:
-	@echo "⎈ Deploying floe-dagster to Kubernetes (Two-Tier Architecture)..."
-	helm upgrade --install floe-dagster charts/floe-dagster/ \
+	@echo "⎈ Deploying floe-dagster to Kubernetes (Three-Tier Architecture)..."
+	helm upgrade --install floe-dagster $(DEMO_CHARTS_DIR)/floe-dagster/ \
 		--namespace $(FLOE_NAMESPACE) \
-		--values charts/floe-dagster/values-local.yaml \
+		--values $(DEMO_CHARTS_DIR)/floe-dagster/values-local.yaml \
 		--wait --timeout 5m
 	@echo "✅ Dagster deployed!"
 	@echo ""
@@ -212,9 +213,9 @@ deploy-local-dagster:
 # Deploy Cube semantic layer
 deploy-local-cube:
 	@echo "⎈ Deploying floe-cube to Kubernetes..."
-	helm upgrade --install floe-cube charts/floe-cube/ \
+	helm upgrade --install floe-cube $(DEMO_CHARTS_DIR)/floe-cube/ \
 		--namespace $(FLOE_NAMESPACE) \
-		--values charts/floe-cube/values-local.yaml \
+		--values $(DEMO_CHARTS_DIR)/floe-cube/values-local.yaml \
 		--wait --timeout 5m
 	@echo "✅ Cube deployed!"
 	@echo ""

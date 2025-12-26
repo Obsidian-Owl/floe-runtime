@@ -1,0 +1,258 @@
+# Production Platform Configuration
+#
+# Environment: production
+# Purpose: AWS EKS production cluster (multi-AZ, high availability)
+# Schema Version: 1.1.0 (Enterprise features)
+#
+# Three-Tier Configuration Architecture:
+# - This file is managed by platform engineers in the platform-config repo
+# - Contains infrastructure endpoints and credential **references**
+# - Data engineers reference logical profiles by name in floe.yaml
+#
+# Usage:
+#   floe compile --platform=platform-config-v1.2.3/platform/prod/platform.yaml
+#   helm install floe-dagster --set-file floe.platformSpec.content=platform/prod/platform.yaml
+#
+# Required environment variables (from AWS Secrets Manager via External Secrets):
+#   POLARIS_CLIENT_ID      - OAuth2 client ID for Polaris
+#   POLARIS_CLIENT_SECRET  - OAuth2 client secret for Polaris
+#   (Credentials use IRSA - no static keys)
+#
+# Infrastructure:
+#   - Storage: AWS S3 (multi-region replication)
+#   - Catalog: Polaris (HA deployment)
+#   - Observability: AWS X-Ray + CloudWatch + Managed Grafana + Marquez
+#
+# Covers: 009-US2 (Same floe.yaml works across dev/staging/prod)
+
+version: "1.1.0"
+
+# =============================================================================
+# Infrastructure Configuration (v1.1.0)
+# =============================================================================
+infrastructure:
+  network:
+    enabled: true
+    dns:
+      internal_domain: prod.floe.internal
+      strategy: kubernetes
+  cloud:
+    provider: aws
+    region: us-east-1
+    account_id: "999888777666"  # Replace with actual prod account ID
+    multi_region:
+      enabled: true
+      regions:
+        - us-east-1
+        - us-west-2
+
+# =============================================================================
+# Security Configuration (v1.1.0)
+# =============================================================================
+security:
+  authentication:
+    enabled: true
+    method: oauth2
+    mfa_required: true
+  authorization:
+    enabled: true
+    rbac:
+      enabled: true
+    abac:
+      enabled: true
+  secret_backends:
+    primary: external_secrets
+    external_secrets:
+      enabled: true
+      provider: aws_secrets_manager
+      region: us-east-1
+      rotation_enabled: true
+      rotation_days: 90
+    kubernetes:
+      enabled: true
+      namespace: floe
+      mount_path: /var/run/secrets
+  encryption:
+    in_transit:
+      enabled: true
+      tls_version: "1.3"
+      cipher_suites:
+        - TLS_AES_256_GCM_SHA384
+        - TLS_CHACHA20_POLY1305_SHA256
+    at_rest:
+      enabled: true
+      kms_key_id: "arn:aws:kms:us-east-1:999888777666:key/prod-key-id"
+      multi_region_key: true
+  audit:
+    enabled: true
+    log_all_access: true
+    retention_days: 2555  # 7 years for compliance
+
+# =============================================================================
+# Governance Configuration (v1.1.0)
+# =============================================================================
+governance:
+  classifications:
+    enabled: true
+    default_classification: confidential
+    enforce_classification: true
+  retention:
+    enabled: true
+    default_retention_days: 2555  # 7 years
+    enforce_retention: true
+  compliance:
+    enabled: true
+    frameworks:
+      - SOC2
+      - GDPR
+      - HIPAA
+      - PCI-DSS
+    enforce_compliance: true
+  data_quality:
+    enabled: true
+    validation_level: strict
+    block_on_failure: true
+  pii_detection:
+    enabled: true
+    scan_all_data: true
+
+# =============================================================================
+# Storage Profiles - Medallion Architecture (Bronze/Silver/Gold)
+# =============================================================================
+storage:
+  # Bronze Layer: Raw and lightly cleaned data
+  # Retention: 7 years, Replication: Multi-region, Encryption: KMS
+  bronze:
+    type: s3
+    region: us-east-1
+    bucket: floe-prod-iceberg-bronze
+    path_style_access: false
+    replication:
+      enabled: true
+      destination_region: us-west-2
+    lifecycle:
+      transition_to_glacier: 90  # After 90 days
+      expiration_days: 2555  # 7 years
+    credentials:
+      mode: iam_role
+      role_arn: "arn:aws:iam::999888777666:role/floe-prod-bronze-access"
+
+  # Silver Layer: Cleaned, deduplicated, enriched data
+  # Retention: 2 years, Replication: Multi-region
+  silver:
+    type: s3
+    region: us-east-1
+    bucket: floe-prod-iceberg-silver
+    path_style_access: false
+    replication:
+      enabled: true
+      destination_region: us-west-2
+    lifecycle:
+      transition_to_glacier: 365  # After 1 year
+      expiration_days: 730  # 2 years
+    credentials:
+      mode: iam_role
+      role_arn: "arn:aws:iam::999888777666:role/floe-prod-silver-access"
+
+  # Gold Layer: Aggregated marts for analytics
+  # Retention: 90 days, High IOPS for analytics workloads
+  gold:
+    type: s3
+    region: us-east-1
+    bucket: floe-prod-iceberg-gold
+    path_style_access: false
+    replication:
+      enabled: false  # Short retention, no replication needed
+    lifecycle:
+      expiration_days: 90
+    credentials:
+      mode: iam_role
+      role_arn: "arn:aws:iam::999888777666:role/floe-prod-gold-access"
+
+  # Default alias points to bronze
+  default:
+    type: s3
+    region: us-east-1
+    bucket: floe-prod-iceberg-bronze
+    path_style_access: false
+    credentials:
+      mode: iam_role
+      role_arn: "arn:aws:iam::999888777666:role/floe-prod-bronze-access"
+
+catalogs:
+  default:
+    type: polaris
+    # Polaris HA deployment (internal EKS service with ALB)
+    uri: "https://polaris.prod.floe.internal/api/catalog"
+    warehouse: prod_catalog
+    namespace: default
+    credentials:
+      mode: oauth2
+      client_id:
+        secret_ref: polaris-client-id
+      client_secret:
+        secret_ref: polaris-client-secret
+      scope: "PRINCIPAL_ROLE:DATA_ENGINEER"
+    # Enable vended credentials for temporary S3 access via STS
+    access_delegation: vended-credentials
+    token_refresh_enabled: true
+    high_availability:
+      enabled: true
+      replicas: 3
+      read_replicas: 2
+
+compute:
+  default:
+    type: duckdb
+    properties:
+      path: ":memory:"
+      threads: 16  # Production-grade resources
+      max_memory: "16GB"
+    credentials:
+      mode: static
+
+# =============================================================================
+# Observability Configuration (Extended in v1.1.0)
+# =============================================================================
+observability:
+  traces: true
+  metrics: true
+  lineage: true
+  # AWS X-Ray for distributed tracing
+  otlp_endpoint: "https://xray.us-east-1.amazonaws.com"
+  # Marquez HA deployment for data lineage
+  lineage_endpoint: "https://marquez.prod.floe.internal/api/v1/lineage"
+  attributes:
+    service.name: floe-prod
+    deployment.environment: production
+    cloud.provider: aws
+    cloud.region: us-east-1
+    compliance.frameworks: "SOC2,GDPR,HIPAA,PCI-DSS"
+  # Extended tracing configuration (v1.1.0)
+  tracing:
+    sampling:
+      sampling_type: probabilistic
+      probability: 0.05  # 5% sampling for cost control
+    exporters:
+      jaeger: false
+      xray: true
+    retention_days: 90
+  # Extended metrics configuration (v1.1.0)
+  metrics_config:
+    scrape_interval: "60s"
+    retention_days: 365
+    exporters:
+      prometheus: true
+      cloudwatch: true
+    alarms:
+      enabled: true
+      sns_topic: "arn:aws:sns:us-east-1:999888777666:floe-prod-alerts"
+  # Extended logging configuration (v1.1.0)
+  logging:
+    level: WARN  # Reduce noise in production
+    log_format: json
+    backends:
+      loki: false
+      cloudwatch: true
+    retention_days: 365
+    log_sampling: 0.1  # Sample 10% of logs for cost control
