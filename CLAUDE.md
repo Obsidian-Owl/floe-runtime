@@ -106,3 +106,10 @@ Task(docker-log-analyser, "Analyse polaris container for startup errors")
 - [Platform Configuration Guide](docs/platform-config.md) - For platform engineers
 - [Pipeline Configuration Guide](docs/pipeline-config.md) - For data engineers
 - [Security Architecture](docs/security.md) - Credential flows and access control
+
+## Active Technologies
+- Python 3.10+ (compatible with Dagster 1.6+, dbt-core 1.7+) + Pydantic v2, pydantic-settings, PyYAML, Dagster, dbt-core, dagster-db (010-orchestration-auto-discovery)
+- Iceberg tables via Polaris REST catalog; S3-compatible backends (MinIO, AWS S3) (010-orchestration-auto-discovery)
+
+## Recent Changes
+- 010-orchestration-auto-discovery: Added Python 3.10+ (compatible with Dagster 1.6+, dbt-core 1.7+) + Pydantic v2, pydantic-settings, PyYAML, Dagster, dbt-core, dagster-db
