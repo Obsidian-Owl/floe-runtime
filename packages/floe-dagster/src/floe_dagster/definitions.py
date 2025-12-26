@@ -261,6 +261,97 @@ class FloeDefinitions:
                     e,
                 )
 
+        # Auto-load partitions from orchestration config
+        loaded_partitions: dict[str, Any] = {}
+        if orchestration and orchestration.get("partitions"):
+            try:
+                from floe_core.schemas.partition_definition import (
+                    DynamicPartition,
+                    MultiPartition,
+                    StaticPartition,
+                    TimeWindowPartition,
+                )
+                from floe_dagster.loaders.partition_loader import load_partitions
+
+                partition_configs = orchestration["partitions"]
+                partition_definitions = {}
+
+                for partition_name, partition_config in partition_configs.items():
+                    partition_type = partition_config.get("type")
+                    if partition_type == "time_window":
+                        partition_definitions[partition_name] = TimeWindowPartition(
+                            **partition_config
+                        )
+                    elif partition_type == "static":
+                        partition_definitions[partition_name] = StaticPartition(**partition_config)
+                    elif partition_type == "multi":
+                        partition_definitions[partition_name] = MultiPartition(**partition_config)
+                    elif partition_type == "dynamic":
+                        partition_definitions[partition_name] = DynamicPartition(**partition_config)
+
+                loaded_partitions = load_partitions(partition_definitions)
+                logger.info(
+                    "Auto-loaded %d partitions from orchestration config", len(loaded_partitions)
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to auto-load partitions: %s. Partitions will not be available.",
+                    e,
+                )
+
+        # Auto-load jobs from orchestration config
+        if orchestration and orchestration.get("jobs"):
+            try:
+                from floe_core.schemas.job_definition import BatchJob, OpsJob
+                from floe_dagster.loaders.job_loader import load_jobs
+
+                job_configs = orchestration["jobs"]
+                job_definitions = {}
+
+                for job_name, job_config in job_configs.items():
+                    job_type = job_config.get("type")
+                    if job_type == "batch":
+                        job_definitions[job_name] = BatchJob(**job_config)
+                    elif job_type == "ops":
+                        job_definitions[job_name] = OpsJob(**job_config)
+
+                loaded_jobs = load_jobs(job_definitions)
+                if loaded_jobs:
+                    jobs = list(jobs or [])
+                    jobs.extend(loaded_jobs)
+                    logger.info("Auto-loaded %d jobs from orchestration config", len(loaded_jobs))
+            except Exception as e:
+                logger.warning(
+                    "Failed to auto-load jobs: %s. Jobs will not be available.",
+                    e,
+                )
+
+        # Auto-load schedules from orchestration config
+        if orchestration and orchestration.get("schedules"):
+            try:
+                from floe_core.schemas.schedule_definition import ScheduleDefinition
+                from floe_dagster.loaders.schedule_loader import load_schedules
+
+                schedule_configs = orchestration["schedules"]
+                schedule_definitions = {}
+
+                for schedule_name, schedule_config in schedule_configs.items():
+                    schedule_definitions[schedule_name] = ScheduleDefinition(**schedule_config)
+
+                dagster_jobs = {job.name: job for job in (jobs or [])}
+                loaded_schedules = load_schedules(schedule_definitions, dagster_jobs)
+                if loaded_schedules:
+                    schedules = list(schedules or [])
+                    schedules.extend(loaded_schedules)
+                    logger.info(
+                        "Auto-loaded %d schedules from orchestration config", len(loaded_schedules)
+                    )
+            except Exception as e:
+                logger.warning(
+                    "Failed to auto-load schedules: %s. Schedules will not be available.",
+                    e,
+                )
+
         # Combine all assets
         all_assets: list[Any] = list(assets or [])
 

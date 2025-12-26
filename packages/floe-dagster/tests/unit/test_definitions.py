@@ -478,6 +478,124 @@ class TestFloeDefinitionsFromDict:
             assert len(asset_graph.get_all_asset_keys()) == 1
 
 
+class TestFloeDefinitionsOrchestrationAutoLoading:
+    """Tests for FloeDefinitions orchestration auto-loading."""
+
+    def test_auto_loads_jobs_from_orchestration_config(self) -> None:
+        """Test jobs are auto-loaded from orchestration config."""
+        artifacts = {
+            "version": "2.0.0",
+            "observability": {},
+            "orchestration": {
+                "jobs": {
+                    "bronze_job": {
+                        "type": "batch",
+                        "selection": ["*"],
+                    }
+                }
+            },
+        }
+
+        with patch(
+            "floe_dagster.definitions.ObservabilityOrchestrator.from_compiled_artifacts"
+        ) as mock_orch:
+            mock_orch.return_value = MagicMock()
+
+            result = FloeDefinitions.from_compiled_artifacts(
+                artifacts_dict=artifacts,
+            )
+
+            assert isinstance(result, Definitions)
+            job_def = result.resolve_job_def("bronze_job")
+            assert job_def is not None
+
+    def test_auto_loads_schedules_from_orchestration_config(self) -> None:
+        """Test schedules are auto-loaded from orchestration config."""
+        artifacts = {
+            "version": "2.0.0",
+            "observability": {},
+            "orchestration": {
+                "jobs": {
+                    "bronze_job": {
+                        "type": "batch",
+                        "selection": ["*"],
+                    }
+                },
+                "schedules": {
+                    "daily_bronze": {
+                        "job": "bronze_job",
+                        "cron_schedule": "0 6 * * *",
+                    }
+                },
+            },
+        }
+
+        with patch(
+            "floe_dagster.definitions.ObservabilityOrchestrator.from_compiled_artifacts"
+        ) as mock_orch:
+            mock_orch.return_value = MagicMock()
+
+            result = FloeDefinitions.from_compiled_artifacts(
+                artifacts_dict=artifacts,
+            )
+
+            assert isinstance(result, Definitions)
+            schedule_def = result.resolve_schedule_def("daily_bronze")
+            assert schedule_def is not None
+
+    def test_auto_loads_partitions_from_orchestration_config(self) -> None:
+        """Test partitions are auto-loaded from orchestration config."""
+        artifacts = {
+            "version": "2.0.0",
+            "observability": {},
+            "orchestration": {
+                "partitions": {
+                    "daily": {
+                        "type": "time_window",
+                        "start": "2024-01-01",
+                        "cron_schedule": "0 0 * * *",
+                    }
+                }
+            },
+        }
+
+        with patch(
+            "floe_dagster.definitions.ObservabilityOrchestrator.from_compiled_artifacts"
+        ) as mock_orch:
+            mock_orch.return_value = MagicMock()
+
+            result = FloeDefinitions.from_compiled_artifacts(
+                artifacts_dict=artifacts,
+            )
+
+            assert isinstance(result, Definitions)
+
+    def test_graceful_degradation_on_job_loading_failure(self) -> None:
+        """Test graceful degradation when job loading fails."""
+        artifacts = {
+            "version": "2.0.0",
+            "observability": {},
+            "orchestration": {
+                "jobs": {
+                    "invalid_job": {
+                        "type": "unknown_type",
+                    }
+                }
+            },
+        }
+
+        with patch(
+            "floe_dagster.definitions.ObservabilityOrchestrator.from_compiled_artifacts"
+        ) as mock_orch:
+            mock_orch.return_value = MagicMock()
+
+            result = FloeDefinitions.from_compiled_artifacts(
+                artifacts_dict=artifacts,
+            )
+
+            assert isinstance(result, Definitions)
+
+
 class TestFloeDefinitionsPlatformLoading:
     """Tests for FloeDefinitions platform.yaml auto-loading (Two-Tier Architecture)."""
 
