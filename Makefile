@@ -1,7 +1,7 @@
 # floe-runtime Makefile
 # Provides consistent commands that mirror CI exactly
 
-.PHONY: check lint typecheck security test test-unit test-contract test-integration test-helm helm-lint format install hooks docker-up docker-down docker-logs deploy-local-infra deploy-local-dagster deploy-local-cube deploy-local-full undeploy-local port-forward-all port-forward-stop show-urls demo-status demo-cleanup demo-logs help
+.PHONY: check lint typecheck security test test-unit test-contract test-integration test-helm helm-lint format install hooks docker-up docker-down docker-logs deploy-local-infra deploy-local-dagster deploy-local-cube deploy-local-full undeploy-local port-forward-all port-forward-stop show-urls demo-status demo-cleanup demo-logs demo-image-build demo-image-push help
 
 # Default target
 help:
@@ -44,6 +44,8 @@ help:
 	@echo "  make demo-status          - Show status of all deployed services"
 	@echo "  make demo-logs            - Show logs from floe-demo user deployment"
 	@echo "  make demo-logs-all        - Show logs from all Dagster components"
+	@echo "  make demo-image-build     - Build demo Docker image"
+	@echo "  make demo-image-push      - Build and push demo image to ghcr.io"
 	@echo ""
 	@echo "Setup:"
 	@echo "  make install         - Install dependencies"
@@ -357,3 +359,18 @@ demo-logs-all:
 	@echo ""
 	@echo "--- User Deployment (floe-demo) ---"
 	@kubectl logs -l deployment=floe-demo -n $(FLOE_NAMESPACE) --tail=20 2>/dev/null || true
+
+# Build demo Docker image
+demo-image-build:
+	@echo "🐳 Building demo Docker image..."
+	docker build -t ghcr.io/obsidian-owl/floe-demo:latest -f docker/Dockerfile.demo .
+	@echo "✅ Demo image built: ghcr.io/obsidian-owl/floe-demo:latest"
+
+# Build and push demo image to GitHub Container Registry
+demo-image-push: demo-image-build
+	@echo "🚀 Pushing demo image to ghcr.io..."
+	docker push ghcr.io/obsidian-owl/floe-demo:latest
+	@echo "✅ Demo image pushed: ghcr.io/obsidian-owl/floe-demo:latest"
+	@echo ""
+	@echo "To deploy updated image:"
+	@echo "  kubectl rollout restart deployment/floe-dagster-dagster-user-deployments-floe-demo -n $(FLOE_NAMESPACE)"
