@@ -373,6 +373,52 @@ class FloeDefinitions:
                     e,
                 )
 
+        # Auto-load sensors from orchestration config
+        if orchestration and orchestration.get("sensors"):
+            try:
+                from floe_core.schemas.sensor_definition import (
+                    AssetSensor,
+                    CustomSensor,
+                    FileWatcherSensor,
+                    RunStatusSensor,
+                )
+                from floe_core.schemas.sensor_definition import (
+                    SensorDefinition as FloeSensorDefinition,
+                )
+                from floe_dagster.loaders.sensor_loader import load_sensors
+
+                sensor_configs = orchestration["sensors"]
+                sensor_definitions: dict[str, FloeSensorDefinition] = {}
+
+                for sensor_name, sensor_config in sensor_configs.items():
+                    sensor_type = sensor_config.get("type")
+                    if sensor_type == "file_watcher":
+                        sensor_definitions[sensor_name] = FileWatcherSensor(**sensor_config)
+                    elif sensor_type == "asset_sensor":
+                        sensor_definitions[sensor_name] = AssetSensor(**sensor_config)
+                    elif sensor_type == "run_status":
+                        sensor_definitions[sensor_name] = RunStatusSensor(**sensor_config)
+                    elif sensor_type == "custom":
+                        sensor_definitions[sensor_name] = CustomSensor(**sensor_config)
+
+                dagster_jobs_for_sensors: dict[str, JobDefinition] = {}
+                for job in jobs or []:
+                    if hasattr(job, "name"):
+                        dagster_jobs_for_sensors[job.name] = job  # type: ignore[assignment]
+
+                loaded_sensors = load_sensors(sensor_definitions, dagster_jobs_for_sensors)
+                if loaded_sensors:
+                    sensors = list(sensors or [])
+                    sensors.extend(loaded_sensors)
+                    logger.info(
+                        "Auto-loaded %d sensors from orchestration config", len(loaded_sensors)
+                    )
+            except Exception as e:
+                logger.warning(
+                    "Failed to auto-load sensors: %s. Sensors will not be available.",
+                    e,
+                )
+
         # Combine all assets
         all_assets: list[Any] = list(assets or [])
 

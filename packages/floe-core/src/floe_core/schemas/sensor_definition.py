@@ -141,8 +141,7 @@ class AssetSensor(BaseModel):
         description="Sensor description (max 500 characters)",
     )
 
-    def __init__(self, **data):
-        # Validate watched assets are non-empty
+    def __init__(self, **data: Any) -> None:
         watched_assets = data.get("watched_assets", [])
         for asset in watched_assets:
             if not asset.strip():
@@ -204,8 +203,7 @@ class RunStatusSensor(BaseModel):
         description="Sensor description (max 500 characters)",
     )
 
-    def __init__(self, **data):
-        # Validate watched jobs use valid identifiers
+    def __init__(self, **data: Any) -> None:
         watched_jobs = data.get("watched_jobs", [])
         for job_name in watched_jobs:
             if not job_name.strip():
