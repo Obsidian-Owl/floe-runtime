@@ -14,9 +14,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Discriminator, Field
 
 # Constants for repeated validation patterns
-FUNCTION_PATH_PATTERN = (
-    r"^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)*\\.[a-zA-Z][a-zA-Z0-9_]*$"
-)
+FUNCTION_PATH_PATTERN = r"^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)*\.[a-zA-Z][a-zA-Z0-9_]*$"
 """Regex pattern for module.function references."""
 
 
