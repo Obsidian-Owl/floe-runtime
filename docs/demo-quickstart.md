@@ -43,12 +43,33 @@ These URLs are **resilient** - they survive pod restarts without needing port-fo
 | Service | URL | Purpose |
 |---------|-----|---------|
 | **Dagster UI** | http://localhost:30000 | Asset orchestration, run monitoring |
-| **Cube REST API** | http://localhost:30400 | Semantic layer queries |
+| **Cube Playground** | http://localhost:30400 | Visual query builder, semantic layer UI |
+| **Cube REST API** | http://localhost:30400/cubejs-api/v1 | Semantic layer queries |
 | **Cube SQL API** | `psql -h localhost -p 30432 -U cube` | Postgres wire protocol |
 | **Marquez UI** | http://localhost:30301 | Data lineage visualization |
 | **Jaeger UI** | http://localhost:30686 | Distributed tracing |
-| **LocalStack** | http://localhost:30566 | S3/STS emulation + Web UI |
+| **LocalStack API** | http://localhost:30566 | S3/STS emulation (API only) |
 | **Polaris API** | http://localhost:30181 | Iceberg REST catalog |
+
+## LocalStack Cloud UI (Optional)
+
+LocalStack Cloud provides a web-based UI for managing your local LocalStack instance:
+
+1. **Create Free Account**: https://app.localstack.cloud (no credit card required)
+
+2. **View S3 Buckets via Cloud UI**:
+   - The LocalStack instance running in K8s automatically connects to LocalStack Cloud
+   - Log in to https://app.localstack.cloud
+   - Navigate to "Resources" → "S3"
+   - View buckets: `iceberg-bronze`, `iceberg-silver`, `iceberg-gold`, `cube-preaggs`
+   - Browse Iceberg data files and metadata
+
+3. **Alternative: LocalStack Desktop** (optional standalone app):
+   - Download from https://app.localstack.cloud/download
+   - Provides local UI with resource browser
+   - Connect to `localhost:30566`
+
+**Note**: LocalStack 3.0 removed the embedded web UI from the API endpoint. The cloud-based UI at app.localstack.cloud is now the primary management interface.
 
 ## Verify Deployment
 

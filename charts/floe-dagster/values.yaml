@@ -33,6 +33,7 @@ dagster:
         port: 80
       periodSeconds: 10
       failureThreshold: 30
+      timeoutSeconds: 10
 
   dagsterDaemon:
     # Reduced heartbeat tolerance for faster detection of hung scheduler
@@ -54,6 +55,7 @@ dagster:
         command: ["dagster-daemon", "liveness-check"]
       periodSeconds: 10
       failureThreshold: 30
+      timeoutSeconds: 10
 
 # Floe-specific configuration
 floe:
