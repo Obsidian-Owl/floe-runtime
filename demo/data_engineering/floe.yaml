@@ -32,6 +32,59 @@ transforms:
     path: "."
     target: demo
 
+# Orchestration configuration (NEW - auto-discovery)
+orchestration:
+  # Auto-discover Python assets from modules
+  asset_modules:
+    - demo.data_engineering.orchestration.assets.bronze
+    - demo.data_engineering.orchestration.assets.ops
+
+  # Auto-load dbt models as individual assets with per-model observability
+  dbt:
+    manifest_path: "demo/data_engineering/dbt/target/manifest.json"
+    project_dir: "demo/data_engineering/dbt"
+
+  # Jobs - declarative asset selection
+  jobs:
+    demo_bronze:
+      type: batch
+      selection: ["group:bronze"]
+      description: "Load bronze layer: raw tables → bronze Iceberg tables"
+
+    demo_pipeline:
+      type: batch
+      selection: ["group:bronze", "group:silver", "group:gold"]
+      description: "Full demo pipeline: bronze → silver → gold"
+
+    maintenance:
+      type: ops
+      target_function: demo.data_engineering.orchestration.assets.ops.vacuum_old_snapshots
+      args:
+        retention_days: 30
+      description: "Vacuum old Iceberg snapshots"
+
+  # Schedules - declarative job scheduling
+  schedules:
+    bronze_refresh_schedule:
+      job: demo_bronze
+      cron_schedule: "*/5 * * * *"
+      description: "Refresh bronze layer every 5 minutes"
+
+    transform_pipeline_schedule:
+      job: demo_pipeline
+      cron_schedule: "*/5 * * * *"
+      description: "Run full transform pipeline every 5 minutes"
+
+  # Sensors - event-driven execution
+  sensors:
+    file_arrival_sensor:
+      type: file_watcher
+      job: demo_bronze
+      path: "/tmp"
+      pattern: "demo_trigger"
+      poll_interval_seconds: 60
+      description: "Trigger pipeline when trigger file appears"
+
 # Semantic layer configuration (Cube)
 consumption:
   enabled: false  # Disabled for initial demo
