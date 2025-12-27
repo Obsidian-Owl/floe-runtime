@@ -112,3 +112,4 @@ compiled_artifacts.json
 # Helm
 charts/*/charts/
 *.tgz
+/evidence/

@@ -70,10 +70,10 @@ postgresql:
       periodSeconds: 5
       failureThreshold: 3
 
-# MinIO - DISABLED (LocalStack provides S3)
-# To use MinIO instead of LocalStack, set minio.enabled=true and localstack.enabled=false
-minio:
-  enabled: false  # Disabled - using LocalStack for S3
+# MinIO - REMOVED (migrated to LocalStack)
+# MinIO has been fully replaced by LocalStack for production-aligned credential vending via STS.
+# The MinIO Helm chart dependency has been removed from Chart.yaml.
+# LocalStack provides S3, STS, IAM, and Secrets Manager - everything MinIO provided plus more.
 
 # LocalStack - AWS service emulator (S3, STS, IAM, Secrets Manager)
 # Provides production-aligned credential vending via STS
@@ -261,3 +261,6 @@ demoCredentials:
   # PostgreSQL (matches postgresql.auth above)
   postgresqlUsername: "postgres"
   postgresqlPassword: "floe-postgres"
+  # Cube semantic layer (consumed by floe-cube chart)
+  cubeApiSecret: "floe-demo-secret-change-in-production"
+  cubeSqlPassword: "cube_password"

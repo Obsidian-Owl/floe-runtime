@@ -1,7 +1,7 @@
 # floe-runtime Makefile
 # Provides consistent commands that mirror CI exactly
 
-.PHONY: check lint typecheck security test test-unit test-contract test-integration test-helm helm-lint format install hooks docker-up docker-down docker-logs deploy-local-infra deploy-local-dagster deploy-local-cube deploy-local-full undeploy-local port-forward-all port-forward-stop show-urls demo-status demo-cleanup demo-logs demo-image-build demo-image-push demo-clean demo-validate demo-quickstart help
+.PHONY: check lint typecheck security test test-unit test-contract test-integration test-helm helm-lint format install hooks docker-up docker-down docker-logs deploy-local-infra deploy-local-dagster deploy-local-cube deploy-local-full undeploy-local port-forward-all port-forward-stop show-urls demo-status demo-cleanup demo-logs demo-image-build demo-image-push demo-clean demo-validate demo-materialize demo-e2e demo-full-e2e demo-quickstart help
 
 # Default target
 help:
@@ -39,8 +39,11 @@ help:
 	@echo ""
 	@echo "Demo Operations:"
 	@echo "  make demo-quickstart      - 🚀 One-command: clean, build, deploy, validate"
+	@echo "  make demo-full-e2e        - 🔬 Deploy + materialize + E2E validation (full pipeline)"
+	@echo "  make demo-materialize     - Trigger Dagster jobs (bronze + full pipeline)"
+	@echo "  make demo-e2e             - E2E validation: data + observability + cube"
 	@echo "  make demo-clean           - Clean deployment (keep images)"
-	@echo "  make demo-validate        - Validate deployment health"
+	@echo "  make demo-validate        - Validate deployment health (pods + endpoints)"
 	@echo "  make show-urls            - Show service URLs (NodePort - resilient access)"
 	@echo "  make port-forward-all     - Start all port-forwards (admin UIs)"
 	@echo "  make port-forward-stop    - Stop all port-forwards"
@@ -391,6 +394,46 @@ demo-clean-all:
 demo-validate:
 	@./scripts/validate-demo.sh
 
-# Quickstart: clean + build + deploy + validate
+# Materialize demo data (automated Dagster job execution)
+# Use DEBUG=1 to enable GraphQL response debugging
+demo-materialize:
+	@DEBUG=$(DEBUG) ./scripts/materialize-demo.sh --all
+
+# E2E validation: data + observability + semantic layer
+demo-e2e:
+	@./scripts/validate-e2e.sh
+
+# Full E2E pipeline: deploy → materialize → validate → evidence
+# Fully automated demo with comprehensive evidence collection
+demo-full-e2e: deploy-local-full
+	@echo ""
+	@echo "=============================================="
+	@echo "⏳ Waiting for all pods to stabilize..."
+	@echo "=============================================="
+	@sleep 30
+	@kubectl wait --for=condition=ready pod --field-selector=status.phase!=Succeeded -n $(FLOE_NAMESPACE) --timeout=300s 2>&1 | grep -v "condition met" | grep -v "no matching resources" || true
+	@echo ""
+	@echo "=============================================="
+	@echo "🚀 Materializing Data Pipeline"
+	@echo "=============================================="
+	@DEBUG=1 ./scripts/materialize-demo.sh --all
+	@echo ""
+	@echo "=============================================="
+	@echo "🔍 Running E2E Validation"
+	@echo "=============================================="
+	@$(MAKE) demo-e2e
+	@echo ""
+	@echo "=============================================="
+	@echo "📊 Evidence Report"
+	@echo "=============================================="
+	@cat ./evidence/latest/SUMMARY.md || echo "⚠️  No evidence generated"
+	@echo ""
+
+# Quickstart: clean + build + deploy + validate (interactive)
 demo-quickstart:
 	@./scripts/quickstart.sh
+
+# Automated quickstart: clean + build + deploy + materialize + validate (no prompts)
+# For CI/CD pipelines - runs E2E validation automatically
+demo-quickstart-auto:
+	@./scripts/quickstart.sh --auto

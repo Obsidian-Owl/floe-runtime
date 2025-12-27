@@ -59,14 +59,27 @@ api:
     # DuckDB S3/LocalStack connection for Iceberg files
     # DuckDB endpoint format: host:port (no http:// prefix)
     # Protocol determined by CUBEJS_DB_DUCKDB_S3_USE_SSL
+    # Values come from platform ConfigMap (Three-Tier Architecture)
     - name: CUBEJS_DB_DUCKDB_S3_ENDPOINT
-      value: "floe-infra-localstack:4566"
+      valueFrom:
+        configMapKeyRef:
+          name: floe-infra-platform-config
+          key: storage.bronze.endpoint
     - name: CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID
-      value: "test"
+      valueFrom:
+        secretKeyRef:
+          name: floe-demo-credentials
+          key: aws-access-key-id
     - name: CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY
-      value: "test"
+      valueFrom:
+        secretKeyRef:
+          name: floe-demo-credentials
+          key: aws-secret-access-key
     - name: CUBEJS_DB_DUCKDB_S3_REGION
-      value: "us-east-1"
+      valueFrom:
+        configMapKeyRef:
+          name: floe-infra-platform-config
+          key: storage.bronze.region
     - name: CUBEJS_DB_DUCKDB_S3_USE_SSL
       value: "false"
     # Path-style URLs required for LocalStack (not virtual-hosted style)
@@ -76,12 +89,18 @@ api:
     - name: CUBEJS_SQL_USER
       value: "cube"
     - name: CUBEJS_SQL_PASSWORD
-      value: "cube_password"
+      valueFrom:
+        secretKeyRef:
+          name: floe-demo-credentials
+          key: cube-sql-password
     - name: CUBEJS_LOG_LEVEL
       value: "debug"
-    # API secret (for demo - use secrets in production)
+    # API secret from K8s secret (Three-Tier Architecture)
     - name: CUBEJS_API_SECRET
-      value: "floe-demo-secret-change-in-production"
+      valueFrom:
+        secretKeyRef:
+          name: floe-demo-credentials
+          key: cube-api-secret
 
 # Cube refresh worker configuration
 refreshWorker:
@@ -100,23 +119,39 @@ refreshWorker:
       memory: 512Mi
 
   # Same environment as API (only unique vars - others set by template/helpers)
+  # Values come from platform ConfigMap (Three-Tier Architecture)
   extraEnv:
     # DuckDB endpoint format: host:port (no http:// prefix)
     - name: CUBEJS_DB_DUCKDB_S3_ENDPOINT
-      value: "floe-infra-localstack:4566"
+      valueFrom:
+        configMapKeyRef:
+          name: floe-infra-platform-config
+          key: storage.bronze.endpoint
     - name: CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID
-      value: "test"
+      valueFrom:
+        secretKeyRef:
+          name: floe-demo-credentials
+          key: aws-access-key-id
     - name: CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY
-      value: "test"
+      valueFrom:
+        secretKeyRef:
+          name: floe-demo-credentials
+          key: aws-secret-access-key
     - name: CUBEJS_DB_DUCKDB_S3_REGION
-      value: "us-east-1"
+      valueFrom:
+        configMapKeyRef:
+          name: floe-infra-platform-config
+          key: storage.bronze.region
     - name: CUBEJS_DB_DUCKDB_S3_USE_SSL
       value: "false"
     # Path-style URLs required for LocalStack (not virtual-hosted style)
     - name: CUBEJS_DB_DUCKDB_S3_URL_STYLE
       value: "path"
     - name: CUBEJS_API_SECRET
-      value: "floe-demo-secret-change-in-production"
+      valueFrom:
+        secretKeyRef:
+          name: floe-demo-credentials
+          key: cube-api-secret
 
 # Pre-aggregation configuration
 preAggregations:
@@ -141,10 +176,11 @@ cubeStore:
     pullPolicy: IfNotPresent
 
   # S3 configuration for pre-aggregation storage (LocalStack)
+  # Note: CubeStore disabled for local demo, but config retained for reference
   s3:
     bucket: "cube-preaggs"
     region: "us-east-1"
-    endpoint: "http://floe-infra-localstack:4566"
+    endpoint: "http://floe-infra-localstack:4566"  # Would use ConfigMap in production
 
   # Minimal resources for local testing
   resources:
@@ -159,17 +195,19 @@ cubeStore:
   persistence:
     enabled: false
 
+  # CubeStore environment (disabled for local demo)
+  # If enabled, would use ConfigMap + secrets for Three-Tier Architecture
   extraEnv:
     - name: CUBESTORE_S3_BUCKET
       value: "cube-preaggs"
     - name: CUBESTORE_S3_ENDPOINT
-      value: "http://floe-infra-localstack:4566"
+      value: "http://floe-infra-localstack:4566"  # Would use ConfigMap if enabled
     - name: CUBESTORE_AWS_ACCESS_KEY_ID
-      value: "test"
+      value: "test"  # Would use secret if enabled
     - name: CUBESTORE_AWS_SECRET_ACCESS_KEY
-      value: "test"
+      value: "test"  # Would use secret if enabled
     - name: CUBESTORE_S3_REGION
-      value: "us-east-1"
+      value: "us-east-1"  # Would use ConfigMap if enabled
 
 # Floe-specific configuration
 # Note: Cube v0.36 uses /cube/conf as base path, so schema must be relative

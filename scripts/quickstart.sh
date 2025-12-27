@@ -14,15 +14,33 @@
 #   - Helm 3.x installed
 #   - uv package manager installed
 #
-# Usage: ./scripts/quickstart.sh [--clean-all]
+# Usage: ./scripts/quickstart.sh [OPTIONS]
+#
+# Options:
 #   --clean-all : Remove Docker images before rebuild (slower)
+#   --auto      : Run E2E validation automatically (no prompts)
 
 set -e
 
+# Parse command line arguments
 CLEAN_ALL_FLAG=""
-if [[ "$1" == "--clean-all" ]]; then
-    CLEAN_ALL_FLAG="--all"
-fi
+AUTO_MODE=false
+
+for arg in "$@"; do
+    case "$arg" in
+        --clean-all)
+            CLEAN_ALL_FLAG="--all"
+            ;;
+        --auto)
+            AUTO_MODE=true
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: $0 [--clean-all] [--auto]"
+            exit 1
+            ;;
+    esac
+done
 
 echo "=============================================="
 echo "🚀 Floe Runtime Quickstart"
@@ -106,12 +124,72 @@ echo "=============================================="
 VALIDATION_EXIT_CODE=$?
 echo ""
 
-# Step 6: Show next steps
+# Step 6: Optional E2E validation
 if [ $VALIDATION_EXIT_CODE -eq 0 ]; then
     echo "=============================================="
     echo "✅ Quickstart Complete!"
     echo "=============================================="
     echo ""
+    # E2E Validation prompt (skip if --auto mode)
+    RUN_E2E=false
+
+    if [ "$AUTO_MODE" = true ]; then
+        echo "🤖 Auto mode: Running E2E validation automatically"
+        RUN_E2E=true
+    else
+        echo "🔬 Optional: Run E2E Validation?"
+        echo ""
+        echo "This will automatically:"
+        echo "  1. Materialize bronze layer (Python assets)"
+        echo "  2. Run full pipeline (bronze → silver → gold)"
+        echo "  3. Validate all data layers"
+        echo "  4. Check Jaeger traces + Marquez lineage"
+        echo "  5. Query Cube semantic layer"
+        echo "  6. Collect evidence"
+        echo ""
+        echo "Estimated time: ~15 minutes"
+        echo ""
+        read -p "Run E2E validation now? [y/N] " -n 1 -r
+        echo
+        echo ""
+
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            RUN_E2E=true
+        fi
+    fi
+
+    if [ "$RUN_E2E" = true ]; then
+        echo "=============================================="
+        echo "6️⃣  E2E Validation Pipeline"
+        echo "=============================================="
+        echo ""
+        ./scripts/materialize-demo.sh --all
+        E2E_MATERIALIZE_EXIT=$?
+        echo ""
+
+        if [ $E2E_MATERIALIZE_EXIT -eq 0 ]; then
+            ./scripts/validate-e2e.sh
+            E2E_VALIDATE_EXIT=$?
+            echo ""
+
+            if [ $E2E_VALIDATE_EXIT -eq 0 ]; then
+                echo "=============================================="
+                echo "✅ E2E Validation Complete!"
+                echo "=============================================="
+                echo ""
+                echo "📁 Evidence collected in: ./evidence/"
+                echo ""
+            else
+                echo "⚠️  E2E validation had some failures (see above)"
+                echo ""
+            fi
+        else
+            echo "⚠️  Data materialization failed - skipping E2E validation"
+            echo ""
+        fi
+    fi
+
+    echo "=============================================="
     echo "🎯 Next Steps:"
     echo ""
     echo "1. Access Dagster UI:"
@@ -140,10 +218,13 @@ if [ $VALIDATION_EXIT_CODE -eq 0 ]; then
     echo "   Docs:   docs/"
     echo ""
     echo "🛠️  Useful commands:"
-    echo "   make demo-status     # Check deployment status"
-    echo "   make demo-logs       # View logs"
-    echo "   make demo-cleanup    # Remove completed pods"
-    echo "   make undeploy-local  # Remove deployment"
+    echo "   make demo-status        # Check deployment status"
+    echo "   make demo-materialize   # Trigger Dagster jobs (automated)"
+    echo "   make demo-e2e           # Run E2E validation"
+    echo "   make demo-full-e2e      # Deploy + materialize + validate (full pipeline)"
+    echo "   make demo-logs          # View logs"
+    echo "   make demo-cleanup       # Remove completed pods"
+    echo "   make undeploy-local     # Remove deployment"
     echo ""
 else
     echo "=============================================="

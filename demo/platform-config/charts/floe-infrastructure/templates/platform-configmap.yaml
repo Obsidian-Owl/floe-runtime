@@ -70,4 +70,16 @@ data:
       otlp_endpoint: {{ include "floe-infrastructure.jaeger.otlp.endpoint" . }}
       lineage_endpoint: {{ include "floe-infrastructure.marquez.endpoint" . }}
 {{- end }}
+
+  # Flattened keys for easy ConfigMap reference by consuming charts
+  # These keys allow charts to use valueFrom.configMapKeyRef without parsing YAML
+  storage.bronze.endpoint: {{ include "floe-infrastructure.storage.endpoint" . | quote }}
+  storage.bronze.region: {{ .Values.localstack.region | default "us-east-1" | quote }}
+  storage.silver.endpoint: {{ include "floe-infrastructure.storage.endpoint" . | quote }}
+  storage.silver.region: {{ .Values.localstack.region | default "us-east-1" | quote }}
+  storage.gold.endpoint: {{ include "floe-infrastructure.storage.endpoint" . | quote }}
+  storage.gold.region: {{ .Values.localstack.region | default "us-east-1" | quote }}
+  catalog.default.uri: {{ printf "%s/api/catalog" (include "floe-infrastructure.polaris.endpoint" .) | quote }}
+  observability.otlp_endpoint: {{ include "floe-infrastructure.jaeger.otlp.endpoint" . | quote }}
+  observability.lineage_endpoint: {{ include "floe-infrastructure.marquez.endpoint" . | quote }}
 {{- end }}

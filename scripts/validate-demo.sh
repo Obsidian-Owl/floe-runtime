@@ -49,9 +49,29 @@ else
     exit 1
 fi
 
-# 2. Pods Health
+# 2. Helm Hook Jobs Status
 echo ""
-echo "2️⃣  Pod Health"
+echo "2️⃣  Helm Hook Jobs (Initialization)"
+# These jobs run once during helm install/upgrade and may have completed and been cleaned up
+for job in polaris-init localstack-init seed-data; do
+    echo -n "  ├─ $job... "
+    # Check if job exists and succeeded
+    if kubectl get job -n "$FLOE_NAMESPACE" "floe-infra-$job" >/dev/null 2>&1; then
+        SUCCEEDED=$(kubectl get job -n "$FLOE_NAMESPACE" "floe-infra-$job" -o jsonpath='{.status.succeeded}' 2>/dev/null || echo "0")
+        if [ "$SUCCEEDED" = "1" ]; then
+            echo "✅ (completed)"
+        else
+            echo "⚠️  (still running or failed)"
+        fi
+    else
+        # Job doesn't exist - likely cleaned up after completion (ttlSecondsAfterFinished)
+        echo "✅ (completed and cleaned up)"
+    fi
+done
+
+# 3. Pods Health
+echo ""
+echo "3️⃣  Pod Health (Running Services)"
 POD_COUNT=$(kubectl get pods -n "$FLOE_NAMESPACE" --no-headers 2>/dev/null | wc -l | tr -d ' ')
 RUNNING_COUNT=$(kubectl get pods -n "$FLOE_NAMESPACE" --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ')
 
@@ -69,16 +89,16 @@ check "Dagster User Deployment" "kubectl get pods -n $FLOE_NAMESPACE -l deployme
 check "Cube API" "kubectl get pods -n $FLOE_NAMESPACE -l app.kubernetes.io/instance=floe-cube,app.kubernetes.io/component=api --no-headers" "Running"
 check "Cube Refresh Worker" "kubectl get pods -n $FLOE_NAMESPACE -l app.kubernetes.io/instance=floe-cube,app.kubernetes.io/component=refresh-worker --no-headers" "Running"
 
-# 3. Services
+# 4. Services
 echo ""
-echo "3️⃣  Service Endpoints"
+echo "4️⃣  Service Endpoints (NodePort Access)"
 check "Dagster UI (NodePort 30000)" "curl -s -o /dev/null -w '%{http_code}' http://localhost:30000" "200"
 check "Cube API (NodePort 30400)" "curl -s -o /dev/null -w '%{http_code}' http://localhost:30400/readyz" "200"
 check "Jaeger UI (NodePort 30686)" "curl -s -o /dev/null -w '%{http_code}' http://localhost:30686" "200"
 
-# 4. Infrastructure Health
+# 5. Infrastructure Health
 echo ""
-echo "4️⃣  Infrastructure Services"
+echo "5️⃣  Infrastructure Services (Internal)"
 
 # Check Polaris catalog
 POLARIS_POD=$(kubectl get pods -n "$FLOE_NAMESPACE" --selector=app.kubernetes.io/instance=floe-infra,app.kubernetes.io/component=polaris -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")

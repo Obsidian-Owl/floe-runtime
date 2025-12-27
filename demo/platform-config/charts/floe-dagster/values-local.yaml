@@ -198,8 +198,7 @@ dagster:
     config:
       k8sRunLauncher:
         envSecrets: []
-        envConfigMaps:
-          - name: dagster-run-env
+        # envConfigMaps: []  # No additional ConfigMaps needed - env comes from user deployment
 
 # Floe-specific configuration
 floe:
