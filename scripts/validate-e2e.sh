@@ -139,9 +139,10 @@ if [ -n "$LOCALSTACK_POD" ]; then
 
         FILE_COUNT=$(kubectl exec -n "$FLOE_NAMESPACE" "$LOCALSTACK_POD" -- \
             awslocal s3 ls "s3://iceberg-silver/demo/" --recursive 2>/dev/null \
-            | grep -c "$table" || echo "0")
+            | grep -c "$table" 2>/dev/null || echo "0")
+        FILE_COUNT=$(echo "$FILE_COUNT" | tr -d '\n' | head -1)
 
-        if [ "$FILE_COUNT" -gt 0 ]; then
+        if [ "$FILE_COUNT" -gt 0 ] 2>/dev/null; then
             echo "✅ ($FILE_COUNT files)"
         else
             echo "⚠️  (no data - run full pipeline first)"
@@ -162,9 +163,10 @@ if [ -n "$LOCALSTACK_POD" ]; then
 
         FILE_COUNT=$(kubectl exec -n "$FLOE_NAMESPACE" "$LOCALSTACK_POD" -- \
             awslocal s3 ls "s3://iceberg-gold/demo/" --recursive 2>/dev/null \
-            | grep -c "$table" || echo "0")
+            | grep -c "$table" 2>/dev/null || echo "0")
+        FILE_COUNT=$(echo "$FILE_COUNT" | tr -d '\n' | head -1)
 
-        if [ "$FILE_COUNT" -gt 0 ]; then
+        if [ "$FILE_COUNT" -gt 0 ] 2>/dev/null; then
             echo "✅ ($FILE_COUNT files)"
         else
             echo "⚠️  (no data - run full pipeline first)"
