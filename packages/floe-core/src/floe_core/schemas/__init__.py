@@ -104,6 +104,8 @@ from floe_core.schemas.job_definition import BatchJob, JobDefinition, OpsJob
 from floe_core.schemas.observability import (
     AlertRule,
     AlertSeverity,
+    ComputeLogManagerType,
+    ComputeLogsConfig,
     LogFormat,
     LoggingBackendsConfig,
     LoggingConfig,
@@ -286,6 +288,8 @@ __all__: list[str] = [
     "LoggingBackendsConfig",
     "LogLevel",
     "LogFormat",
+    "ComputeLogsConfig",
+    "ComputeLogManagerType",
     # Catalog (legacy)
     "CatalogConfig",
     # Orchestration (Feature 010)

@@ -67,7 +67,25 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Layer 5: Generate dbt manifest for FloeAssetFactory
 # The manifest.json is required for @dbt_assets decorator and per-model observability
 WORKDIR /app/demo/data_engineering/dbt
-RUN /app/.venv/bin/dbt deps && /app/.venv/bin/dbt compile --target dev || true
+
+# Install dbt dependencies
+RUN /app/.venv/bin/dbt deps
+
+# Generate minimal profiles.yml for build-time manifest generation
+# This will be replaced at runtime by DbtProfilesGenerator with real platform config
+RUN mkdir -p /app/demo/data_engineering/dbt && \
+    echo "floe_demo:" > profiles.yml && \
+    echo "  target: dev" >> profiles.yml && \
+    echo "  outputs:" >> profiles.yml && \
+    echo "    dev:" >> profiles.yml && \
+    echo "      type: duckdb" >> profiles.yml && \
+    echo "      path: ':memory:'" >> profiles.yml && \
+    echo "      threads: 4" >> profiles.yml
+
+# Run dbt parse to generate manifest.json (doesn't need DB connection)
+# This ensures manifest exists before Python module import
+RUN /app/.venv/bin/dbt parse --profiles-dir /app/demo/data_engineering/dbt
+
 WORKDIR /app
 
 # =============================================================================
@@ -75,7 +93,10 @@ WORKDIR /app
 # =============================================================================
 FROM python:3.12-slim-bookworm AS runtime
 
-WORKDIR /app
+# Set working directory to demo/ (parent of data_engineering package)
+# This allows Python to import data_engineering module
+# FloeDefinitions will find floe.yaml at data_engineering/floe.yaml (relative to CWD)
+WORKDIR /app/demo
 
 # Install only runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -97,7 +118,10 @@ COPY --from=builder /app/demo /app/demo
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app
+
+# Copy and setup entrypoint script
+COPY docker/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 # Set ownership
 RUN chown -R dagster:dagster /app
@@ -112,8 +136,10 @@ EXPOSE 3030
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD python -c "import socket; s=socket.socket(); s.connect(('localhost', 3030)); s.close()" || exit 1
 
+# Entrypoint: Generates profiles.yml, runs dbt compile, then exec's CMD
+ENTRYPOINT ["/app/entrypoint.sh"]
+
 # Default command: Dagster gRPC code server
-# Serves the demo.data_engineering.orchestration.definitions module
-# NOTE: Using CMD instead of ENTRYPOINT so K8s Run Launcher can override
-# the command when executing pipeline runs (dagster api execute_run ...)
-CMD ["dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "3030", "-m", "demo.data_engineering.orchestration.definitions"]
+# Serves the data_engineering.orchestration.definitions module
+# NOTE: ENTRYPOINT handles pre-startup (dbt compile), CMD is the main process
+CMD ["dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "3030", "-m", "data_engineering.orchestration.definitions"]

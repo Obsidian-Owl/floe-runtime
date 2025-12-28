@@ -115,7 +115,7 @@ class FloeTranslator(DagsterDbtTranslator):
     def get_group_name(self, dbt_resource_props: Mapping[str, Any]) -> str | None:
         """Get group name from dbt resource properties.
 
-        Uses schema as group name, falling back to package name.
+        Checks meta.dagster.group first, then falls back to schema name.
 
         Args:
             dbt_resource_props: dbt manifest node properties.
@@ -123,7 +123,12 @@ class FloeTranslator(DagsterDbtTranslator):
         Returns:
             Group name string or None.
         """
-        # Try schema first
+        # Try meta.dagster.group first (for explicit group assignment)
+        dagster_meta = dbt_resource_props.get("meta", {}).get("dagster", {})
+        if group := dagster_meta.get("group"):
+            return str(group)
+
+        # Fall back to schema name
         if schema := dbt_resource_props.get("schema"):
             return str(schema)
 

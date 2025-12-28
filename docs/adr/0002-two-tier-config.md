@@ -1,4 +1,4 @@
-# ADR-0002: Two-Tier Configuration Architecture
+# ADR-0002: Three-Tier Configuration Architecture
 
 ## Status
 
@@ -86,9 +86,39 @@ Kubernetes deployments required:
 
 ## Decision
 
-Adopt a **two-tier configuration architecture** that separates concerns between personas:
+Adopt a **three-tier configuration architecture** that separates concerns across three layers:
 
-### Tier 1: platform.yaml (Platform Engineer Domain)
+### Tier 1: floe.yaml (Data Engineer Domain)
+
+Data engineers define pipelines with **logical references** only:
+
+```yaml
+# floe.yaml - Owned by Data Engineering
+name: customer-analytics
+version: "1.0.0"
+
+# Logical references - resolved at compile time
+storage: default
+catalog: default
+compute: default
+
+transforms:
+  - type: dbt
+    path: ./dbt
+    target: prod
+
+governance:
+  classification_source: dbt_meta
+  emit_lineage: true
+
+observability:
+  traces: true
+  lineage: true
+  attributes:
+    service.name: customer-analytics
+```
+
+### Tier 2: platform.yaml (Platform Engineer Domain)
 
 Platform engineers define infrastructure in `platform.yaml`:
 
@@ -134,70 +164,99 @@ observability:
   lineage_endpoint: "http://marquez:5000"
 ```
 
-### Tier 2: floe.yaml (Data Engineer Domain)
+### Tier 3: values.yaml (Kubernetes/DevOps Domain)
 
-Data engineers define pipelines with **logical references** only:
+Kubernetes operators define infrastructure deployment configuration:
 
 ```yaml
-# floe.yaml - Owned by Data Engineering
-name: customer-analytics
-version: "1.0.0"
+# values-prod.yaml - Owned by DevOps/Platform Ops
+# Kubernetes-specific configuration only
 
-# Logical references - resolved at compile time
-storage: default
-catalog: default
-compute: default
+# Platform config from Tier 2 (mounted as ConfigMap)
+externalPlatformConfig:
+  enabled: true
+  configMapName: "floe-platform-config"
+  configMapKey: "platform.yaml"
 
-transforms:
-  - type: dbt
-    path: ./dbt
-    target: prod
+# Credentials via Kubernetes Secrets (references, not values)
+dagster:
+  dagster-user-deployments:
+    deployments:
+      - name: "customer-analytics"
+        env:
+          # ✅ TIER 3: Secret references, not values
+          - name: POLARIS_CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                name: polaris-credentials
+                key: client-id
+          - name: POLARIS_CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: polaris-credentials
+                key: client-secret
 
-governance:
-  classification_source: dbt_meta
-  emit_lineage: true
+# Kubernetes resource configuration
+resources:
+  webserver:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
 
-observability:
-  traces: true
-  lineage: true
-  attributes:
-    service.name: customer-analytics
+# High availability for production
+replicaCount: 3
 ```
 
-### Compilation Model
-
-At compile/deploy time, `FloeSpec` and `PlatformSpec` are merged into `CompiledArtifacts`:
+### Three-Tier Compilation and Deployment Model
 
 ```
-┌─────────────────────┐     ┌─────────────────────┐
-│     floe.yaml       │     │   platform.yaml     │
-│   (Data Engineer)   │     │ (Platform Engineer) │
-└─────────────────────┘     └─────────────────────┘
-          │                           │
-          │                           │
-          ▼                           ▼
-    ┌─────────────────────────────────────────┐
-    │           PlatformResolver               │
-    │  • Load platform.yaml by FLOE_PLATFORM_ENV
-    │  • Resolve secret references            │
-    │  • Validate credential modes            │
-    └─────────────────────────────────────────┘
-                      │
-                      ▼
-    ┌─────────────────────────────────────────┐
-    │              Compiler                    │
-    │  • Merge FloeSpec + PlatformSpec        │
-    │  • Resolve profile references           │
-    │  • Generate CompiledArtifacts           │
-    └─────────────────────────────────────────┘
-                      │
-                      ▼
-    ┌─────────────────────────────────────────┐
-    │          CompiledArtifacts              │
-    │  • Fully resolved configuration         │
-    │  • All secrets injected                 │
-    │  • Ready for Dagster execution          │
-    └─────────────────────────────────────────┘
+TIER 1: floe.yaml          TIER 2: platform.yaml       TIER 3: values.yaml
+(Data Engineer)            (Platform Engineer)         (K8s/DevOps)
+─────────────────          ─────────────────────       ───────────────
+Logical references         Infrastructure endpoints    K8s config + secrets
+• storage: default         • S3 endpoint              • secretKeyRef
+• catalog: default         • Polaris URI              • resource limits
+• transforms: dbt          • secret_ref names         • replica count
+                          • credential modes          • nodePort config
+        │                           │                           │
+        └───────────────┬───────────┘                           │
+                        ▼                                       │
+            ┌──────────────────────────┐                        │
+            │   PlatformResolver       │                        │
+            │ • Load platform.yaml     │                        │
+            │ • Validate secret refs   │                        │
+            └──────────┬───────────────┘                        │
+                       ▼                                        │
+            ┌──────────────────────────┐                        │
+            │      Compiler            │                        │
+            │ • Merge Tier 1 + Tier 2  │                        │
+            │ • Generate artifacts     │                        │
+            └──────────┬───────────────┘                        │
+                       ▼                                        │
+            ┌──────────────────────────┐                        │
+            │   CompiledArtifacts      │                        │
+            │ • Baked into Docker img  │                        │
+            └──────────┬───────────────┘                        │
+                       │                                        │
+                       └────────────────┬───────────────────────┘
+                                        ▼
+                            ┌───────────────────────────┐
+                            │   Helm Deployment         │
+                            │ • Mount platform ConfigMap│
+                            │ • Inject K8s Secrets      │
+                            │ • Apply resource limits   │
+                            └───────────────────────────┘
+                                        │
+                                        ▼
+                            ┌───────────────────────────┐
+                            │   Dagster Pod Running     │
+                            │ • CompiledArtifacts       │
+                            │ • Platform config mounted │
+                            │ • Secrets injected        │
+                            └───────────────────────────┘
 ```
 
 ## Alternatives Considered
@@ -365,28 +424,55 @@ storage: "aws_access_key_here"  # High-entropy string detected!
 storage: default  # Logical reference only
 ```
 
-## Directory Structure
+## Multi-Repo Directory Structure
+
+### Recommended: Two-Repo Architecture
 
 ```
-floe-runtime/
+platform-config/                    # 🔐 Platform Engineering Repo
 ├── platform/
 │   ├── local/
-│   │   └── platform.yaml     # Local development (Docker Compose)
+│   │   └── platform.yaml          # LocalStack, Docker Desktop
 │   ├── dev/
-│   │   └── platform.yaml     # Development environment
+│   │   └── platform.yaml          # AWS dev, EKS
 │   └── prod/
-│       └── platform.yaml     # Production template
-├── demo/
-│   └── floe.yaml             # Demo pipeline (logical refs only)
-└── packages/
-    └── floe-core/
-        └── src/floe_core/
-            ├── schemas/
-            │   ├── platform_spec.py
-            │   ├── credential_config.py
-            │   └── floe_spec.py
-            └── compiler/
-                └── platform_resolver.py
+│       └── platform.yaml          # Production HA
+├── charts/                         # Helm charts (Tier 3)
+│   ├── floe-dagster/
+│   │   ├── values.yaml            # BASE K8s defaults
+│   │   ├── values-dev.yaml        # Dev overrides
+│   │   └── values-prod.yaml       # Prod overrides
+│   └── floe-infrastructure/
+│       └── ...
+└── secrets/
+    ├── dev/
+    │   └── sealed-secrets.yaml    # Encrypted credentials
+    └── prod/
+        └── sealed-secrets.yaml
+
+customer-analytics/                # 📊 Data Engineering Repo
+├── floe.yaml                      # Tier 1: Pipeline config
+├── orchestration/
+│   └── assets.py                  # Dagster assets
+├── dbt/
+│   └── models/                    # SQL transformations
+├── Dockerfile                     # Builds image with CompiledArtifacts
+└── .floe/
+    └── compiled_artifacts.json    # Generated at build time
+```
+
+### Alternative: Monorepo (Demo Structure)
+
+```
+floe-runtime/demo/
+├── platform-config/               # Simulates platform repo
+│   ├── platform/
+│   ├── charts/
+│   └── secrets/
+└── data-engineering/              # Simulates data repo
+    ├── floe.yaml
+    ├── orchestration/
+    └── dbt/
 ```
 
 ## Batteries-Included floe-dagster
@@ -505,16 +591,124 @@ def bronze_customers(context, catalog: PolarisCatalog) -> dict:
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-Two-tier configuration separates **what to configure**. Batteries-included floe-dagster hides **how to use that configuration**.
+Three-tier configuration separates **what to configure** (Tier 1), **where to deploy** (Tier 2), and **how to deploy** (Tier 3). Batteries-included floe-dagster hides the complexity of using that configuration.
+
+## Multi-Repo CI/CD Workflow
+
+### Platform Config Repo Release
+
+```yaml
+# .github/workflows/release.yaml (in platform-config repo)
+name: Release Platform Config
+
+on:
+  push:
+    tags:
+      - 'platform-config-v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate platform configs
+        run: |
+          for env in local dev prod; do
+            floe validate platform/\${env}/platform.yaml
+          done
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            platform/*/platform.yaml
+            charts/**/values-*.yaml
+          body: |
+            Platform configuration release \${{ github.ref_name }}
+
+            **Changes**: See commit history
+            **Compatibility**: floe-runtime >= v1.0.0
+```
+
+### Data Engineering Repo Build
+
+```yaml
+# .github/workflows/build-deploy.yaml (in data-engineering repo)
+name: Build & Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  PLATFORM_CONFIG_VERSION: "platform-config-v1.2.3"  # Pin platform version
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download platform config artifact
+        run: |
+          gh release download \$PLATFORM_CONFIG_VERSION \\
+            --repo myorg/platform-config \\
+            --pattern "platform-\${{ env.ENVIRONMENT }}.yaml" \\
+            --dir .floe/
+
+      - name: Compile artifacts
+        run: |
+          floe compile \\
+            --floe-yaml=floe.yaml \\
+            --platform-yaml=.floe/platform-\${{ env.ENVIRONMENT }}.yaml \\
+            --output=.floe/compiled_artifacts.json
+
+      - name: Build Docker image
+        run: |
+          docker build -t ghcr.io/myorg/customer-analytics:\${{ github.sha }} .
+
+      - name: Push image
+        run: docker push ghcr.io/myorg/customer-analytics:\${{ github.sha }}
+
+      - name: Deploy with Helm
+        run: |
+          # Fetch Helm values from platform config
+          gh release download \$PLATFORM_CONFIG_VERSION \\
+            --repo myorg/platform-config \\
+            --pattern "values-\${{ env.ENVIRONMENT }}.yaml"
+
+          helm upgrade --install customer-analytics oci://ghcr.io/myorg/floe-dagster \\
+            --values values-\${{ env.ENVIRONMENT }}.yaml \\
+            --set image.tag=\${{ github.sha }}
+```
+
+### Artifact Version Pinning
+
+Data engineering repos pin platform config versions:
+
+```yaml
+# .floe/platform-version.yaml (in data-engineering repo)
+platform_config_version: "platform-config-v1.2.3"
+compatibility:
+  min_version: "platform-config-v1.2.0"
+  max_version: "platform-config-v1.3.0"
+```
+
+**Benefits:**
+- Data engineers control when to upgrade platform dependencies
+- Platform engineers can release backward-compatible updates
+- Easy rollback: change version pin, rebuild image
 
 ## Migration
 
 Since floe-runtime has no prior releases, no migration is required. New projects should:
 
-1. Create `platform/` directory with environment-specific configs
-2. Update `floe.yaml` to use profile references
-3. Set `FLOE_PLATFORM_ENV` for environment selection
-4. Use `floe compile` to generate `CompiledArtifacts`
+1. Create `platform-config/` repo with environment-specific configs
+2. Create `charts/` directory with BASE values.yaml + overrides
+3. Update `floe.yaml` to use profile references only
+4. Use `floe compile` in CI/CD to generate `CompiledArtifacts`
+5. Pin platform-config version in data engineering repos
 
 ## References
 

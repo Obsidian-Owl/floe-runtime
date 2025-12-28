@@ -744,6 +744,21 @@ wheels = [
 ]
 
 [[package]]
+name = "dagster-aws"
+version = "0.28.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "boto3" },
+    { name = "dagster" },
+    { name = "packaging" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/cd/41/e8655092a12edfa02158b1d600a152944e4b7be617e31f33a22507043c93/dagster_aws-0.28.6.tar.gz", hash = "sha256:37e6fa417421cce594c6c119d7b702aeacae3d7668d7876933f978683f580e2c", size = 127891, upload-time = "2025-12-11T20:32:22.14Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fd/ce/9a5dcead50c1c74c7930b122496a386f82b20fa5bf9b38a2d6cdf61da944/dagster_aws-0.28.6-py3-none-any.whl", hash = "sha256:9b5ddf526025b31a553c3b0d618ab488c217a95ada17c21bf1a5a584df1dc36d", size = 158125, upload-time = "2025-12-11T20:32:20.825Z" },
+]
+
+[[package]]
 name = "dagster-dbt"
 version = "0.28.6"
 source = { registry = "https://pypi.org/simple" }
@@ -1469,6 +1484,7 @@ version = "0.1.0"
 source = { editable = "packages/floe-dagster" }
 dependencies = [
     { name = "dagster" },
+    { name = "dagster-aws" },
     { name = "dagster-dbt" },
     { name = "dagster-k8s" },
     { name = "dagster-postgres" },
@@ -1493,6 +1509,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "dagster", specifier = ">=1.9" },
+    { name = "dagster-aws", specifier = ">=0.25" },
     { name = "dagster-dbt", specifier = ">=0.25" },
     { name = "dagster-k8s", specifier = ">=0.25" },
     { name = "dagster-postgres", specifier = ">=0.25" },

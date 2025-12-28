@@ -138,47 +138,30 @@ class Plugin(BasePlugin):
         # Get credentials from config or environment
         client_id = self.config.get("client_id") or os.getenv("POLARIS_CLIENT_ID", "")
         client_secret = self.config.get("client_secret") or os.getenv("POLARIS_CLIENT_SECRET", "")
-        scope = self.config.get("scope", "PRINCIPAL_ROLE:service_admin")
-
-        # S3 configuration
-        s3_endpoint = self.config.get("s3_endpoint", "")
-        s3_region = self.config.get("s3_region", "us-east-1")
-        s3_access_key = self.config.get("s3_access_key_id") or os.getenv("AWS_ACCESS_KEY_ID", "")
-        s3_secret_key = self.config.get("s3_secret_access_key") or os.getenv(
-            "AWS_SECRET_ACCESS_KEY", ""
-        )
 
         try:
-            # Step 1: Create S3 secret for storage access
-            # DuckDB requires S3 credentials as a separate secret
-            if s3_access_key and s3_secret_key:
-                s3_secret_sql = f"""
-                CREATE OR REPLACE SECRET s3_secret (
-                    TYPE S3,
-                    KEY_ID '{s3_access_key}',
-                    SECRET '{s3_secret_key}',
-                    REGION '{s3_region}',
-                    ENDPOINT '{s3_endpoint}',
-                    URL_STYLE 'path'
-                )
-                """
-                conn.execute(s3_secret_sql)
-
-            # Step 2: ATTACH Iceberg catalog - minimal approach
-            # Let DuckDB Iceberg extension handle OAuth2 token endpoint discovery
-            # Polaris REST catalogs advertise their OAuth2 endpoint in metadata
-
-            # Build full catalog path: {base}/warehouse_name
-            # Example: http://polaris:8181/api/catalog/demo_catalog
-            full_catalog_path = f"{catalog_uri}/{warehouse}"
-
-            # Minimal ATTACH with just credentials
-            # DuckDB should discover OAuth2 endpoint from Polaris catalog config
-            attach_sql = f"""
-            ATTACH '{full_catalog_path}' AS polaris_catalog (
+            # Create Polaris Iceberg secret with OAuth2 credentials
+            # DuckDB Iceberg extension requires UPPERCASE parameter names in secret
+            # NOTE: We do NOT create an S3 secret here because DuckDB's secret manager
+            # locks after the first CREATE SECRET, preventing additional secrets.
+            # Instead, S3 credentials are provided via environment variables:
+            # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY (auto-detected by httpfs extension)
+            polaris_secret_sql = f"""
+            CREATE OR REPLACE SECRET polaris_secret (
                 TYPE ICEBERG,
-                client_id '{client_id}',
-                client_secret '{client_secret}'
+                CLIENT_ID '{client_id}',
+                CLIENT_SECRET '{client_secret}',
+                ENDPOINT '{catalog_uri}'
+            )
+            """
+            conn.execute(polaris_secret_sql)
+
+            # ATTACH Polaris catalog using the secret
+            # Catalog name is the warehouse, not full URL path
+            attach_sql = f"""
+            ATTACH '{warehouse}' AS polaris_catalog (
+                TYPE ICEBERG,
+                SECRET polaris_secret
             )
             """
             conn.execute(attach_sql)

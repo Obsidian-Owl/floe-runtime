@@ -186,9 +186,6 @@ class DbtProfilesGenerator:
             "path": database_path,
             "threads": threads,
             "extensions": ["iceberg", "httpfs"],
-            "settings": {
-                "allow_persistent_secrets": "true",
-            },
         }
 
         plugin_config = self._build_polaris_plugin_config(catalog, storage)
@@ -232,13 +229,10 @@ class DbtProfilesGenerator:
             )
             return None
 
-        catalog_uri = catalog.get_uri()
-        warehouse = catalog.warehouse
-
         attach_config: dict[str, Any] = {
             "alias": "polaris_catalog",
             "type": "iceberg",
-            "catalog": f"{{{{ env_var('FLOE_CATALOG_WAREHOUSE', '{warehouse}') }}}}",
+            "catalog": f"{{{{ env_var('FLOE_CATALOG_WAREHOUSE', '{catalog.warehouse}') }}}}",
         }
 
         return attach_config
@@ -269,10 +263,8 @@ class DbtProfilesGenerator:
             )
             return None
 
-        catalog_uri = catalog.get_uri()
-
         config: dict[str, Any] = {
-            "catalog_uri": f"{{{{ env_var('FLOE_CATALOG_URI', '{catalog_uri}') }}}}",
+            "catalog_uri": f"{{{{ env_var('FLOE_CATALOG_URI', '{catalog.get_uri()}') }}}}",
             "warehouse": f"{{{{ env_var('FLOE_CATALOG_WAREHOUSE', '{catalog.warehouse}') }}}}",
         }
 

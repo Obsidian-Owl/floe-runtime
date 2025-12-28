@@ -27,7 +27,6 @@ from typing import Any
 
 import yaml
 
-from floe_core.compiler.platform_resolver import PlatformResolver
 from floe_core.schemas.observability import ComputeLogManagerType
 from floe_core.schemas.platform_spec import PlatformSpec
 

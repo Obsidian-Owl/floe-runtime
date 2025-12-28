@@ -786,6 +786,248 @@ class CloudConfig(BaseModel):
 
 
 # =============================================================================
+# Lifecycle Management Configuration
+# =============================================================================
+
+
+class JobCleanupConfig(BaseModel):
+    """Job cleanup configuration for ephemeral Kubernetes jobs.
+
+    Attributes:
+        ttl_seconds: TTL (seconds) after job completion for auto-deletion.
+        history_limits: Keep N successful/failed jobs for debugging.
+
+    Example:
+        >>> cleanup = JobCleanupConfig(
+        ...     ttl_seconds=300,
+        ...     history_limits={"successful": 3, "failed": 5},
+        ... )
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    ttl_seconds: int = Field(
+        default=300,
+        ge=0,
+        description="TTL (seconds) after job completion",
+    )
+    history_limits: dict[str, int] = Field(
+        default_factory=lambda: {"successful": 3, "failed": 5},
+        description="Job history limits (successful, failed)",
+    )
+
+
+class CleanupConfig(BaseModel):
+    """Cleanup configuration for ephemeral resources.
+
+    Attributes:
+        enabled: Enable automatic cleanup.
+        jobs: Job cleanup configuration.
+
+    Example:
+        >>> cleanup = CleanupConfig(
+        ...     enabled=True,
+        ...     jobs=JobCleanupConfig(ttl_seconds=300),
+        ... )
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    enabled: bool = Field(
+        default=True,
+        description="Enable automatic cleanup",
+    )
+    jobs: JobCleanupConfig = Field(
+        default_factory=JobCleanupConfig,
+        description="Job cleanup configuration",
+    )
+
+
+class ResourceQuotaLimits(BaseModel):
+    """Namespace-level resource quota limits.
+
+    Attributes:
+        pods: Maximum number of pods.
+        requests_cpu: Total CPU requests (e.g., "8").
+        requests_memory: Total memory requests (e.g., "8Gi").
+        limits_cpu: Total CPU limits (e.g., "12").
+        limits_memory: Total memory limits (e.g., "20Gi").
+
+    Example:
+        >>> limits = ResourceQuotaLimits(
+        ...     pods=50,
+        ...     requests_cpu="8",
+        ...     requests_memory="8Gi",
+        ...     limits_cpu="12",
+        ...     limits_memory="20Gi",
+        ... )
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    pods: int = Field(
+        default=50,
+        ge=1,
+        description="Maximum number of pods",
+    )
+    requests_cpu: str = Field(
+        default="8",
+        description="Total CPU requests",
+    )
+    requests_memory: str = Field(
+        default="8Gi",
+        description="Total memory requests",
+    )
+    limits_cpu: str = Field(
+        default="12",
+        description="Total CPU limits",
+    )
+    limits_memory: str = Field(
+        default="20Gi",
+        description="Total memory limits",
+    )
+
+
+class ResourceQuotasConfig(BaseModel):
+    """Resource quotas configuration.
+
+    Attributes:
+        enabled: Enable resource quotas.
+        namespace_limits: Namespace-level resource limits.
+
+    Example:
+        >>> quotas = ResourceQuotasConfig(
+        ...     enabled=True,
+        ...     namespace_limits=ResourceQuotaLimits(pods=50),
+        ... )
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    enabled: bool = Field(
+        default=True,
+        description="Enable resource quotas",
+    )
+    namespace_limits: ResourceQuotaLimits = Field(
+        default_factory=ResourceQuotaLimits,
+        description="Namespace-level resource limits",
+    )
+
+
+class LifecycleConfig(BaseModel):
+    """Lifecycle management configuration.
+
+    Automated cleanup and resource control for ephemeral resources.
+
+    Attributes:
+        cleanup: Cleanup configuration for jobs and pods.
+        resource_quotas: Namespace-level resource quotas.
+
+    Example:
+        >>> lifecycle = LifecycleConfig(
+        ...     cleanup=CleanupConfig(enabled=True),
+        ...     resource_quotas=ResourceQuotasConfig(enabled=True),
+        ... )
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    cleanup: CleanupConfig = Field(
+        default_factory=CleanupConfig,
+        description="Cleanup configuration",
+    )
+    resource_quotas: ResourceQuotasConfig = Field(
+        default_factory=ResourceQuotasConfig,
+        description="Resource quotas configuration",
+    )
+
+
+# =============================================================================
+# Resource Profiles Configuration
+# =============================================================================
+
+
+class ResourceRequests(BaseModel):
+    """Kubernetes resource requests.
+
+    Attributes:
+        cpu: CPU request (e.g., "100m").
+        memory: Memory request (e.g., "256Mi").
+
+    Example:
+        >>> requests = ResourceRequests(cpu="100m", memory="256Mi")
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    cpu: str = Field(
+        ...,
+        description="CPU request",
+    )
+    memory: str = Field(
+        ...,
+        description="Memory request",
+    )
+
+
+class ResourceLimits(BaseModel):
+    """Kubernetes resource limits.
+
+    Attributes:
+        cpu: CPU limit (e.g., "500m").
+        memory: Memory limit (e.g., "512Mi").
+
+    Example:
+        >>> limits = ResourceLimits(cpu="500m", memory="512Mi")
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    cpu: str = Field(
+        ...,
+        description="CPU limit",
+    )
+    memory: str = Field(
+        ...,
+        description="Memory limit",
+    )
+
+
+class ResourceProfile(BaseModel):
+    """Resource profile for a service class.
+
+    Defines CPU/memory requests and limits, plus optional environment variables.
+
+    Attributes:
+        requests: Resource requests (guaranteed).
+        limits: Resource limits (maximum).
+        env: Optional environment variables.
+
+    Example:
+        >>> profile = ResourceProfile(
+        ...     requests=ResourceRequests(cpu="100m", memory="256Mi"),
+        ...     limits=ResourceLimits(cpu="500m", memory="512Mi"),
+        ...     env={"DUCKDB_MEMORY_LIMIT": "8GB"},
+        ... )
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    requests: ResourceRequests = Field(
+        ...,
+        description="Resource requests",
+    )
+    limits: ResourceLimits = Field(
+        ...,
+        description="Resource limits",
+    )
+    env: dict[str, str] = Field(
+        default_factory=dict,
+        description="Environment variables",
+    )
+
+
+# =============================================================================
 # Infrastructure Configuration (Root)
 # =============================================================================
 
@@ -797,11 +1039,15 @@ class InfrastructureConfig(BaseModel):
     Supports AWS-first design with LocalStack for local development.
 
     Attributes:
+        timezone: IANA timezone for all pods (e.g., 'Australia/Sydney', 'America/New_York').
         network: Network configuration (DNS, policies, ingress).
         cloud: Cloud provider configuration (AWS, LocalStack).
+        lifecycle: Lifecycle management (cleanup, resource quotas).
+        resource_profiles: Named resource profiles (platform, storage, transform).
 
     Example:
         >>> infra = InfrastructureConfig(
+        ...     timezone="Australia/Sydney",
         ...     network=NetworkConfig(
         ...         local_access=LocalAccessConfig(enabled=True),
         ...     ),
@@ -809,11 +1055,24 @@ class InfrastructureConfig(BaseModel):
         ...         provider=CloudProvider.LOCAL,
         ...         localstack=LocalStackConfig(enabled=True),
         ...     ),
+        ...     lifecycle=LifecycleConfig(),
+        ...     resource_profiles={
+        ...         "platform": ResourceProfile(
+        ...             requests=ResourceRequests(cpu="100m", memory="256Mi"),
+        ...             limits=ResourceLimits(cpu="500m", memory="512Mi"),
+        ...         ),
+        ...     },
         ... )
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
+    timezone: str = Field(
+        default="UTC",
+        description=(
+            "IANA timezone for all pods (e.g., 'Australia/Sydney', 'UTC', 'America/New_York')"
+        ),
+    )
     network: NetworkConfig = Field(
         default_factory=NetworkConfig,
         description="Network configuration",
@@ -821,4 +1080,12 @@ class InfrastructureConfig(BaseModel):
     cloud: CloudConfig = Field(
         default_factory=CloudConfig,
         description="Cloud provider configuration",
+    )
+    lifecycle: LifecycleConfig | None = Field(
+        default=None,
+        description="Lifecycle management configuration",
+    )
+    resource_profiles: dict[str, ResourceProfile] | None = Field(
+        default=None,
+        description="Named resource profiles",
     )

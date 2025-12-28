@@ -40,6 +40,10 @@ version: "1.1.0"
 # Infrastructure Configuration (v1.1.0)
 # =============================================================================
 infrastructure:
+  # Timezone for all pods (logs, timestamps)
+  # Uses IANA timezone database: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+  timezone: "Australia/Sydney"  # AEDT (UTC+11) during summer, AEST (UTC+10) during winter
+
   network:
     enabled: true
     dns:

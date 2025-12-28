@@ -53,6 +53,14 @@ help:
 	@echo "  make demo-image-build     - Build demo Docker image"
 	@echo "  make demo-image-push      - Build and push demo image to ghcr.io"
 	@echo ""
+	@echo "Cleanup & Maintenance:"
+	@echo "  make dev-clean            - Daily cleanup (completed pods, Docker volumes)"
+	@echo "  make dev-clean-weekly     - Weekly maintenance (+ old containers/ConfigMaps)"
+	@echo "  make dev-clean-monthly    - Monthly deep clean (+ unused images)"
+	@echo "  make dev-clean-dry-run    - Preview daily cleanup actions"
+	@echo "  make dev-reset            - Nuclear reset (destroys entire environment)"
+	@echo "  make demo-cleanup         - Alias for dev-clean (backward compatibility)"
+	@echo ""
 	@echo "Setup:"
 	@echo "  make install         - Install dependencies"
 	@echo "  make hooks           - Install git hooks"
@@ -341,41 +349,46 @@ demo-status:
 	@echo "Jobs:"
 	@kubectl get jobs -n $(FLOE_NAMESPACE) 2>/dev/null || true
 
-# Clean up completed Dagster run pods (can accumulate over time)
-demo-cleanup:
-	@echo "⎈ Cleaning up completed Dagster run pods..."
-	@kubectl delete pods -n $(FLOE_NAMESPACE) --field-selector=status.phase==Succeeded 2>/dev/null || echo "No completed pods to clean"
-	@echo "✅ Cleanup complete"
+# Clean up completed Dagster run pods (can accumulate over time) - DEPRECATED
+# Use 'make dev-clean' instead
 
-# Daily development cleanup (pods + failed resources)
+# ============================================================================
+# Development Cleanup and Maintenance
+# ============================================================================
+# Comprehensive cleanup strategies for local Kubernetes development.
+# Uses the claude-cleanup.sh script for safe, graduated cleanup options.
+
+# Daily cleanup - safe for active development (preserves running services)
 dev-clean:
-	@echo "⎈ Running daily development cleanup..."
-	@echo "  Deleting completed pods..."
-	@kubectl delete pods -n $(FLOE_NAMESPACE) --field-selector=status.phase==Succeeded 2>/dev/null || echo "  No completed pods"
-	@echo "  Deleting failed pods..."
-	@kubectl delete pods -n $(FLOE_NAMESPACE) --field-selector=status.phase==Failed 2>/dev/null || echo "  No failed pods"
-	@echo "  Pruning Docker volumes..."
-	@docker volume prune -f 2>&1 | grep "Total reclaimed" || true
-	@echo "✅ Daily cleanup complete"
+	@./scripts/claude-cleanup.sh daily
 
-# Nuclear option: complete environment reset
+# Weekly maintenance - includes old containers and ConfigMaps
+dev-clean-weekly:
+	@./scripts/claude-cleanup.sh weekly
+
+# Monthly deep clean - includes unused Docker images
+dev-clean-monthly:
+	@./scripts/claude-cleanup.sh monthly
+
+# Preview cleanup actions without making changes
+dev-clean-dry-run:
+	@./scripts/claude-cleanup.sh daily --dry-run
+
+# Show what weekly cleanup would do
+dev-clean-weekly-dry-run:
+	@./scripts/claude-cleanup.sh weekly --dry-run
+
+# Show what monthly cleanup would do
+dev-clean-monthly-dry-run:
+	@./scripts/claude-cleanup.sh monthly --dry-run
+
+# Legacy cleanup for backward compatibility (maps to daily)
+demo-cleanup:
+	@./scripts/claude-cleanup.sh daily
+
+# Nuclear option: complete environment reset (requires confirmation)
 dev-reset:
-	@echo "⚠️  WARNING: This will completely reset your local environment!"
-	@echo "  - All pods in namespace '$(FLOE_NAMESPACE)' will be deleted"
-	@echo "  - All Docker volumes will be pruned"
-	@echo ""
-	@read -p "Are you sure? Type 'yes' to continue: " confirm && [ "$$confirm" = "yes" ] || (echo "Cancelled" && exit 1)
-	@echo ""
-	@echo "⎈ Deleting all Helm releases..."
-	@helm uninstall floe-cube -n $(FLOE_NAMESPACE) 2>/dev/null || true
-	@helm uninstall floe-dagster -n $(FLOE_NAMESPACE) 2>/dev/null || true
-	@helm uninstall floe-infra -n $(FLOE_NAMESPACE) 2>/dev/null || true
-	@echo "⎈ Deleting namespace..."
-	@kubectl delete namespace $(FLOE_NAMESPACE) --wait --timeout=60s 2>/dev/null || true
-	@echo "⎈ Pruning Docker resources..."
-	@docker volume prune -f
-	@docker container prune -f
-	@echo "✅ Environment reset complete. Run 'make deploy-local-full' to redeploy."
+	@./scripts/claude-cleanup.sh nuclear
 
 # Show logs from demo user deployment (tail)
 demo-logs:

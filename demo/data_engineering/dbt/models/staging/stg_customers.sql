@@ -14,7 +14,7 @@
 --   - Filter out invalid records
 
 with source as (
-    select * from read_parquet('s3://iceberg-bronze/demo/bronze_customers/data/*.parquet')
+    select * from {{ iceberg_source('demo', 'bronze_customers') }}
 ),
 
 deduped as (
@@ -22,7 +22,6 @@ deduped as (
         customer_id,
         name,
         lower(trim(email)) as email,
-        segment,
         region,
         created_at,
         row_number() over (partition by customer_id order by created_at desc) as rn
@@ -37,7 +36,6 @@ final as (
         customer_id,
         name,
         email,
-        segment,
         region,
         cast(created_at as timestamp) as created_at
     from deduped

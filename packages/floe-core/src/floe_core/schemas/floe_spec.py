@@ -57,6 +57,8 @@ class FloeSpec(BaseModel):
         governance: Data governance configuration.
         observability: Observability configuration.
         orchestration: Declarative orchestration configuration (Feature 010).
+        service_account: Service account identity for catalog RBAC (optional).
+        principal_role: Principal role for catalog access control (optional).
 
     Example:
         >>> # Data engineer creates floe.yaml with logical references
@@ -120,6 +122,16 @@ class FloeSpec(BaseModel):
     orchestration: OrchestrationConfig | None = Field(
         default=None,
         description="Declarative orchestration configuration (Feature 010)",
+    )
+    service_account: str | None = Field(
+        default=None,
+        pattern=r"^[a-zA-Z][a-zA-Z0-9_-]*$",
+        description="Service account identity for catalog RBAC",
+    )
+    principal_role: str | None = Field(
+        default=None,
+        pattern=r"^[a-zA-Z][a-zA-Z0-9_-]*$",
+        description="Principal role for catalog access control",
     )
 
     @classmethod

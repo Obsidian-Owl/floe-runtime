@@ -1,6 +1,7 @@
 # Local development values for floe-infrastructure
-# Optimized for Docker Desktop Kubernetes
-# Uses emptyDir instead of PVCs (Docker Desktop hostpath provisioner is unreliable)
+# Optimized for OrbStack Kubernetes (24GB RAM, 14 CPUs)
+# Uses emptyDir instead of PVCs for ephemeral local development
+# Resource strategy: 4.5GB platform services + 18.5GB available for transforms
 
 # Platform Configuration (Two-Tier Architecture)
 # This ConfigMap is mounted by Dagster pods to load platform.yaml at runtime
@@ -53,6 +54,7 @@ postgresql:
   primary:
     persistence:
       enabled: false  # Uses emptyDir - data is ephemeral
+    # Platform profile: Continuous service, modest resources
     resources:
       requests:
         cpu: 100m
@@ -88,6 +90,7 @@ localstack:
   debug: "0"
   persistence:
     enabled: false  # Uses emptyDir - data is ephemeral
+  # Storage profile: Heavy I/O service (S3 + STS + IAM + SecretsManager)
   resources:
     requests:
       cpu: 200m
@@ -113,14 +116,17 @@ localstack:
       pullPolicy: IfNotPresent
     # Medallion Architecture: Separate buckets per layer
     buckets:
-      - name: iceberg-bronze    # Bronze: Raw + lightly cleaned (7yr retention)
-      - name: iceberg-silver    # Silver: Cleaned + enriched (2yr retention)
-      - name: iceberg-gold      # Gold: Aggregated marts (90d retention)
-      - name: cube-preaggs      # Cube: Pre-aggregation cache
+      - name: iceberg-bronze         # Bronze: Raw + lightly cleaned (7yr retention)
+      - name: iceberg-silver         # Silver: Cleaned + enriched (2yr retention)
+      - name: iceberg-gold           # Gold: Aggregated marts (90d retention)
+      - name: dagster-compute-logs   # Dagster: Run stdout/stderr logs (30d retention)
+      - name: cube-preaggs           # Cube: Pre-aggregation cache
     iamRole:
       name: "polaris-storage-role"
     secretsManager:
       enabled: true  # Store Polaris credentials in Secrets Manager
+    # Ephemeral job - auto-cleanup via TTL
+    ttlSecondsAfterFinished: 300  # 5 minutes
     resources:
       requests:
         cpu: 50m
@@ -137,6 +143,7 @@ polaris:
     tag: "latest"
     pullPolicy: IfNotPresent
   replicaCount: 1
+  # Storage profile: Iceberg catalog REST API
   resources:
     requests:
       cpu: 100m
@@ -162,10 +169,11 @@ jaeger:
     cassandra: false
   allInOne:
     enabled: true
+    # Platform profile: Tracing (all-in-one, memory storage)
     resources:
       requests:
         cpu: 100m
-        memory: 128Mi
+        memory: 256Mi
       limits:
         cpu: 500m
         memory: 512Mi
@@ -188,6 +196,7 @@ marquez:
     tag: "0.49.0"
     pullPolicy: IfNotPresent
   replicaCount: 1
+  # Platform profile: Lineage tracking (API + Web UI)
   resources:
     requests:
       cpu: 100m
@@ -264,3 +273,48 @@ demoCredentials:
   # Cube semantic layer (consumed by floe-cube chart)
   cubeApiSecret: "floe-demo-secret-change-in-production"
   cubeSqlPassword: "cube_password"
+
+# ==============================================================================
+# Resource Management (Lifecycle Automation from platform.yaml)
+# ==============================================================================
+# ResourceQuota and LimitRange enforce resource budgets from platform.yaml
+# Budget: 24GB total = 4.5GB platform + 18.5GB transforms
+
+# Namespace-level resource quota (prevent runaway resource usage)
+resourceQuota:
+  enabled: true
+  limits:
+    pods: 50                      # Max 50 pods in namespace
+    requests_cpu: "8"              # 8 cores reserved
+    requests_memory: 8Gi           # 8Gi guaranteed
+    limits_cpu: "12"               # 12 cores burstable
+    limits_memory: 20Gi            # 20Gi max (4.5Gi platform + 15.5Gi jobs)
+
+# Container-level limit ranges (default resource limits for pods)
+limitRange:
+  enabled: true
+  container:
+    # Default limits (if pod doesn't specify) - aligns with "platform" profile
+    default:
+      cpu: "500m"
+      memory: "512Mi"
+    # Default requests (if pod doesn't specify)
+    defaultRequest:
+      cpu: "100m"
+      memory: "256Mi"
+    # Minimum allowed - prevent tiny pods
+    min:
+      cpu: "50m"
+      memory: "64Mi"
+    # Maximum allowed - aligned with "transform" profile (12Gi for Dagster run pods)
+    max:
+      cpu: "8000m"
+      memory: "12Gi"
+  pod:
+    # Pod-level limits (sum of all containers)
+    min:
+      cpu: "50m"
+      memory: "64Mi"
+    max:
+      cpu: "8000m"
+      memory: "12Gi"

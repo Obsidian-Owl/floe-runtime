@@ -10,7 +10,7 @@
 }}
 
 -- Gold Mart: Revenue Analytics
--- Daily revenue aggregations by region, status, and customer segment
+-- Daily revenue aggregations by region and status
 -- Optimized for Cube semantic layer queries
 
 with customer_orders as (
@@ -33,27 +33,12 @@ daily_revenue as (
     group by 1, 2, 3
 ),
 
--- Customer segment analysis
-segment_revenue as (
-    select
-        cast(order_date as date) as revenue_date,
-        customer_segment as segment,
-        order_status as status,
-        count(distinct order_id) as order_count,
-        count(distinct customer_id) as customer_count,
-        sum(order_total) as total_revenue,
-        avg(order_total) as avg_order_value
-    from customer_orders
-    group by 1, 2, 3
-),
-
--- Combine daily and segment views
+-- Final aggregations with time-series analytics
 final as (
     select
         dr.revenue_date,
         dr.region,
         dr.status,
-        sr.segment,
         dr.order_count,
         dr.customer_count,
         dr.total_revenue,
@@ -90,9 +75,6 @@ final as (
         end as wow_growth_pct
 
     from daily_revenue dr
-    left join segment_revenue sr
-        on dr.revenue_date = sr.revenue_date
-        and dr.status = sr.status
 )
 
 select * from final

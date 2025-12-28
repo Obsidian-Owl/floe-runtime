@@ -47,7 +47,6 @@ final as (
         c.customer_id,
         c.name as customer_name,
         c.email as customer_email,
-        c.segment as customer_segment,
         c.region as customer_region,
 
         -- Order dimensions
