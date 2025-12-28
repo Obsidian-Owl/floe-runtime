@@ -444,7 +444,9 @@ class ComputeLogsConfig(BaseModel):
     )
     bucket: str | None = Field(
         default=None,
-        description="Override bucket name (defaults to storage profile bucket with -compute-logs suffix)",
+        description=(
+            "Override bucket name (defaults to storage profile bucket with -compute-logs suffix)"
+        ),
     )
     prefix: str = Field(
         default="dagster-compute-logs/",

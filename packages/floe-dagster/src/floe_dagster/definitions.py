@@ -280,7 +280,8 @@ class FloeDefinitions:
             logger.info("DbtCliResource initialized")
         except Exception as e:
             logger.error(
-                "CRITICAL: Failed to create DbtCliResource: %s. dbt resource will not be available.",
+                "CRITICAL: Failed to create DbtCliResource: %s. "
+                "dbt resource will not be available.",
                 e,
                 exc_info=True,
             )
@@ -318,7 +319,8 @@ class FloeDefinitions:
                         )
                     else:
                         logger.warning(
-                            "dbt_assets has unexpected structure - no 'keys' or 'node_defs' attribute"
+                            "dbt_assets has unexpected structure - "
+                            "no 'keys' or 'node_defs' attribute"
                         )
 
                     assets = list(assets or [])
