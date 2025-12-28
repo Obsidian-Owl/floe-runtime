@@ -2,12 +2,13 @@
   config(
     materialized='table',
     schema='gold',
-    polaris_namespace='demo.gold',
     tags=['marts', 'gold', 'revenue_analytics']
   )
 }}
 
 -- Gold Mart: Revenue Analytics
+-- Platform-managed: Writes to polaris_catalog.demo.gold.mart_revenue
+-- Location resolved from platform.yaml storage.gold profile
 -- Daily revenue aggregations by region and status
 -- Optimized for Cube semantic layer queries
 

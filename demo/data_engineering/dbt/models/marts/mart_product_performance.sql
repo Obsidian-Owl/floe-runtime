@@ -2,12 +2,13 @@
   config(
     materialized='table',
     schema='gold',
-    polaris_namespace='demo.gold',
     tags=['marts', 'gold', 'product_analytics']
   )
 }}
 
 -- Gold Mart: Product Performance Analytics
+-- Platform-managed: Writes to polaris_catalog.demo.gold.mart_product_performance
+-- Location resolved from platform.yaml storage.gold profile
 -- Product sales metrics aggregated by category and time period
 
 with products as (

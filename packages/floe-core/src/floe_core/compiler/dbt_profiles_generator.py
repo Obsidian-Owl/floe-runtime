@@ -168,7 +168,7 @@ class DbtProfilesGenerator:
         - Iceberg extension for catalog-native table access
         - httpfs extension for S3 connectivity
         - ATTACH configuration for Polaris REST catalog
-        - Polaris plugin for external materialization (write operations)
+        - Platform mappings injected as dbt vars for native Iceberg writes
 
         Args:
             catalog: CatalogProfile for Iceberg catalog configuration.
@@ -186,7 +186,24 @@ class DbtProfilesGenerator:
             "path": database_path,
             "threads": threads,
             "extensions": ["iceberg", "httpfs"],
+            "settings": {
+                "allow_persistent_secrets": "true",
+            },
         }
+
+        catalog_mappings = self._build_catalog_mappings(catalog)
+        storage_mappings = self._build_storage_mapping()
+
+        if catalog_mappings or storage_mappings:
+            output["vars"] = {}
+            if catalog_mappings:
+                output["vars"]["floe_catalog_mappings"] = catalog_mappings
+            if storage_mappings:
+                output["vars"]["floe_storage_mappings"] = storage_mappings
+
+        attach_config = self._build_attach_config(catalog, storage)
+        if attach_config:
+            output["attach"] = [attach_config]
 
         plugin_config = self._build_polaris_plugin_config(catalog, storage)
         if plugin_config:
@@ -289,13 +306,51 @@ class DbtProfilesGenerator:
 
         return config
 
+    def _build_catalog_mappings(self, catalog: CatalogProfile) -> dict[str, str]:
+        """Build catalog namespace mappings from platform.yaml.
+
+        Maps logical schema names (bronze, silver, gold) to physical catalog
+        namespace paths. This enables dbt macros to automatically resolve:
+            schema='gold' → 'polaris_catalog.demo.gold'
+
+        Injected as dbt vars for use in custom table materialization macro.
+
+        Args:
+            catalog: CatalogProfile containing warehouse/namespace info.
+
+        Returns:
+            Catalog mapping dictionary: {schema: catalog_namespace}
+
+        Example:
+            >>> {
+            ...     'bronze': 'polaris_catalog.demo.bronze',
+            ...     'silver': 'polaris_catalog.demo.silver',
+            ...     'gold': 'polaris_catalog.demo.gold',
+            ...     'default': 'polaris_catalog.demo.default'
+            ... }
+        """
+        from floe_core.schemas.catalog_profile import CatalogType
+
+        if catalog.type != CatalogType.POLARIS:
+            logger.info("Non-Polaris catalog. Catalog mappings not generated.")
+            return {}
+
+        catalog_alias = "polaris_catalog"
+        base_namespace = "demo"
+
+        mapping = {}
+        for schema_name in ["bronze", "silver", "gold", "default"]:
+            mapping[schema_name] = f"{catalog_alias}.{base_namespace}.{schema_name}"
+
+        return mapping
+
     def _build_storage_mapping(self) -> dict[str, dict[str, str]]:
         """Build storage mapping from platform.yaml storage profiles.
 
         Creates a mapping from logical schema names (bronze, silver, gold)
         to their physical storage configuration (bucket, endpoint).
 
-        This enables the plugin to automatically resolve:
+        This enables macros to automatically resolve:
             schema='gold' → s3://iceberg-gold/... (via platform.yaml)
 
         Returns:

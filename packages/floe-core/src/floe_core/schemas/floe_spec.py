@@ -196,13 +196,25 @@ def _scan_file_for_credentials(path: Path) -> None:
 def validate_dbt_models(dbt_path: Path) -> None:
     """Validate dbt models for architectural compliance at compile-time.
 
-    Scans all dbt SQL models and enforces catalog control plane architecture:
-    • No hardcoded S3 paths (violates environment portability)
-    • No materialized='external' (bypasses catalog control plane)
-    • No infrastructure keywords in configs (endpoints, buckets, etc.)
+    Enforces catalog control plane architecture using DuckDB native Iceberg writes:
+    • Platform handles ALL table writes via ATTACH (transparent to data engineers)
+    • Data engineers use standard materialized='table' (no custom syntax)
+    • NO hardcoded infrastructure (S3 paths, endpoints, buckets)
+    • NO bypassing catalog (external/iceberg materializations deprecated)
 
-    This provides early detection of architectural violations before deployment,
-    with helpful error messages explaining how to fix violations.
+    Validation Rules:
+        ✅ ALLOWED: materialized='table'|'view'|'incremental'
+        ❌ BANNED: materialized='external' (bypasses catalog control plane)
+        ❌ BANNED: materialized='iceberg' (deprecated - use 'table')
+        ❌ BANNED: location='s3://...' (hardcoded infrastructure)
+        ❌ BANNED: polaris_namespace, polaris_table (legacy plugin config)
+        ❌ BANNED: endpoint, bucket, region, access_key (infrastructure)
+
+    Architecture:
+        Data Engineer:  materialized='table', schema='gold'
+        Platform:       → DuckDB ATTACH polaris_catalog
+                       → CREATE TABLE polaris_catalog.demo.gold.{table}
+                       → S3 location resolved from platform.yaml
 
     Args:
         dbt_path: Path to dbt project directory.
@@ -230,18 +242,44 @@ def validate_dbt_models(dbt_path: Path) -> None:
         for config_str in config_blocks:
             if re.search(r"location\s*=\s*['\"]s3://", config_str):
                 violations.append(
-                    f"{rel_path}: Hardcoded S3 location detected. "
-                    f"Remove 'location' parameter - resolved from platform.yaml "
-                    f"via storage mapping."
+                    f"{rel_path}: Hardcoded S3 location forbidden. "
+                    f"Platform resolves locations from schema automatically. "
+                    f"Remove 'location' parameter."
                 )
 
             if re.search(r"materialized\s*=\s*['\"]external['\"]", config_str):
                 violations.append(
                     f"{rel_path}: 'external' materialization bypasses catalog control plane. "
-                    f"Use materialized='iceberg' instead to enforce catalog writes."
+                    f"Use materialized='table' instead (platform handles Iceberg writes)."
                 )
 
-            forbidden_keys = ["endpoint", "bucket", "region", "access_key"]
+            if re.search(r"materialized\s*=\s*['\"]iceberg['\"]", config_str):
+                violations.append(
+                    f"{rel_path}: 'iceberg' materialization is DEPRECATED. "
+                    f"Use materialized='table' instead (platform uses DuckDB native writes)."
+                )
+
+            if re.search(r"polaris_namespace\s*=", config_str):
+                violations.append(
+                    f"{rel_path}: 'polaris_namespace' config is DEPRECATED "
+                    f"(legacy plugin pattern). "
+                    f"Remove - platform resolves from schema automatically."
+                )
+
+            if re.search(r"polaris_table\s*=", config_str):
+                violations.append(
+                    f"{rel_path}: 'polaris_table' config is DEPRECATED (legacy plugin pattern). "
+                    f"Remove - table name inferred from model name."
+                )
+
+            forbidden_keys = [
+                "endpoint",
+                "bucket",
+                "region",
+                "access_key",
+                "catalog_uri",
+                "warehouse",
+            ]
             for key in forbidden_keys:
                 if re.search(rf"{key}\s*=", config_str, re.IGNORECASE):
                     violations.append(
@@ -251,6 +289,18 @@ def validate_dbt_models(dbt_path: Path) -> None:
 
     if violations:
         raise ValueError(
-            "dbt model architectural compliance validation failed:\n"
-            + "\n".join(f"  • {v}" for v in violations)
+            "\n" + "=" * 70 + "\n"
+            "🚨 DBT MODEL ARCHITECTURAL COMPLIANCE VALIDATION FAILED\n" + "=" * 70 + "\n\n"
+            "Catalog control plane enforcement detected violations:\n\n"
+            + "\n".join(f"  ❌ {v}" for v in violations)
+            + "\n\n"
+            "Platform uses DuckDB native Iceberg writes via ATTACH.\n"
+            "Data engineers use standard dbt syntax:\n\n"
+            "  ✅ CORRECT:\n"
+            "     {{ config(\n"
+            "         materialized='table',\n"
+            "         schema='gold'\n"
+            "     ) }}\n\n"
+            "  ❌ FORBIDDEN:\n"
+            "     location='s3://...', polaris_namespace='...', etc.\n\n" + "=" * 70 + "\n"
         )

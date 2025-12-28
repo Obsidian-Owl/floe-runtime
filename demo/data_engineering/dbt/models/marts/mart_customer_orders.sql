@@ -2,12 +2,13 @@
   config(
     materialized='table',
     schema='gold',
-    polaris_namespace='demo.gold',
     tags=['marts', 'gold', 'customer_analytics']
   )
 }}
 
 -- Gold Mart: Customer Order Analytics
+-- Platform-managed: Writes to polaris_catalog.demo.gold.mart_customer_orders
+-- Location resolved from platform.yaml storage.gold profile
 -- Aggregates customer order behavior for BI tools
 -- Joins: customers + orders + order_items + products
 
