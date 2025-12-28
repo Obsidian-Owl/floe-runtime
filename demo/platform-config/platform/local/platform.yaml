@@ -67,6 +67,73 @@ infrastructure:
         - iam
         - secretsmanager
 
+  # =============================================================================
+  # Lifecycle Management - Automated Cleanup & Resource Control
+  # =============================================================================
+  # Full automation for ephemeral resources (Dagster run pods, init jobs)
+  # Designed for OrbStack local development (24GB RAM, 14 CPUs)
+  lifecycle:
+    cleanup:
+      enabled: true
+      # Ephemeral job pods auto-deleted after completion
+      jobs:
+        ttl_seconds: 300  # 5 minutes after completion (success or failure)
+        history_limits:
+          successful: 3   # Keep last 3 successful jobs for debugging
+          failed: 5       # Keep last 5 failed jobs for troubleshooting
+    # Namespace-level resource quotas prevent runaway resource usage
+    resource_quotas:
+      enabled: true
+      namespace_limits:
+        pods: 50                      # Max 50 pods in namespace
+        requests_cpu: "8"              # 8 cores reserved
+        requests_memory: 8Gi           # 8Gi guaranteed
+        limits_cpu: "12"               # 12 cores burstable
+        limits_memory: 20Gi            # 20Gi max (4.5Gi platform + 15.5Gi jobs)
+
+  # =============================================================================
+  # Resource Profiles - Service Classification by Lifecycle
+  # =============================================================================
+  # Three profiles: platform (continuous), storage (heavy I/O), transform (ephemeral)
+  # Budget: 24GB total = 4.5GB platform + 1GB OrbStack + 18.5GB available for transforms
+  resource_profiles:
+    # Platform services (continuous) - PostgreSQL, Dagster webserver/daemon, Jaeger, Marquez
+    # Target: 256-512Mi each, total ~4.5GB for all platform services
+    platform:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+
+    # Storage services (continuous, heavy I/O) - LocalStack, Polaris
+    # LocalStack needs more memory for S3 + STS + IAM + SecretsManager
+    storage:
+      requests:
+        cpu: "200m"
+        memory: "512Mi"
+      limits:
+        cpu: "1000m"
+        memory: "1Gi"
+
+    # Transform jobs (ephemeral, high memory) - Dagster run pods
+    # DuckDB + PyArrow + dbt require 12Gi for data processing workloads
+    # Allows 1-2 concurrent transform jobs within 24GB budget
+    transform:
+      requests:
+        cpu: "1000m"       # 1 core guaranteed
+        memory: "4Gi"      # 4Gi guaranteed (ensures scheduling)
+      limits:
+        cpu: "8000m"       # 8 cores burstable
+        memory: "12Gi"     # 12Gi max (research-backed for PyArrow + DuckDB + dbt)
+      # DuckDB configuration to prevent OOM
+      # Set via environment variables in Dagster run pods
+      env:
+        DUCKDB_MEMORY_LIMIT: "8GB"  # 67% of 12Gi limit
+        DUCKDB_THREADS: "4"         # Conservative thread count
+        DUCKDB_TEMP_DIRECTORY: "/tmp/duckdb"  # Spill-to-disk location
+
 # =============================================================================
 # Security Configuration (v1.1.0)
 # =============================================================================
@@ -177,7 +244,7 @@ catalogs:
         secret_ref: polaris-client-id
       client_secret:
         secret_ref: polaris-client-secret
-      scope: "PRINCIPAL_ROLE:DATA_ENGINEER"
+      scope: "PRINCIPAL_ROLE:service_admin"
     # Disable vended credentials for LocalStack (STS support varies)
     access_delegation: none
     token_refresh_enabled: true
@@ -229,3 +296,14 @@ observability:
     backends:
       loki: false  # Not deployed in local K8s
       cloudwatch: false
+  # Dagster compute logs storage (platform-managed)
+  # Captures stdout/stderr from Dagster runs for debugging and audit
+  compute_logs:
+    enabled: true
+    manager_type: s3  # Uses LocalStack S3 for local environment
+    storage_ref: default  # References storage.default (iceberg-bronze bucket)
+    bucket: dagster-compute-logs  # Separate bucket for compute logs
+    prefix: "compute-logs/"
+    retention_days: 30  # Keep logs for 30 days
+    local_dir: /tmp/dagster-compute-logs  # Local buffer before S3 upload
+    upload_interval: 30  # Upload every 30 seconds

@@ -2,6 +2,8 @@
 
 This module exports the Compiler class, resolution utilities, and output models:
 - Compiler: Main compiler class
+- DbtProfilesGenerator: Generate dbt profiles.yml from platform.yaml
+- DagsterInstanceGenerator: Generate Dagster instance.yaml from platform.yaml
 - PlatformResolver: Load platform.yaml from file or environment
 - ProfileResolver: Resolve logical profile references to concrete configs
 - SecretResolver: Validate and resolve secret references
@@ -15,6 +17,8 @@ This module exports the Compiler class, resolution utilities, and output models:
 from __future__ import annotations
 
 from floe_core.compiler.compiler import Compiler
+from floe_core.compiler.dagster_instance_generator import DagsterInstanceGenerator
+from floe_core.compiler.dbt_profiles_generator import DbtProfilesGenerator
 from floe_core.compiler.extractor import extract_column_classifications
 from floe_core.compiler.models import (
     ArtifactMetadata,
@@ -47,6 +51,9 @@ from floe_core.errors import ProfileNotFoundError
 __all__: list[str] = [
     # Compiler class
     "Compiler",
+    # Platform-managed generators
+    "DbtProfilesGenerator",
+    "DagsterInstanceGenerator",
     # Platform resolution
     "PlatformResolver",
     "PlatformNotFoundError",

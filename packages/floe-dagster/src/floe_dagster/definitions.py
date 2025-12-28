@@ -184,6 +184,11 @@ class FloeDefinitions:
             if platform is not None:
                 # Also load floe.yaml for orchestration config
                 floe_spec = cls._load_floe_spec(namespace=namespace)
+
+                # Generate dbt profiles.yml from platform.yaml
+                if floe_spec and platform:
+                    cls._generate_dbt_profiles(platform, floe_spec, namespace=namespace)
+
                 artifacts = cls._build_artifacts_from_platform(platform, floe_spec=floe_spec)
                 if floe_spec:
                     logger.info(
@@ -244,11 +249,16 @@ class FloeDefinitions:
                     extra={"warehouse": catalog_resource.warehouse},
                 )
             except Exception as e:
-                logger.warning(
-                    "Failed to create PolarisCatalogResource: %s. "
+                logger.error(
+                    "CRITICAL: Failed to create PolarisCatalogResource: %s. "
                     "Catalog resource will not be available.",
                     e,
+                    exc_info=True,
                 )
+                raise RuntimeError(
+                    f"PolarisCatalogResource initialization failed: {e}. "
+                    "Cannot proceed without catalog."
+                ) from e
 
         # Create DbtCliResource (batteries-included for demo)
         # Extract dbt paths from orchestration config if available
@@ -269,10 +279,14 @@ class FloeDefinitions:
             resources["dbt"] = dbt_resource
             logger.info("DbtCliResource initialized")
         except Exception as e:
-            logger.warning(
-                "Failed to create DbtCliResource: %s. dbt resource will not be available.",
+            logger.error(
+                "CRITICAL: Failed to create DbtCliResource: %s. dbt resource will not be available.",
                 e,
+                exc_info=True,
             )
+            raise RuntimeError(
+                f"DbtCliResource initialization failed: {e}. Cannot proceed without dbt resource."
+            ) from e
 
         # Auto-load dbt assets from orchestration config
         if orchestration and orchestration.get("dbt"):
@@ -283,13 +297,38 @@ class FloeDefinitions:
                 dbt_config = DbtConfig(**orchestration["dbt"])
                 dbt_assets = load_dbt_assets(dbt_config)
                 if dbt_assets:
+                    logger.info(
+                        "dbt_assets loaded - type: %s, callable: %s, has_keys: %s",
+                        type(dbt_assets).__name__,
+                        callable(dbt_assets),
+                        hasattr(dbt_assets, "keys"),
+                    )
+
+                    if hasattr(dbt_assets, "keys"):
+                        asset_keys = [str(k) for k in dbt_assets.keys]
+                        logger.info(
+                            "dbt asset keys (%d total): %s",
+                            len(asset_keys),
+                            asset_keys,
+                        )
+                    elif hasattr(dbt_assets, "node_defs"):
+                        logger.info(
+                            "dbt_assets has node_defs: %d nodes",
+                            len(dbt_assets.node_defs) if dbt_assets.node_defs else 0,
+                        )
+                    else:
+                        logger.warning(
+                            "dbt_assets has unexpected structure - no 'keys' or 'node_defs' attribute"
+                        )
+
                     assets = list(assets or [])
                     assets.append(dbt_assets)
                     logger.info("Auto-loaded dbt assets from orchestration config")
             except Exception as e:
-                logger.warning(
+                logger.error(
                     "Failed to auto-load dbt assets: %s. dbt assets will not be available.",
                     e,
+                    exc_info=True,
                 )
 
         # Auto-load assets from Python modules
@@ -306,9 +345,10 @@ class FloeDefinitions:
                         len(loaded_assets),
                     )
             except Exception as e:
-                logger.warning(
+                logger.error(
                     "Failed to auto-load asset modules: %s. Asset modules will not be available.",
                     e,
+                    exc_info=True,
                 )
 
         # Auto-load partitions from orchestration config
@@ -344,9 +384,10 @@ class FloeDefinitions:
                     "Auto-loaded %d partitions from orchestration config", len(loaded_partitions)
                 )
             except Exception as e:
-                logger.warning(
+                logger.error(
                     "Failed to auto-load partitions: %s. Partitions will not be available.",
                     e,
+                    exc_info=True,
                 )
 
         # Auto-load jobs from orchestration config
@@ -371,9 +412,10 @@ class FloeDefinitions:
                     jobs.extend(loaded_jobs)
                     logger.info("Auto-loaded %d jobs from orchestration config", len(loaded_jobs))
             except Exception as e:
-                logger.warning(
+                logger.error(
                     "Failed to auto-load jobs: %s. Jobs will not be available.",
                     e,
+                    exc_info=True,
                 )
 
         # Auto-load schedules from orchestration config
@@ -399,9 +441,10 @@ class FloeDefinitions:
                         "Auto-loaded %d schedules from orchestration config", len(loaded_schedules)
                     )
             except Exception as e:
-                logger.warning(
+                logger.error(
                     "Failed to auto-load schedules: %s. Schedules will not be available.",
                     e,
+                    exc_info=True,
                 )
 
         # Auto-load sensors from orchestration config
@@ -445,9 +488,10 @@ class FloeDefinitions:
                         "Auto-loaded %d sensors from orchestration config", len(loaded_sensors)
                     )
             except Exception as e:
-                logger.warning(
+                logger.error(
                     "Failed to auto-load sensors: %s. Sensors will not be available.",
                     e,
+                    exc_info=True,
                 )
 
         # Combine all assets
@@ -710,6 +754,50 @@ class FloeDefinitions:
             "observability": observability_config,
             "orchestration": orchestration_config,
         }
+
+    @classmethod
+    def _generate_dbt_profiles(
+        cls,
+        platform: PlatformSpec,
+        floe_spec: FloeSpec,
+        namespace: str | None = None,
+    ) -> None:
+        """Generate dbt profiles.yml from platform.yaml + floe.yaml.
+
+        Generates profiles.yml at runtime to ensure dbt configuration always
+        matches the current platform configuration. Critical for K8s deployments
+        where platform.yaml comes from ConfigMaps.
+
+        Args:
+            platform: Loaded PlatformSpec from platform.yaml.
+            floe_spec: Loaded FloeSpec from floe.yaml.
+            namespace: Optional namespace for finding floe.yaml/dbt paths.
+
+        Note:
+            profiles.yml is written to:
+            1. {namespace}/dbt/profiles.yml (if namespace provided)
+            2. .floe/profiles.yml (fallback)
+        """
+        try:
+            from floe_core.compiler.dbt_profiles_generator import DbtProfilesGenerator
+
+            generator = DbtProfilesGenerator(platform, floe_spec)
+            profiles = generator.generate_profiles()
+
+            if namespace:
+                profiles_path = Path(namespace) / "dbt" / "profiles.yml"
+            else:
+                profiles_path = Path(".floe") / "profiles.yml"
+
+            generator.write_profiles_yml(profiles_path, profiles)
+            logger.info("Generated dbt profiles.yml at %s", profiles_path)
+        except ImportError:
+            logger.warning(
+                "floe_core.compiler.DbtProfilesGenerator not available. "
+                "dbt profiles.yml will not be generated."
+            )
+        except Exception as e:
+            logger.error("Failed to generate dbt profiles.yml: %s", e, exc_info=True)
 
 
 def load_definitions_from_artifacts(

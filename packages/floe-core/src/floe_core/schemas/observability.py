@@ -377,6 +377,98 @@ class LoggingConfig(BaseModel):
 
 
 # =============================================================================
+# Compute Logs Configuration
+# =============================================================================
+
+
+class ComputeLogManagerType(str, Enum):
+    """Compute log manager backend types.
+
+    Values:
+        S3: Amazon S3 or S3-compatible storage (LocalStack, MinIO).
+        AZURE_BLOB: Azure Blob Storage.
+        GCS: Google Cloud Storage.
+        LOCAL: Local filesystem storage.
+        NOOP: Disable compute log storage (not recommended).
+    """
+
+    S3 = "s3"
+    AZURE_BLOB = "azure_blob"
+    GCS = "gcs"
+    LOCAL = "local"
+    NOOP = "noop"
+
+
+class ComputeLogsConfig(BaseModel):
+    """Dagster compute logs storage configuration.
+
+    Platform-managed: Configured in platform.yaml observability section.
+    Generates Dagster instance.yaml compute_logs configuration.
+
+    Compute logs capture stdout/stderr from Dagster runs and store them
+    in object storage for debugging and audit trails.
+
+    Attributes:
+        enabled: Enable compute log capture and storage.
+        manager_type: Storage backend type.
+        storage_ref: Reference to storage profile in platform.yaml.
+        bucket: Override bucket name (defaults to storage profile bucket).
+        prefix: S3 key prefix for log files.
+        retention_days: Log retention period.
+        local_dir: Local directory for log buffering.
+        upload_interval: Upload interval in seconds.
+
+    Example:
+        >>> compute_logs = ComputeLogsConfig(
+        ...     enabled=True,
+        ...     manager_type=ComputeLogManagerType.S3,
+        ...     storage_ref="default",
+        ...     prefix="dagster-compute-logs/",
+        ...     retention_days=30,
+        ... )
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    enabled: bool = Field(
+        default=True,
+        description="Enable compute log capture and storage",
+    )
+    manager_type: ComputeLogManagerType = Field(
+        default=ComputeLogManagerType.S3,
+        description="Storage backend type",
+    )
+    storage_ref: str | None = Field(
+        default="default",
+        description="Reference to storage profile in platform.yaml",
+    )
+    bucket: str | None = Field(
+        default=None,
+        description="Override bucket name (defaults to storage profile bucket with -compute-logs suffix)",
+    )
+    prefix: str = Field(
+        default="dagster-compute-logs/",
+        description="S3 key prefix for log files",
+    )
+    retention_days: int = Field(
+        default=30,
+        ge=1,
+        le=365,
+        description="Log retention period in days",
+    )
+    local_dir: str = Field(
+        default="/tmp/dagster-compute-logs",
+        description="Local directory for log buffering before upload",
+    )
+    upload_interval: int = Field(
+        default=30,
+        ge=1,
+        le=300,
+        description="Upload interval in seconds",
+    )
+
+
+# =============================================================================
 # Observability Configuration (Root - Extended)
 # =============================================================================
 
@@ -386,7 +478,7 @@ class ObservabilityConfig(BaseModel):
 
     Enables OpenTelemetry traces and metrics, plus OpenLineage
     for data lineage tracking. Extended with enterprise tracing
-    sampling, metrics exporters, and logging backends.
+    sampling, metrics exporters, logging backends, and compute log storage.
 
     Attributes:
         traces: Enable OpenTelemetry traces.
@@ -398,6 +490,7 @@ class ObservabilityConfig(BaseModel):
         tracing: Extended tracing configuration (sampling, exporters).
         metrics_config: Extended metrics configuration (exporters, alerting).
         logging: Extended logging configuration (backends, format).
+        compute_logs: Dagster compute logs storage (platform-managed).
 
     Example:
         >>> config = ObservabilityConfig(
@@ -450,4 +543,8 @@ class ObservabilityConfig(BaseModel):
     logging: LoggingConfig | None = Field(
         default=None,
         description="Extended logging configuration",
+    )
+    compute_logs: ComputeLogsConfig | None = Field(
+        default=None,
+        description="Dagster compute logs storage configuration (platform-managed)",
     )

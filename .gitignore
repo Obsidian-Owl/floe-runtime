@@ -43,6 +43,8 @@ dbt_packages/
 dbt_modules/
 logs/
 *.log
+# Generated profiles.yml (created from platform.yaml)
+**/profiles.yml
 
 # Dagster
 .dagster/

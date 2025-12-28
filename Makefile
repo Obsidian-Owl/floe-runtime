@@ -347,6 +347,36 @@ demo-cleanup:
 	@kubectl delete pods -n $(FLOE_NAMESPACE) --field-selector=status.phase==Succeeded 2>/dev/null || echo "No completed pods to clean"
 	@echo "✅ Cleanup complete"
 
+# Daily development cleanup (pods + failed resources)
+dev-clean:
+	@echo "⎈ Running daily development cleanup..."
+	@echo "  Deleting completed pods..."
+	@kubectl delete pods -n $(FLOE_NAMESPACE) --field-selector=status.phase==Succeeded 2>/dev/null || echo "  No completed pods"
+	@echo "  Deleting failed pods..."
+	@kubectl delete pods -n $(FLOE_NAMESPACE) --field-selector=status.phase==Failed 2>/dev/null || echo "  No failed pods"
+	@echo "  Pruning Docker volumes..."
+	@docker volume prune -f 2>&1 | grep "Total reclaimed" || true
+	@echo "✅ Daily cleanup complete"
+
+# Nuclear option: complete environment reset
+dev-reset:
+	@echo "⚠️  WARNING: This will completely reset your local environment!"
+	@echo "  - All pods in namespace '$(FLOE_NAMESPACE)' will be deleted"
+	@echo "  - All Docker volumes will be pruned"
+	@echo ""
+	@read -p "Are you sure? Type 'yes' to continue: " confirm && [ "$$confirm" = "yes" ] || (echo "Cancelled" && exit 1)
+	@echo ""
+	@echo "⎈ Deleting all Helm releases..."
+	@helm uninstall floe-cube -n $(FLOE_NAMESPACE) 2>/dev/null || true
+	@helm uninstall floe-dagster -n $(FLOE_NAMESPACE) 2>/dev/null || true
+	@helm uninstall floe-infra -n $(FLOE_NAMESPACE) 2>/dev/null || true
+	@echo "⎈ Deleting namespace..."
+	@kubectl delete namespace $(FLOE_NAMESPACE) --wait --timeout=60s 2>/dev/null || true
+	@echo "⎈ Pruning Docker resources..."
+	@docker volume prune -f
+	@docker container prune -f
+	@echo "✅ Environment reset complete. Run 'make deploy-local-full' to redeploy."
+
 # Show logs from demo user deployment (tail)
 demo-logs:
 	@echo "⎈ Floe Demo Logs (floe-demo user deployment)"
