@@ -1,0 +1,109 @@
+# Floe Runtime Demo Pipeline Configuration
+#
+# This file defines the demo pipeline using logical profile references (Two-Tier Architecture).
+# Infrastructure configuration (endpoints, credentials) is defined in platform.yaml.
+# The same floe.yaml works across local, dev, staging, and production environments.
+#
+# Profile references:
+#   storage: "default"  - Resolved from platform.yaml storage profiles
+#   catalog: "default"  - Resolved from platform.yaml catalogs profiles
+#   compute: "default"  - Resolved from platform.yaml compute profiles
+#
+# To run the demo:
+#   export FLOE_PLATFORM_ENV=local  # or dev, staging, prod
+#   floe compile
+#   dagster dev
+#
+# Covers: 007-FR-029 (E2E validation tests)
+# Covers: 007-FR-031 (Medallion architecture demo)
+# Covers: 009-FR-001 (Two-Tier Configuration Architecture)
+
+name: floe-demo
+version: "1.0.0"
+
+# Profile references - resolved at compile/deploy time from platform.yaml
+storage: default
+catalog: default
+compute: default
+
+# Service account identity (for catalog RBAC)
+service_account: demo_service
+principal_role: demo_service
+
+# dbt transformation layer
+transforms:
+  - type: dbt
+    path: "."
+    target: demo
+
+# Orchestration configuration (NEW - auto-discovery)
+orchestration:
+  # Auto-discover Python assets from modules
+  asset_modules:
+    - data_engineering.orchestration.assets.bronze
+    - data_engineering.orchestration.assets.ops
+
+  # Auto-load dbt models as individual assets with per-model observability
+  dbt:
+    manifest_path: "data_engineering/dbt/target/manifest.json"
+    project_dir: "data_engineering/dbt"
+    profiles_dir: "data_engineering/dbt"
+
+  # Jobs - declarative asset selection
+  jobs:
+    demo_bronze:
+      type: batch
+      selection: ["group:bronze"]
+      description: "Load bronze layer: raw tables → bronze Iceberg tables"
+
+    demo_pipeline:
+      type: batch
+      selection: ["group:bronze", "group:silver", "group:gold"]
+      description: "Full demo pipeline: bronze → silver → gold"
+
+    maintenance:
+      type: ops
+      target_function: data_engineering.orchestration.assets.ops.vacuum_old_snapshots
+      args:
+        retention_days: 30
+      description: "Vacuum old Iceberg snapshots"
+
+  # Schedules - declarative job scheduling
+  schedules:
+    bronze_refresh_schedule:
+      job: demo_bronze
+      cron_schedule: "*/5 * * * *"
+      description: "Refresh bronze layer every 5 minutes"
+
+    transform_pipeline_schedule:
+      job: demo_pipeline
+      cron_schedule: "*/5 * * * *"
+      description: "Run full transform pipeline every 5 minutes"
+
+  # Sensors - event-driven execution
+  sensors:
+    file_arrival_sensor:
+      type: file_watcher
+      job: demo_bronze
+      path: "/tmp"
+      pattern: "demo_trigger"
+      poll_interval_seconds: 60
+      description: "Trigger pipeline when trigger file appears"
+
+# Semantic layer configuration (Cube)
+consumption:
+  enabled: false  # Disabled for initial demo
+
+# Data governance configuration
+governance:
+  classification_source: dbt_meta
+
+# Observability configuration
+# Actual endpoints (Jaeger, Marquez) are configured in platform.yaml
+observability:
+  traces: true
+  metrics: true
+  lineage: true
+  attributes:
+    service.name: floe-demo
+    deployment.environment: "${FLOE_PLATFORM_ENV:-local}"

@@ -1,0 +1,51 @@
+{{- if .Values.limitRange.enabled -}}
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: {{ include "floe-infrastructure.fullname" . }}-limits
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "floe-infrastructure.labels" . | nindent 4 }}
+    app.kubernetes.io/component: resource-management
+spec:
+  limits:
+  # Container-level limits - apply to each container
+  - type: Container
+    # Default limits (if pod doesn't specify)
+    # These align with "platform" profile from platform.yaml
+    default:
+      cpu: {{ .Values.limitRange.container.default.cpu }}
+      memory: {{ .Values.limitRange.container.default.memory }}
+
+    # Default requests (if pod doesn't specify)
+    defaultRequest:
+      cpu: {{ .Values.limitRange.container.defaultRequest.cpu }}
+      memory: {{ .Values.limitRange.container.defaultRequest.memory }}
+
+    # Minimum allowed - prevent tiny pods
+    min:
+      cpu: {{ .Values.limitRange.container.min.cpu }}
+      memory: {{ .Values.limitRange.container.min.memory }}
+
+    # Maximum allowed - prevent single pod consuming all resources
+    # Max set to "transform" profile (12Gi for Dagster run pods)
+    max:
+      cpu: {{ .Values.limitRange.container.max.cpu }}
+      memory: {{ .Values.limitRange.container.max.memory }}
+
+  # Pod-level limits - sum of all containers in pod
+  - type: Pod
+    min:
+      cpu: {{ .Values.limitRange.pod.min.cpu }}
+      memory: {{ .Values.limitRange.pod.min.memory }}
+    max:
+      cpu: {{ .Values.limitRange.pod.max.cpu }}
+      memory: {{ .Values.limitRange.pod.max.memory }}
+
+  # PersistentVolumeClaim limits (not used in local dev, but good practice)
+  - type: PersistentVolumeClaim
+    min:
+      storage: 1Gi
+    max:
+      storage: 100Gi
+{{- end }}

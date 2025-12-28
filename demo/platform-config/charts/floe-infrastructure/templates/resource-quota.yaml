@@ -1,0 +1,55 @@
+{{- if .Values.resourceQuota.enabled -}}
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: {{ include "floe-infrastructure.fullname" . }}-quota
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "floe-infrastructure.labels" . | nindent 4 }}
+    app.kubernetes.io/component: resource-management
+spec:
+  hard:
+    # Pod limits - prevent runaway pod creation
+    pods: {{ .Values.resourceQuota.limits.pods | quote }}
+
+    # CPU quotas - ensure platform services get resources
+    requests.cpu: {{ .Values.resourceQuota.limits.requests_cpu | quote }}
+    limits.cpu: {{ .Values.resourceQuota.limits.limits_cpu | quote }}
+
+    # Memory quotas - critical for preventing OOM scenarios
+    # Allocation: 4.5GB platform + 15.5GB transforms = 20GB total
+    requests.memory: {{ .Values.resourceQuota.limits.requests_memory }}
+    limits.memory: {{ .Values.resourceQuota.limits.limits_memory }}
+
+    # Storage quotas (emptyDir uses memory, but we're not persisting)
+    # persistentvolumeclaims: "0"  # Not using PVCs for local dev
+
+    # Service limits
+    services: "20"
+    services.nodeports: "10"
+
+    # ConfigMap and Secret limits
+    configmaps: "50"
+    secrets: "50"
+---
+# Scope selector to exclude system pods from quota
+# This ensures kube-system and other system namespaces aren't affected
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: {{ include "floe-infrastructure.fullname" . }}-quota-scoped
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "floe-infrastructure.labels" . | nindent 4 }}
+    app.kubernetes.io/component: resource-management
+spec:
+  hard:
+    # Only count pods that are not in Terminating or Failed state
+    count/pods: {{ .Values.resourceQuota.limits.pods | quote }}
+  scopeSelector:
+    matchExpressions:
+    - operator: In
+      scopeName: PriorityClass
+      values:
+      - ""  # Empty string matches pods without priority class
+{{- end }}

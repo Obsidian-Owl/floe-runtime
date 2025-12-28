@@ -1,10 +1,8 @@
 {{
   config(
-    materialized='external',
-    location='s3://temp-dbt/gold/mart_customer_orders',
-    format='parquet',
+    materialized='table',
+    schema='gold',
     polaris_namespace='demo.gold',
-    polaris_table='mart_customer_orders',
     tags=['marts', 'gold', 'customer_analytics']
   )
 }}

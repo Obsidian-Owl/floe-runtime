@@ -1,0 +1,147 @@
+# Optional CronJob for Automated Kubernetes Cleanup
+#
+# This CronJob automatically cleans completed Dagster job pods and old jobs
+# to prevent resource accumulation in local development environments.
+#
+# Deploy with:
+#   kubectl apply -f k8s/cleanup-cronjob.yaml -n floe
+#
+# Remove with:
+#   kubectl delete cronjob floe-cleanup -n floe
+#
+# Schedule: Daily at 3 AM (adjust as needed)
+# Job History: Keeps last 3 successful and 1 failed job
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: floe-cleanup
+  namespace: floe
+  labels:
+    app: floe-cleanup
+    component: maintenance
+spec:
+  schedule: "0 3 * * *"  # Daily at 3 AM
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  concurrencyPolicy: Forbid  # Don't run multiple cleanup jobs simultaneously
+  jobTemplate:
+    metadata:
+      labels:
+        app: floe-cleanup
+        component: maintenance
+    spec:
+      ttlSecondsAfterFinished: 3600  # Clean up the cleanup job after 1 hour
+      template:
+        metadata:
+          labels:
+            app: floe-cleanup
+            component: maintenance
+        spec:
+          serviceAccountName: floe-cleanup
+          restartPolicy: OnFailure
+          containers:
+          - name: cleanup
+            image: bitnami/kubectl:latest
+            imagePullPolicy: IfNotPresent
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              echo "🧹 Starting automated cleanup at $(date)"
+
+              # Clean completed pods (Succeeded status)
+              COMPLETED_PODS=$(kubectl get pods --field-selector=status.phase==Succeeded --no-headers 2>/dev/null | wc -l)
+              if [ "$COMPLETED_PODS" -gt 0 ]; then
+                echo "ℹ️  Deleting $COMPLETED_PODS completed pods"
+                kubectl delete pods --field-selector=status.phase==Succeeded --wait=false
+              else
+                echo "ℹ️  No completed pods to clean"
+              fi
+
+              # Clean failed pods (Failed status)
+              FAILED_PODS=$(kubectl get pods --field-selector=status.phase==Failed --no-headers 2>/dev/null | wc -l)
+              if [ "$FAILED_PODS" -gt 0 ]; then
+                echo "ℹ️  Deleting $FAILED_PODS failed pods"
+                kubectl delete pods --field-selector=status.phase==Failed --wait=false
+              else
+                echo "ℹ️  No failed pods to clean"
+              fi
+
+              # Clean old completed jobs (older than 2 hours)
+              # Get completed jobs and filter by completion time
+              OLD_JOBS=$(kubectl get jobs -o jsonpath='{range .items[?(@.status.completionTime)]}{.metadata.name}{" "}{.status.completionTime}{"\n"}{end}' | \
+                awk -v cutoff="$(date -u -d '2 hours ago' '+%Y-%m-%dT%H:%M:%SZ')" '$2 < cutoff {print $1}')
+
+              if [ -n "$OLD_JOBS" ]; then
+                JOB_COUNT=$(echo "$OLD_JOBS" | wc -l)
+                echo "ℹ️  Deleting $JOB_COUNT old completed jobs"
+                echo "$OLD_JOBS" | while read -r job; do
+                  [ -n "$job" ] && kubectl delete job "$job" --wait=false || true
+                done
+              else
+                echo "ℹ️  No old jobs to clean"
+              fi
+
+              echo "✅ Cleanup completed at $(date)"
+
+              # Show remaining resources for logging
+              echo "📊 Current status:"
+              echo "   Pods: $(kubectl get pods --no-headers 2>/dev/null | wc -l)"
+              echo "   Jobs: $(kubectl get jobs --no-headers 2>/dev/null | wc -l)"
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                cpu: 200m
+                memory: 128Mi
+
+---
+# ServiceAccount for the cleanup job
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: floe-cleanup
+  namespace: floe
+  labels:
+    app: floe-cleanup
+    component: maintenance
+
+---
+# ClusterRole with minimal permissions for cleanup operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: floe-cleanup
+  namespace: floe
+  labels:
+    app: floe-cleanup
+    component: maintenance
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "delete"]
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "delete"]
+
+---
+# RoleBinding to grant the ServiceAccount cleanup permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: floe-cleanup
+  namespace: floe
+  labels:
+    app: floe-cleanup
+    component: maintenance
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: floe-cleanup
+subjects:
+- kind: ServiceAccount
+  name: floe-cleanup
+  namespace: floe

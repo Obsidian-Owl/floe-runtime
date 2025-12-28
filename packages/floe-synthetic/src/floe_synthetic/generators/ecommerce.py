@@ -260,11 +260,11 @@ class EcommerceGenerator(DataGenerator):
 
         return pa.table(
             {
-                "id": pa.array(order_ids, type=pa.int64()),
+                "order_id": pa.array(order_ids, type=pa.int64()),
                 "customer_id": pa.array(customer_ids, type=pa.int64()),
                 "status": pa.array(order_statuses, type=pa.string()),
                 "region": pa.array(order_regions, type=pa.string()),
-                "amount": pa.array(amounts, type=pa.float64()),
+                "total_amount": pa.array(amounts, type=pa.float64()),
                 "created_at": pa.array(created_ats, type=pa.timestamp("us")),
             }
         )
@@ -342,6 +342,14 @@ class EcommerceGenerator(DataGenerator):
             sku = f"{category[:3].upper()}-{self.fake.random_int(100, 999)}"
             skus.append(sku)
 
+        # Generate created_at timestamps for products
+        start_date = datetime.now() - timedelta(days=730)
+        end_date = datetime.now()
+        created_ats: list[datetime] = [
+            self.fake.date_time_between(start_date=start_date, end_date=end_date)
+            for _ in range(count)
+        ]
+
         self._log_generation("products", count)
 
         return pa.table(
@@ -351,6 +359,7 @@ class EcommerceGenerator(DataGenerator):
                 "category": pa.array(product_categories, type=pa.string()),
                 "price": pa.array(prices, type=pa.float64()),
                 "sku": pa.array(skus, type=pa.string()),
+                "created_at": pa.array(created_ats, type=pa.timestamp("us")),
             }
         )
 
@@ -428,9 +437,10 @@ class EcommerceGenerator(DataGenerator):
         order_ids: list[int] = []
         product_ids: list[int] = []
         quantities: list[int] = []
-        unit_prices: list[float] = []
+        prices: list[float] = []
         discounts: list[float] = []
         subtotals: list[float] = []
+        created_ats: list[datetime] = []
 
         for i in range(count):
             order_item_id = start_id + i
@@ -447,15 +457,15 @@ class EcommerceGenerator(DataGenerator):
             quantity = self.fake.random_int(min=min_quantity, max=max_quantity)
             quantities.append(quantity)
 
-            # Generate unit price (realistic product price range)
-            unit_price = float(
+            # Generate price (realistic product price range)
+            price = float(
                 self.fake.pydecimal(
                     min_value=Decimal("5.00"),
                     max_value=Decimal("500.00"),
                     right_digits=2,
                 )
             )
-            unit_prices.append(unit_price)
+            prices.append(price)
 
             # Generate discount
             discount = float(
@@ -468,8 +478,15 @@ class EcommerceGenerator(DataGenerator):
             discounts.append(discount)
 
             # Calculate subtotal
-            subtotal = (quantity * unit_price) - discount
+            subtotal = (quantity * price) - discount
             subtotals.append(round(subtotal, 2))
+
+            # Generate created_at timestamp
+            created_at = self.fake.date_time_between(
+                start_date=datetime.now() - timedelta(days=365),
+                end_date=datetime.now(),
+            )
+            created_ats.append(created_at)
 
         self._log_generation("order_items", count)
 
@@ -479,9 +496,10 @@ class EcommerceGenerator(DataGenerator):
                 "order_id": pa.array(order_ids, type=pa.int64()),
                 "product_id": pa.array(product_ids, type=pa.int64()),
                 "quantity": pa.array(quantities, type=pa.int64()),
-                "unit_price": pa.array(unit_prices, type=pa.float64()),
+                "price": pa.array(prices, type=pa.float64()),
                 "discount": pa.array(discounts, type=pa.float64()),
                 "subtotal": pa.array(subtotals, type=pa.float64()),
+                "created_at": pa.array(created_ats, type=pa.timestamp("us")),
             }
         )
 

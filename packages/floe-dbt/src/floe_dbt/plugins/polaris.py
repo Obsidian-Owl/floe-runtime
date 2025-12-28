@@ -92,6 +92,7 @@ class Plugin(BasePlugin):
         Args:
             config: Plugin configuration from generated profiles.yml.
                    Values use {{ env_var('VAR') }} interpolation.
+                   Includes storage_mapping from platform.yaml.
         """
         self.config = config
 
@@ -122,6 +123,8 @@ class Plugin(BasePlugin):
 
         self.catalog = PolarisCatalog(catalog_config)
 
+        self.storage_mapping = config.get("storage_mapping", {})
+
     def configure_connection(self, conn: Any) -> None:
         """Attach Polaris Iceberg catalog to DuckDB connection.
 
@@ -132,6 +135,8 @@ class Plugin(BasePlugin):
         Args:
             conn: DuckDB connection object.
         """
+        self._validate_catalog_control_plane()
+
         catalog_uri = self.config["catalog_uri"]
         warehouse = self.config["warehouse"]
 
@@ -173,6 +178,83 @@ class Plugin(BasePlugin):
             traceback.print_exc()
             print(f"Warning: Failed to attach Polaris catalog: {e}")
 
+    def _validate_catalog_control_plane(self) -> None:
+        """Enforce catalog control plane - reject patterns that bypass the catalog.
+
+        Scans dbt manifest for forbidden patterns that would bypass Polaris catalog:
+        • materialized='external' with location parameter (direct S3 writes)
+        • Hardcoded S3 paths in model configs
+        • Direct storage/endpoint references
+
+        This enforces the architectural principle that ALL Iceberg writes must go
+        through the Polaris catalog control plane for:
+        • Access control (RBAC)
+        • Audit trails
+        • Governance policies
+        • Environment portability
+
+        Raises:
+            ValueError: If architectural violations are detected.
+        """
+        import json
+        from pathlib import Path
+
+        manifest_path = Path.cwd() / "target" / "manifest.json"
+        if not manifest_path.exists():
+            return
+
+        try:
+            manifest = json.loads(manifest_path.read_text())
+        except Exception:
+            return
+
+        violations = []
+
+        for node_id, node in manifest.get("nodes", {}).items():
+            if node.get("resource_type") != "model":
+                continue
+
+            config = node.get("config", {})
+            model_name = node.get("name", node_id)
+
+            if config.get("materialized") == "external":
+                violations.append(
+                    f"{model_name}: 'external' materialization bypasses Polaris catalog. "
+                    f"Use materialized='iceberg' to enforce catalog control plane."
+                )
+
+            location = config.get("location", "")
+            if location and location.startswith("s3://"):
+                violations.append(
+                    f"{model_name}: Hardcoded S3 path '{location}' detected. "
+                    f"Remove 'location' parameter - storage resolved from platform.yaml."
+                )
+
+            for key in config:
+                if "endpoint" in key.lower() or "bucket" in key.lower():
+                    violations.append(
+                        f"{model_name}: Infrastructure key '{key}' forbidden. "
+                        f"All infrastructure configured in platform.yaml."
+                    )
+
+        if violations:
+            error_msg = (
+                "\n" + "=" * 70 + "\n"
+                "🚨 CATALOG CONTROL PLANE VIOLATION DETECTED\n" + "=" * 70 + "\n\n"
+                "All Iceberg table writes MUST go through the Polaris catalog.\n"
+                "Direct S3 writes bypass:\n"
+                "  • Access control (RBAC)\n"
+                "  • Audit trails\n"
+                "  • Governance policies\n"
+                "  • Environment portability\n\n"
+                "Violations found:\n\n"
+                + "\n".join(f"  ❌ {v}" for v in violations)
+                + "\n\n"
+                + "=" * 70
+                + "\n"
+            )
+            raise ValueError(error_msg)
+
     def store(self, target_config: TargetConfig) -> None:
         """Write dbt transformation output to Iceberg table via Polaris.
 
@@ -211,20 +293,25 @@ class Plugin(BasePlugin):
 
         iceberg_schema = Schema(*iceberg_fields)
 
+        schema = target_config.config.get("schema", "default")
+
+        storage_config = self.storage_mapping.get(schema)
+        if not storage_config:
+            storage_config = self.storage_mapping.get("default", {})
+
+        if not storage_config:
+            raise ValueError(
+                f"No storage configuration found for schema '{schema}'. "
+                f"Available schemas: {list(self.storage_mapping.keys())}"
+            )
+
+        bucket = storage_config.get("bucket", "iceberg-data")
+        location = f"s3://{bucket}/demo/{table_name}"
+
         try:
             existing_table = self.catalog._catalog.load_table(full_table_id)
             existing_table.overwrite(table_data)
         except Exception:
-            schema = namespace.split(".")[-1]
-            if schema == "silver":
-                bucket = "iceberg-silver"
-            elif schema == "gold":
-                bucket = "iceberg-gold"
-            else:
-                bucket = "iceberg-data"
-
-            location = f"s3://{bucket}/{namespace.replace('.', '/')}/{table_name}"
-
             self.catalog._catalog.create_table(
                 identifier=full_table_id,
                 schema=iceberg_schema,

@@ -191,3 +191,66 @@ def _scan_file_for_credentials(path: Path) -> None:
             field_name=f"file '{path.name}'",
             secret_type=detected[0].secret_type,
         )
+
+
+def validate_dbt_models(dbt_path: Path) -> None:
+    """Validate dbt models for architectural compliance at compile-time.
+
+    Scans all dbt SQL models and enforces catalog control plane architecture:
+    • No hardcoded S3 paths (violates environment portability)
+    • No materialized='external' (bypasses catalog control plane)
+    • No infrastructure keywords in configs (endpoints, buckets, etc.)
+
+    This provides early detection of architectural violations before deployment,
+    with helpful error messages explaining how to fix violations.
+
+    Args:
+        dbt_path: Path to dbt project directory.
+
+    Raises:
+        ValueError: If architectural violations are detected.
+
+    Example:
+        >>> validate_dbt_models(Path("demo/data_engineering/dbt"))
+    """
+    import re
+
+    models_path = dbt_path / "models"
+    if not models_path.exists():
+        return
+
+    violations = []
+
+    for model_file in models_path.rglob("*.sql"):
+        content = model_file.read_text()
+        rel_path = model_file.relative_to(dbt_path)
+
+        config_blocks = re.findall(r"{{\s*config\((.*?)\)\s*}}", content, re.DOTALL)
+
+        for config_str in config_blocks:
+            if re.search(r"location\s*=\s*['\"]s3://", config_str):
+                violations.append(
+                    f"{rel_path}: Hardcoded S3 location detected. "
+                    f"Remove 'location' parameter - resolved from platform.yaml "
+                    f"via storage mapping."
+                )
+
+            if re.search(r"materialized\s*=\s*['\"]external['\"]", config_str):
+                violations.append(
+                    f"{rel_path}: 'external' materialization bypasses catalog control plane. "
+                    f"Use materialized='iceberg' instead to enforce catalog writes."
+                )
+
+            forbidden_keys = ["endpoint", "bucket", "region", "access_key"]
+            for key in forbidden_keys:
+                if re.search(rf"{key}\s*=", config_str, re.IGNORECASE):
+                    violations.append(
+                        f"{rel_path}: Infrastructure key '{key}' forbidden. "
+                        f"All infrastructure configured in platform.yaml only."
+                    )
+
+    if violations:
+        raise ValueError(
+            "dbt model architectural compliance validation failed:\n"
+            + "\n".join(f"  • {v}" for v in violations)
+        )

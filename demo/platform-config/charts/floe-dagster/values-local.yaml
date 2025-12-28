@@ -102,7 +102,7 @@ dagster:
                   path: platform.yaml
           - name: dagster-instance
             configMap:
-              name: dagster-instance
+              name: floe-dagster-instance
               items:
                 - key: dagster.yaml
                   path: dagster.yaml
@@ -324,7 +324,7 @@ dagster:
                       path: platform.yaml
               - name: dagster-instance
                 configMap:
-                  name: dagster-instance
+                  name: floe-dagster-instance
                   items:
                     - key: dagster.yaml
                       path: dagster.yaml

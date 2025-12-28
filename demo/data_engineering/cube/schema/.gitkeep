@@ -1,0 +1,6 @@
+# Cube semantic layer schemas
+# Defines metrics, dimensions, and pre-aggregations
+# See plan.md for schema specifications:
+# - Orders.js
+# - Customers.js
+# - Products.js

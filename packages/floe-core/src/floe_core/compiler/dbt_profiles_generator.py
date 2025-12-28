@@ -247,6 +247,9 @@ class DbtProfilesGenerator:
         Uses environment variable interpolation for secrets to maintain
         Two-Tier Architecture separation.
 
+        Includes storage_mapping from platform.yaml to enable automatic
+        resolution of schema → S3 bucket paths for Iceberg tables.
+
         Args:
             catalog: CatalogProfile containing catalog endpoint and warehouse.
             storage: StorageProfile containing S3 configuration.
@@ -280,7 +283,45 @@ class DbtProfilesGenerator:
         config["s3_access_key_id"] = "{{ env_var('AWS_ACCESS_KEY_ID') }}"
         config["s3_secret_access_key"] = "{{ env_var('AWS_SECRET_ACCESS_KEY') }}"
 
+        storage_mapping = self._build_storage_mapping()
+        if storage_mapping:
+            config["storage_mapping"] = storage_mapping
+
         return config
+
+    def _build_storage_mapping(self) -> dict[str, dict[str, str]]:
+        """Build storage mapping from platform.yaml storage profiles.
+
+        Creates a mapping from logical schema names (bronze, silver, gold)
+        to their physical storage configuration (bucket, endpoint).
+
+        This enables the plugin to automatically resolve:
+            schema='gold' → s3://iceberg-gold/... (via platform.yaml)
+
+        Returns:
+            Storage mapping dictionary: {schema: {bucket, endpoint}}
+
+        Example:
+            >>> {
+            ...     'bronze': {'bucket': 'iceberg-bronze', 'endpoint': 'http://...'},
+            ...     'silver': {'bucket': 'iceberg-silver', 'endpoint': 'http://...'},
+            ...     'gold': {'bucket': 'iceberg-gold', 'endpoint': 'http://...'}
+            ... }
+        """
+        mapping = {}
+
+        for schema_name in ["bronze", "silver", "gold", "default"]:
+            try:
+                profile = self.platform.get_storage_profile(schema_name)
+                mapping[schema_name] = {
+                    "bucket": profile.bucket,
+                    "endpoint": profile.get_endpoint(),
+                    "region": profile.region,
+                }
+            except KeyError:
+                continue
+
+        return mapping
 
     def write_profiles_yml(
         self,

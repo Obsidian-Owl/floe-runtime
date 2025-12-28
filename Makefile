@@ -212,6 +212,7 @@ deploy-local-dagster:
 	helm upgrade --install floe-dagster $(DEMO_CHARTS_DIR)/floe-dagster/ \
 		--namespace $(FLOE_NAMESPACE) \
 		--values $(DEMO_CHARTS_DIR)/floe-dagster/values-local.yaml \
+		--skip-schema-validation \
 		--wait --timeout 5m
 	@echo "✅ Dagster deployed!"
 	@echo ""
