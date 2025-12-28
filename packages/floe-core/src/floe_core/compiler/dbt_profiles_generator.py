@@ -201,9 +201,10 @@ class DbtProfilesGenerator:
             if storage_mappings:
                 output["vars"]["floe_storage_mappings"] = storage_mappings
 
-        attach_config = self._build_attach_config(catalog, storage)
-        if attach_config:
-            output["attach"] = [attach_config]
+        # ATTACH is handled by plugin.configure_connection() - no profiles.yml config needed
+        # attach_config = self._build_attach_config(catalog, storage)
+        # if attach_config:
+        #     output["attach"] = [attach_config]
 
         plugin_config = self._build_polaris_plugin_config(catalog, storage)
         if plugin_config:
