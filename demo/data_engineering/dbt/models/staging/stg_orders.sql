@@ -14,7 +14,7 @@
 --   - Cast timestamps
 
 with source as (
-    select * from {{ iceberg_source('demo', 'bronze_orders') }}
+    select * from {{ source('bronze', 'bronze_orders') }}
 ),
 
 cleaned as (

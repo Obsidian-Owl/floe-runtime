@@ -14,7 +14,7 @@
 --   - Filter out invalid records
 
 with source as (
-    select * from {{ iceberg_source('demo', 'bronze_customers') }}
+    select * from {{ source('bronze', 'bronze_customers') }}
 ),
 
 deduped as (

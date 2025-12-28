@@ -1,0 +1,21 @@
+version: 2
+
+sources:
+  - name: bronze
+    description: |
+      Bronze layer tables created by Dagster Python assets.
+      These tables are written to the Polaris catalog in the 'demo' namespace.
+    database: polaris_catalog
+    schema: demo
+    tables:
+      - name: bronze_customers
+        description: Raw customer data loaded to Iceberg from demo.raw_customers
+
+      - name: bronze_products
+        description: Raw product data loaded to Iceberg from demo.raw_products
+
+      - name: bronze_orders
+        description: Raw order data loaded to Iceberg from demo.raw_orders
+
+      - name: bronze_order_items
+        description: Raw order item data loaded to Iceberg from demo.raw_order_items
