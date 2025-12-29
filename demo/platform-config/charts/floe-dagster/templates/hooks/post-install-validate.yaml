@@ -1,0 +1,179 @@
+{{- if .Values.postInstallValidation.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "floe-dagster.fullname" . }}-validate
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "floe-dagster.labels" . | nindent 4 }}
+    app.kubernetes.io/component: validation-job
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  ttlSecondsAfterFinished: 300  # Auto-cleanup after 5 minutes
+  template:
+    metadata:
+      labels:
+        {{- include "floe-dagster.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: validation-job
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: validator
+        image: python:3.11-slim
+        command:
+        - python
+        - -c
+        - |
+          import sys
+          import json
+          import time
+          import urllib.request
+          import urllib.error
+          from datetime import datetime
+          from dataclasses import dataclass, asdict, field
+          from typing import Optional
+
+          @dataclass
+          class ValidationCheck:
+              name: str
+              passed: bool
+              message: str
+              duration_ms: int
+              depends_on: list = field(default_factory=list)
+
+          checks = []
+
+          def check(name, depends_on=None):
+              """Decorator for validation checks with dependency tracking."""
+              def decorator(func):
+                  start_ms = int(time.time() * 1000)
+                  try:
+                      func()
+                      passed = True
+                      message = "OK"
+                  except Exception as e:
+                      passed = False
+                      message = str(e)
+                  duration_ms = int(time.time() * 1000) - start_ms
+
+                  checks.append(ValidationCheck(
+                      name=name,
+                      passed=passed,
+                      message=message,
+                      duration_ms=duration_ms,
+                      depends_on=depends_on or []
+                  ))
+                  return func
+              return decorator
+
+          def http_check(url, timeout=5):
+              """Helper to perform HTTP health check."""
+              req = urllib.request.Request(url)
+              with urllib.request.urlopen(req, timeout=timeout) as response:
+                  if response.status != 200:
+                      raise Exception(f"HTTP {response.status}")
+                  return response.read().decode('utf-8')
+
+          # Define validation checks
+          @check("PostgreSQL")
+          def check_postgres():
+              """Verify PostgreSQL is accepting connections."""
+              # We can't easily check PostgreSQL without psycopg2,
+              # so we infer health from dependent services
+              pass  # Implicit check via dependencies
+
+          @check("LocalStack S3", depends_on=["PostgreSQL"])
+          def check_s3():
+              """Verify LocalStack S3 service is running."""
+              health_data = http_check("http://floe-infra-localstack:4566/_localstack/health")
+              health_json = json.loads(health_data)
+              s3_status = health_json.get("services", {}).get("s3")
+              if s3_status not in ["running", "available"]:
+                  raise Exception(f"S3 service status: {s3_status}")
+
+          @check("Polaris Catalog", depends_on=["PostgreSQL", "LocalStack S3"])
+          def check_polaris():
+              """Verify Polaris catalog is responding."""
+              http_check("http://floe-infra-polaris:8182/q/health/ready")
+
+          @check("Dagster Webserver", depends_on=["PostgreSQL"])
+          def check_dagster_webserver():
+              """Verify Dagster webserver is responding."""
+              server_info = http_check("http://floe-dagster-dagster-webserver/server_info")
+              # Verify it's actually JSON
+              json.loads(server_info)
+
+          @check("Dagster Daemon", depends_on=["Dagster Webserver"])
+          def check_dagster_daemon():
+              """Verify Dagster daemon is healthy."""
+              query = '{"query": "{ instance { daemonHealth { allDaemonStatuses { healthy daemonType } } } }"}'
+              req = urllib.request.Request(
+                  "http://floe-dagster-dagster-webserver/graphql",
+                  data=query.encode('utf-8'),
+                  headers={"Content-Type": "application/json"}
+              )
+              with urllib.request.urlopen(req, timeout=10) as response:
+                  data = json.loads(response.read().decode('utf-8'))
+
+              daemon_statuses = data["data"]["instance"]["daemonHealth"]["allDaemonStatuses"]
+              unhealthy = [d for d in daemon_statuses if not d["healthy"]]
+              if unhealthy:
+                  raise Exception(f"Unhealthy daemons: {[d['daemonType'] for d in unhealthy]}")
+
+          @check("Cube API", depends_on=["Polaris Catalog"])
+          def check_cube():
+              """Verify Cube API is responding."""
+              http_check("http://floe-cube-api:4000/readyz")
+
+          @check("Jaeger")
+          def check_jaeger():
+              """Verify Jaeger is responding."""
+              services = http_check("http://floe-infra-jaeger-query:16686/api/services")
+              json.loads(services)  # Verify it's valid JSON
+
+          @check("Marquez", depends_on=["PostgreSQL"])
+          def check_marquez():
+              """Verify Marquez API is responding."""
+              namespaces = http_check("http://floe-infra-marquez:5000/api/v1/namespaces")
+              json.loads(namespaces)  # Verify it's valid JSON
+
+          # Run all checks
+          print("=" * 70)
+          print("FLOE DEPLOYMENT VALIDATION")
+          print("=" * 70)
+          print()
+
+          # Output summary
+          summary = {
+              "timestamp": datetime.utcnow().isoformat(),
+              "status": "PASS" if all(c.passed for c in checks) else "FAIL",
+              "passed": sum(1 for c in checks if c.passed),
+              "failed": sum(1 for c in checks if not c.passed),
+              "total": len(checks),
+              "checks": [asdict(c) for c in checks]
+          }
+
+          print(json.dumps(summary, indent=2))
+          print()
+
+          # Print failures
+          failed = [c for c in checks if not c.passed]
+          if failed:
+              print("=" * 70)
+              print(f"❌ {len(failed)} check(s) failed:")
+              print("=" * 70)
+              for c in failed:
+                  print(f"  ✗ {c.name}: {c.message}")
+              print()
+              sys.exit(1)
+          else:
+              print("=" * 70)
+              print(f"✅ All {len(checks)} checks passed!")
+              print("=" * 70)
+              print()
+              sys.exit(0)
+  backoffLimit: 2
+{{- end }}

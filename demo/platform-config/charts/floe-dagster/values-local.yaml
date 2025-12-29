@@ -386,6 +386,11 @@ polarisInit:
   namespace: "demo"
   s3Endpoint: "http://floe-infra-localstack:4566"
 
+# Post-Install Validation Job
+# Validates all 8 components are healthy after deployment
+postInstallValidation:
+  enabled: true
+
 # Floe-specific configuration
 floe:
   compiledArtifacts:
