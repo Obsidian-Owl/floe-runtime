@@ -91,6 +91,67 @@ Use `/project:k8s-debug` or delegate explicitly:
 Task(docker-log-analyser, "Analyse polaris container for startup errors")
 ```
 
+## Deployment Validation Architecture
+
+Floe-runtime uses Kubernetes-native validation for production-grade deployments:
+
+| Layer | Tool | Purpose |
+|-------|------|---------|
+| **Pre-Install** | Helm init jobs | Polaris warehouse/namespace setup, DB migration |
+| **Pod Health** | K8s startup/readiness/liveness probes | Container lifecycle management |
+| **Post-Install** | Helm validation job | Multi-component health aggregation (8 services) |
+| **E2E Testing** | scripts/validate-e2e.sh | Full data pipeline validation |
+
+### Quick Start
+
+```bash
+# Deploy with built-in validation
+helm install floe-dagster charts/floe-dagster/ -n floe --wait
+
+# Verify deployment health (post-install hook runs automatically)
+kubectl logs -n floe job/floe-dagster-validate
+
+# Run full E2E validation
+./scripts/validate-e2e.sh
+```
+
+### Architecture
+
+```
+Helm Install
+├─ Pre-Install Hooks (weight: -10 to -5)
+│  ├─ init-polaris: Create warehouse/namespace
+│  └─ migrate-db: Run Dagster schema migrations (official chart)
+├─ Deployment Resources
+│  ├─ Pods with startup/readiness/liveness probes
+│  └─ Services with health check endpoints
+└─ Post-Install Hooks (weight: 10)
+   └─ validate: Aggregate health check (8 components)
+```
+
+### Probes Reference
+
+| Component | Startup | Readiness | Liveness | Health Endpoint |
+|-----------|---------|-----------|----------|-----------------|
+| Dagster Webserver | 5 min | GraphQL check | 30s interval | `/server_info` |
+| Polaris | 2 min | Catalog API | 30s interval | `/q/health/ready` |
+| Cube | 1.5 min | Meta endpoint | 20s interval | `/readyz` |
+| LocalStack | 1.5 min | Service status | 10s interval | `/_localstack/health` |
+| Marquez | 2.5 min | Namespaces API | 10s interval | `/api/v1/namespaces` |
+| PostgreSQL | 1.5 min | DB exists check | 30s interval | `pg_isready` |
+
+### Job Management Scripts
+
+```bash
+# Launch Dagster job programmatically
+./scripts/launch-dagster-job.sh demo_bronze
+
+# Monitor run status with timeout
+./scripts/monitor-dagster-run.sh <run-id> 120
+```
+
+See [docs/troubleshooting/deployment-debugging.md](docs/troubleshooting/deployment-debugging.md) for complete debugging guide.
+
 ## SonarQube Quality Gates
 
 | Rule | Prevention |
