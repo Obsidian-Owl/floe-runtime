@@ -53,10 +53,13 @@ localAccess:
 dagster:
   enabled: true
 
-  # Global environment variables for all Dagster components
-  # NOTE: Infrastructure endpoints are NOW in platform.yaml (ConfigMap)
-  # Only credentials and service-specific overrides remain here
+  # Global Dagster configuration
+  # Use existing secret for PostgreSQL credentials (created by floe-infra chart)
   global:
+    # Reference existing floe-demo-credentials secret for PostgreSQL password
+    # This secret is created by floe-infrastructure chart
+    postgresqlSecretName: "floe-demo-credentials"
+
     env:
       # Python module resolution for dbt plugins
       - name: PYTHONPATH
@@ -76,6 +79,12 @@ dagster:
   # Disable telemetry to avoid permission errors on /opt/dagster
   telemetry:
     enabled: false
+
+  # Database migration job
+  # Runs on install/upgrade to initialize Dagster schema
+  # This ensures the database is ready before webserver starts
+  migrate:
+    enabled: true
 
   # User deployments configuration
   # Image: ghcr.io/obsidian-owl/floe-demo:latest
@@ -174,6 +183,9 @@ dagster:
         # envSecrets would create env vars with kebab-case names (polaris-client-id)
         # but Python code expects SCREAMING_SNAKE_CASE (POLARIS_CLIENT_ID)
 
+  # Don't generate a separate PostgreSQL secret - use existing floe-demo-credentials
+  generatePostgresqlPasswordSecret: false
+
   # PostgreSQL for Dagster metadata
   # DISABLED: Use floe-infra-postgresql (shared infrastructure PostgreSQL)
   # This avoids PVC provisioning issues on Docker Desktop
@@ -182,7 +194,8 @@ dagster:
     # Point to infrastructure PostgreSQL
     postgresqlHost: "floe-infra-postgresql"
     postgresqlUsername: "postgres"
-    postgresqlPassword: "floe-postgres"
+    # Password comes from floe-demo-credentials secret (via global.postgresqlSecretName)
+    # The Dagster chart will automatically look for the 'postgresql-password' key
     postgresqlDatabase: "dagster"
 
   # Minimal resource configuration for local testing

@@ -187,6 +187,11 @@ class PolarisCatalog:
             properties["s3.path-style-access"] = str(self.config.s3_path_style_access).lower()
             properties["s3.region"] = self.config.s3_region
 
+            # Disable credential vending to force static credentials
+            # This prevents PyIceberg from requesting vended credentials from Polaris
+            # which may contain internal K8s hostnames that fail to resolve
+            properties["rest.vended-credentials-enabled"] = "false"
+
             # Static S3 credentials (if not using vended credentials)
             if self.config.s3_access_key_id:
                 properties["s3.access-key-id"] = self.config.s3_access_key_id
