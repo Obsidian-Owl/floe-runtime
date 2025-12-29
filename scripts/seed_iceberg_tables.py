@@ -55,10 +55,11 @@ import os
 import sys
 
 from pydantic import SecretStr
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 
 def _detect_s3_endpoint() -> str:
-    """Detect S3 endpoint based on execution context.
+    """Detect S3 endpoint based on execution context with validation.
 
     Returns:
         S3 endpoint URL appropriate for execution context
@@ -67,7 +68,11 @@ def _detect_s3_endpoint() -> str:
         - Explicit AWS_ENDPOINT_URL environment variable takes precedence
         - Detects K8s execution by checking for service account token
         - Falls back to NodePort for local machine execution
+        - Validates endpoint reachability with socket connection test
     """
+    import socket
+    from urllib.parse import urlparse
+
     # Explicit override takes precedence
     if endpoint := os.environ.get("AWS_ENDPOINT_URL"):
         return endpoint
@@ -75,10 +80,36 @@ def _detect_s3_endpoint() -> str:
     # Detect K8s execution context
     if os.path.exists("/var/run/secrets/kubernetes.io/serviceaccount"):
         # Running in K8s pod - use internal service DNS
-        return "http://floe-infra-localstack:4566"
+        endpoint = "http://floe-infra-localstack:4566"
+    else:
+        # Local execution - use NodePort (survives pod restarts)
+        endpoint = "http://localhost:30566"
 
-    # Local execution - use NodePort (survives pod restarts)
-    return "http://localhost:30566"
+    # Validate endpoint reachability
+    try:
+        parsed = urlparse(endpoint)
+        hostname = parsed.hostname or "localhost"
+        port = parsed.port or 4566
+
+        # Test connectivity with 2-second timeout
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(2)
+        result = sock.connect_ex((hostname, port))
+        sock.close()
+
+        if result == 0:
+            print(f"✓ S3 endpoint reachable: {endpoint}")
+        else:
+            print(f"⚠️  S3 endpoint not reachable: {endpoint} (connection refused)")
+            print("   Proceeding anyway - will fail if S3 operations are attempted")
+    except socket.gaierror as e:
+        print(f"⚠️  Cannot resolve S3 hostname '{hostname}': {e}")
+        print("   Proceeding anyway - will fail if S3 operations are attempted")
+    except Exception as e:
+        print(f"⚠️  S3 endpoint validation failed: {e}")
+        print(f"   Proceeding with: {endpoint}")
+
+    return endpoint
 
 
 def parse_args() -> argparse.Namespace:
@@ -169,6 +200,38 @@ def parse_args() -> argparse.Namespace:
     )
 
     return parser.parse_args()
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True,
+)
+def _write_table_with_retry(manager, table_id: str, data, schema):
+    """Write to Iceberg table with exponential backoff retry.
+
+    Args:
+        manager: IcebergTableManager instance
+        table_id: Table identifier (e.g., "demo.raw_customers")
+        data: PyArrow table data
+        schema: PyArrow schema
+
+    Returns:
+        Snapshot object with rows_loaded and snapshot_id
+
+    Raises:
+        Exception: If write fails after 3 attempts
+
+    Notes:
+        - Retries up to 3 times with exponential backoff (2s, 4s, 8s)
+        - Handles transient S3 connectivity issues
+        - Re-raises exception after final failure for proper error reporting
+    """
+    # Create table if it doesn't exist (idempotent)
+    manager.create_table_if_not_exists(table_id, schema)
+
+    # Overwrite with fresh data (retry-protected operation)
+    return manager.overwrite(table_id, data)
 
 
 def main() -> int:
@@ -269,13 +332,11 @@ def main() -> int:
     for table_id, data in tables:
         print(f"  Seeding {table_id}...")
         try:
-            # Create table if not exists
-            manager.create_table_if_not_exists(table_id, data.schema)
-            # Overwrite with fresh data
-            snapshot = manager.overwrite(table_id, data)
+            # Write with retry (handles transient S3 connectivity issues)
+            snapshot = _write_table_with_retry(manager, table_id, data, data.schema)
             print(f"    ✅ {table_id}: {data.num_rows} rows (snapshot: {snapshot.snapshot_id})")
         except Exception as e:
-            print(f"    ❌ Failed to seed {table_id}: {e}")
+            print(f"    ❌ Failed to seed {table_id} after 3 attempts: {e}")
             success = False
 
     print()

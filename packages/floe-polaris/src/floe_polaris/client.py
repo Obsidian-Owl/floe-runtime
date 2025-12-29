@@ -184,7 +184,12 @@ class PolarisCatalog:
             # needs localhost:4566
             properties["py-io-impl"] = "pyiceberg.io.pyarrow.PyArrowFileIO"
             properties["s3.endpoint"] = self.config.s3_endpoint
-            properties["s3.path-style-access"] = str(self.config.s3_path_style_access).lower()
+
+            # CRITICAL: Always enable path-style access for S3-compatible storage
+            # This is REQUIRED for LocalStack and MinIO, regardless of config value
+            # Path-style: http://endpoint/bucket/key vs virtual-hosted: http://bucket.endpoint/key
+            properties["s3.path-style-access"] = "true"
+
             properties["s3.region"] = self.config.s3_region
 
             # Disable credential vending to force static credentials
