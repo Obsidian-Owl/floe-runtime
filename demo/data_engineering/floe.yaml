@@ -40,7 +40,6 @@ transforms:
 orchestration:
   # Auto-discover Python assets from modules
   asset_modules:
-    - data_engineering.orchestration.assets.bronze
     - data_engineering.orchestration.assets.ops
 
   # Auto-load dbt models as individual assets with per-model observability
@@ -51,15 +50,10 @@ orchestration:
 
   # Jobs - declarative asset selection
   jobs:
-    demo_bronze:
-      type: batch
-      selection: ["group:bronze"]
-      description: "Bronze layer: Validate raw synthetic data tables (medallion architecture)"
-
     demo_pipeline:
       type: batch
-      selection: ["group:bronze", "group:silver", "group:gold"]
-      description: "Full medallion pipeline: bronze (raw) → silver (cleaned) → gold (analytics)"
+      selection: ["tag:silver", "tag:gold"]
+      description: "dbt transformation pipeline: silver (staging) → gold (marts)"
 
     maintenance:
       type: ops
@@ -70,21 +64,16 @@ orchestration:
 
   # Schedules - declarative job scheduling
   schedules:
-    bronze_refresh_schedule:
-      job: demo_bronze
-      cron_schedule: "*/5 * * * *"
-      description: "Refresh bronze layer every 5 minutes"
-
     transform_pipeline_schedule:
       job: demo_pipeline
       cron_schedule: "*/5 * * * *"
-      description: "Run full transform pipeline every 5 minutes"
+      description: "Run dbt transform pipeline every 5 minutes"
 
   # Sensors - event-driven execution
   sensors:
     file_arrival_sensor:
       type: file_watcher
-      job: demo_bronze
+      job: demo_pipeline
       path: "/tmp"
       pattern: "demo_trigger"
       poll_interval_seconds: 60

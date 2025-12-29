@@ -82,10 +82,11 @@
 
     {% do persist_docs(target_relation, model) %}
 
-    {% call noop_statement('main', status="CREATED VIA CATALOG") %}
+    {% call noop_statement('main') %}
       -- Table created: {{ iceberg_table }}
       -- Location: {{ table_location }}
       -- Catalog: Polaris (control plane enforced)
+      -- Status: CREATED VIA CATALOG
     {%- endcall %}
 
   {%- else -%}
@@ -99,8 +100,8 @@
 
     {% do persist_docs(target_relation, model) %}
 
-    {% call noop_statement('main', status="WARNING") %}
-      -- Table created in DuckDB local storage (catalog not attached)
+    {% call noop_statement('main') %}
+      -- WARNING: Table created in DuckDB local storage (catalog not attached)
       -- Run with Polaris attached for Iceberg persistence
     {%- endcall %}
 
