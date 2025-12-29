@@ -18,7 +18,9 @@ Architecture:
 
 from __future__ import annotations
 
-from dagster import AssetExecutionContext, asset
+from typing import Any
+
+from dagster import asset
 
 from floe_dagster.observability import ObservabilityOrchestrator
 from floe_synthetic.dagster.resources import (
@@ -35,10 +37,10 @@ from floe_synthetic.dagster.resources import (
     compute_kind="synthetic",
 )
 def raw_customers(
-    context: AssetExecutionContext,
+    context,
     ecommerce_generator: EcommerceGeneratorResource,
     iceberg_loader: IcebergLoaderResource,
-) -> dict[str, int]:
+) -> dict[str, Any]:
     """Generate and load raw customer data.
 
     Args:
@@ -82,10 +84,10 @@ def raw_customers(
     compute_kind="synthetic",
 )
 def raw_products(
-    context: AssetExecutionContext,
+    context,
     ecommerce_generator: EcommerceGeneratorResource,
     iceberg_loader: IcebergLoaderResource,
-) -> dict[str, int]:
+) -> dict[str, Any]:
     """Generate and load raw product data.
 
     Args:
@@ -130,10 +132,10 @@ def raw_products(
     deps=[raw_customers, raw_products],
 )
 def raw_orders(
-    context: AssetExecutionContext,
+    context,
     ecommerce_generator: EcommerceGeneratorResource,
     iceberg_loader: IcebergLoaderResource,
-) -> dict[str, int]:
+) -> dict[str, Any]:
     """Generate and load raw order data.
 
     Args:
@@ -178,10 +180,10 @@ def raw_orders(
     deps=[raw_orders],
 )
 def raw_order_items(
-    context: AssetExecutionContext,
+    context,
     ecommerce_generator: EcommerceGeneratorResource,
     iceberg_loader: IcebergLoaderResource,
-) -> dict[str, int]:
+) -> dict[str, Any]:
     """Generate and load raw order item data.
 
     Args:
