@@ -13,7 +13,7 @@
 --   - Ensure price >= 0
 
 with source as (
-    select * from {{ source('bronze', 'bronze_products') }}
+    select * from {{ source('bronze', 'raw_products') }}
 ),
 
 cleaned as (

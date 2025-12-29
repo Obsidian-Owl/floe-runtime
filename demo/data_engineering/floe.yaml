@@ -54,12 +54,12 @@ orchestration:
     demo_bronze:
       type: batch
       selection: ["group:bronze"]
-      description: "Load bronze layer: raw tables → bronze Iceberg tables"
+      description: "Bronze layer: Validate raw synthetic data tables (medallion architecture)"
 
     demo_pipeline:
       type: batch
       selection: ["group:bronze", "group:silver", "group:gold"]
-      description: "Full demo pipeline: bronze → silver → gold"
+      description: "Full medallion pipeline: bronze (raw) → silver (cleaned) → gold (analytics)"
 
     maintenance:
       type: ops

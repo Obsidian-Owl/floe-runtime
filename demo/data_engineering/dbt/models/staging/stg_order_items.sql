@@ -13,7 +13,7 @@
 --   - Calculate line_total
 
 with source as (
-    select * from {{ source('bronze', 'bronze_order_items') }}
+    select * from {{ source('bronze', 'raw_order_items') }}
 ),
 
 cleaned as (

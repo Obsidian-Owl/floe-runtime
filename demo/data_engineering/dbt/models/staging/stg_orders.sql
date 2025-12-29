@@ -14,7 +14,7 @@
 --   - Cast timestamps
 
 with source as (
-    select * from {{ source('bronze', 'bronze_orders') }}
+    select * from {{ source('bronze', 'raw_orders') }}
 ),
 
 cleaned as (

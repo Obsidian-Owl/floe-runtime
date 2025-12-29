@@ -8,14 +8,14 @@ sources:
     database: polaris_catalog
     schema: demo
     tables:
-      - name: bronze_customers
-        description: Raw customer data loaded to Iceberg from demo.raw_customers
+      - name: raw_customers
+        description: Raw customer data loaded to Iceberg
 
-      - name: bronze_products
-        description: Raw product data loaded to Iceberg from demo.raw_products
+      - name: raw_products
+        description: Raw product data loaded to Iceberg
 
-      - name: bronze_orders
-        description: Raw order data loaded to Iceberg from demo.raw_orders
+      - name: raw_orders
+        description: Raw order data loaded to Iceberg
 
-      - name: bronze_order_items
-        description: Raw order item data loaded to Iceberg from demo.raw_order_items
+      - name: raw_order_items
+        description: Raw order item data loaded to Iceberg
