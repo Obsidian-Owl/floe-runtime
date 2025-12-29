@@ -178,8 +178,8 @@ class DbtProfilesGenerator:
         Returns:
             dbt output configuration dictionary with extensions and attach config.
         """
-        threads = getattr(compute, "threads", 4)
-        database_path = getattr(compute, "database", ":memory:")
+        threads = compute.properties.get("threads", 4)
+        database_path = compute.properties.get("path", ":memory:")
 
         output: dict[str, Any] = {
             "type": "duckdb",
