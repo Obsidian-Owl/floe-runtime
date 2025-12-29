@@ -80,12 +80,9 @@ from floe_synthetic.dagster.resources import (
 #   dagster dev
 #
 
-# Create base definitions from floe.yaml + platform.yaml
-base_defs = FloeDefinitions.from_compiled_artifacts(namespace="data_engineering")
-
 # Add floe-synthetic resources for bronze layer data generation
 # These resources are used by bronze.py assets to generate and load synthetic data
-synthetic_resources = {
+_synthetic_resources = {
     "ecommerce_generator": EcommerceGeneratorResource(seed=42),
     "iceberg_loader": IcebergLoaderResource(
         catalog_uri=os.getenv("POLARIS_URI", "http://floe-infra-polaris:8181/api/catalog"),
@@ -97,8 +94,8 @@ synthetic_resources = {
     ),
 }
 
-# Merge synthetic resources with auto-loaded resources
+# Merge synthetic resources with auto-loaded resources from floe.yaml + platform.yaml
 defs = Definitions.merge(
-    base_defs,
-    Definitions(resources=synthetic_resources),
+    FloeDefinitions.from_compiled_artifacts(namespace="data_engineering"),
+    Definitions(resources=_synthetic_resources),
 )

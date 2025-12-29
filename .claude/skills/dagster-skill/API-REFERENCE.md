@@ -1,36 +1,27 @@
 # Dagster API Reference
 
-> **Current Version**: Dagster 1.x (as of 2025)
->
-> **Documentation**: https://docs.dagster.io
->
-> **Python Support**: 3.9 - 3.13
+> **Version**: Dagster 1.x (2025)
+> **Docs**: https://docs.dagster.io
+> **Python**: 3.9 - 3.13
 
-## Core Concepts
+## Software-Defined Assets
 
-### Software-Defined Assets
+### Basic Asset
 
-Assets represent logical data units (tables, datasets, ML models) with dependency tracking.
-
-**Basic Asset**:
 ```python
 from dagster import asset
 
 @asset
 def my_table():
-    """Materialize my_table asset."""
     return some_dataframe
-```
 
-**Asset with Dependencies**:
-```python
 @asset
 def downstream_table(my_table):
-    """Depends on my_table."""
     return transform(my_table)
 ```
 
-**Multi-Asset** (shared computation):
+### Multi-Asset
+
 ```python
 from dagster import multi_asset, AssetOut
 
@@ -41,223 +32,148 @@ from dagster import multi_asset, AssetOut
     }
 )
 def compute_tables():
-    """Materialize multiple assets from single computation."""
     return table_a, table_b
+```
+
+### Asset Configuration
+
+```python
+@asset(
+    name="custom_name",
+    key_prefix=["analytics"],
+    group_name="marketing",
+    compute_kind="python",
+    description="My asset",
+    metadata={"owner": "team@example.com"},
+    deps=[upstream_asset],
+    io_manager_key="iceberg_io",
+    partitions_def=daily_partitions,
+)
+def configured_asset():
+    return data
 ```
 
 ## Resources
 
-Resources provide external services (databases, APIs, storage) to assets.
+### ConfigurableResource
 
-**ConfigurableResource** (recommended for v1.x):
 ```python
 from dagster import ConfigurableResource
-from pydantic import Field
 
 class DatabaseResource(ConfigurableResource):
-    """Database connection resource."""
     host: str
-    port: int = Field(default=5432)
+    port: int = 5432
 
     def query(self, sql: str):
-        # Implementation
         pass
+
+@asset
+def my_asset(database: DatabaseResource):
+    return database.query("SELECT * FROM table")
 ```
 
-**Binding Resources to Assets**:
-```python
-from dagster import Definitions
+### Environment Variables
 
-defs = Definitions(
-    assets=[my_table, downstream_table],
-    resources={
-        "database": DatabaseResource(host="localhost"),
-    }
-)
+```python
+from dagster import EnvVar
+
+class SecureResource(ConfigurableResource):
+    api_key: str = EnvVar("API_KEY")
 ```
 
 ## IO Managers
 
-IO managers control how asset data is stored and retrieved.
-
-**Custom IO Manager**:
 ```python
-from dagster import IOManager
+from dagster import IOManager, InputContext, OutputContext
 
-class MyIOManager(IOManager):
-    def handle_output(self, context, obj):
-        """Store asset output."""
-        # Write obj to storage
+class CustomIOManager(IOManager):
+    def handle_output(self, context: OutputContext, obj):
+        # Write
         pass
 
-    def load_input(self, context):
-        """Load asset input."""
-        # Read from storage
+    def load_input(self, context: InputContext):
+        # Read
         return data
-```
-
-**Attaching IO Manager**:
-```python
-from dagster import Definitions
-
-defs = Definitions(
-    assets=[my_table],
-    resources={
-        "io_manager": MyIOManager(),
-    }
-)
 ```
 
 ## Schedules
 
-Time-based automation of asset materialization.
-
-**Schedule Decorator**:
 ```python
-from dagster import schedule, RunRequest
+from dagster import schedule, RunRequest, ScheduleDefinition, define_asset_job
 
-@schedule(cron_schedule="0 9 * * 1", job=my_job)
-def monday_schedule():
-    """Run every Monday at 9am."""
+# Decorator
+@schedule(cron_schedule="0 9 * * *", job=my_job)
+def daily_schedule():
     return RunRequest()
-```
 
-**Asset-based Schedule**:
-```python
-from dagster import AssetSelection, define_asset_job, ScheduleDefinition
-
-daily_job = define_asset_job("daily_job", selection=AssetSelection.all())
+# Definition
+daily_job = define_asset_job("daily", selection=AssetSelection.all())
 daily_schedule = ScheduleDefinition(job=daily_job, cron_schedule="0 0 * * *")
 ```
 
 ## Sensors
 
-Event-based automation of asset materialization.
-
-**Sensor Decorator**:
 ```python
-from dagster import sensor, RunRequest
+from dagster import sensor, RunRequest, asset_sensor, AssetKey
 
 @sensor(job=my_job)
 def file_sensor(context):
-    """Trigger when file appears."""
     if file_exists():
         yield RunRequest()
-```
 
-**Asset Sensor** (monitor asset materializations):
-```python
-from dagster import asset_sensor, AssetKey
-
-@asset_sensor(asset_key=AssetKey("upstream_table"), job=downstream_job)
-def react_to_upstream(context):
-    """Trigger when upstream_table materializes."""
+@asset_sensor(asset_key=AssetKey("upstream"), job=downstream_job)
+def asset_change_sensor(context):
     yield RunRequest()
-```
-
-## dbt Integration
-
-**dagster-dbt** library provides dbt integration.
-
-**Load Assets from dbt Project**:
-```python
-from dagster_dbt import DbtProject, load_assets_from_dbt_project
-
-dbt_project = DbtProject(project_dir="path/to/dbt/project")
-dbt_assets = load_assets_from_dbt_project(dbt_project)
-```
-
-**Load Assets from Manifest**:
-```python
-from dagster_dbt import load_assets_from_dbt_manifest
-
-dbt_assets = load_assets_from_dbt_manifest(
-    manifest_json=dbt_manifest_path
-)
-```
-
-**DbtCliResource** (execute dbt commands):
-```python
-from dagster_dbt import DbtCliResource
-
-dbt_resource = DbtCliResource(
-    project_dir="path/to/dbt/project",
-    profiles_dir="path/to/profiles",
-    target="dev"
-)
 ```
 
 ## Partitions
 
-Partition assets by time or dimension.
-
-**Daily Partitions**:
 ```python
-from dagster import asset, DailyPartitionsDefinition
-
-daily_partitions = DailyPartitionsDefinition(start_date="2025-01-01")
-
-@asset(partitions_def=daily_partitions)
-def daily_table(context):
-    """Partitioned by day."""
-    partition_key = context.partition_key  # "2025-01-15"
-    return compute_for_date(partition_key)
-```
-
-**Static Partitions**:
-```python
-from dagster import StaticPartitionsDefinition
-
-partitions = StaticPartitionsDefinition(["us", "eu", "asia"])
-
-@asset(partitions_def=partitions)
-def regional_table(context):
-    """Partitioned by region."""
-    region = context.partition_key
-    return compute_for_region(region)
-```
-
-## Metadata
-
-Attach metadata to assets for observability.
-
-**Asset Metadata**:
-```python
-from dagster import asset, MetadataValue
-
-@asset(
-    metadata={
-        "description": "Customer dimension table",
-        "owner": "data-team",
-        "pii": True,
-    }
+from dagster import (
+    DailyPartitionsDefinition,
+    MonthlyPartitionsDefinition,
+    StaticPartitionsDefinition,
+    MultiPartitionsDefinition,
 )
-def customers():
-    return dataframe
+
+daily = DailyPartitionsDefinition(start_date="2024-01-01")
+monthly = MonthlyPartitionsDefinition(start_date="2024-01")
+static = StaticPartitionsDefinition(["us", "eu", "asia"])
+multi = MultiPartitionsDefinition({
+    "date": daily,
+    "region": static,
+})
+
+@asset(partitions_def=daily)
+def partitioned_asset(context):
+    date = context.partition_key
+    return compute_for_date(date)
 ```
 
-**Runtime Metadata** (computed during materialization):
+## Asset Selection
+
 ```python
-from dagster import Output, MetadataValue
+from dagster import AssetSelection, define_asset_job
 
-@asset
-def my_table(context):
-    df = compute()
+# By key
+AssetSelection.keys("table_a", "table_b")
 
-    return Output(
-        df,
-        metadata={
-            "row_count": MetadataValue.int(len(df)),
-            "columns": MetadataValue.text(str(df.columns.tolist())),
-        }
-    )
+# By group
+AssetSelection.groups("analytics")
+
+# By prefix
+AssetSelection.key_prefixes("raw")
+
+# With graph traversal
+AssetSelection.keys("table").upstream()
+AssetSelection.keys("table").downstream()
+
+# Create job
+job = define_asset_job("my_job", selection=AssetSelection.groups("ml"))
 ```
 
 ## Definitions
 
-Top-level object that bundles assets, resources, schedules, sensors.
-
-**Definitions**:
 ```python
 from dagster import Definitions
 
@@ -269,127 +185,65 @@ defs = Definitions(
     },
     schedules=[daily_schedule],
     sensors=[file_sensor],
+    jobs=[my_job],
 )
 ```
 
-## Key Patterns
-
-### Asset Dependencies
-
-**Implicit** (function parameter name matches asset name):
-```python
-@asset
-def upstream():
-    return data
-
-@asset
-def downstream(upstream):  # Depends on 'upstream' asset
-    return transform(upstream)
-```
-
-**Explicit** (using `AssetIn`):
-```python
-from dagster import AssetIn
-
-@asset(ins={"input_data": AssetIn("upstream")})
-def downstream(input_data):
-    return transform(input_data)
-```
-
-### Asset Selection
-
-Select subsets of assets for jobs or schedules:
+## dbt Integration
 
 ```python
-from dagster import AssetSelection, define_asset_job
+from dagster_dbt import DbtProject, DbtCliResource, dbt_assets
 
-# All assets
-all_job = define_asset_job("all", selection=AssetSelection.all())
+dbt_project = DbtProject(project_dir="./dbt")
+dbt_project.prepare_if_dev()
 
-# By key
-specific_job = define_asset_job("specific", selection=AssetSelection.keys("table_a"))
+@dbt_assets(manifest=dbt_project.manifest_path)
+def my_dbt_assets(context, dbt: DbtCliResource):
+    yield from dbt.cli(["build"], context=context).stream()
 
-# By group
-group_job = define_asset_job("group", selection=AssetSelection.groups("analytics"))
-
-# Upstream/downstream
-upstream_job = define_asset_job(
-    "upstream",
-    selection=AssetSelection.keys("table_a").upstream()
+defs = Definitions(
+    assets=[my_dbt_assets],
+    resources={"dbt": DbtCliResource(project_dir=dbt_project)},
 )
-```
-
-### Asset Groups
-
-Organize assets into logical groups:
-
-```python
-@asset(group_name="analytics")
-def analytics_table():
-    return data
-
-@asset(group_name="ml")
-def ml_features():
-    return features
 ```
 
 ## Testing
 
-**Unit Testing Assets**:
 ```python
 from dagster import materialize
 
-def test_my_asset():
-    result = materialize([my_asset])
+def test_asset():
+    result = materialize([my_asset], resources={...})
     assert result.success
-
-    # Access materialized output
     output = result.output_for_node("my_asset")
-    assert len(output) > 0
 ```
 
-**Testing with Resources**:
-```python
-def test_asset_with_resources():
-    result = materialize(
-        [my_asset],
-        resources={"database": DatabaseResource(host="test-db")}
-    )
-    assert result.success
-```
-
-## Development Commands
+## CLI Commands
 
 ```bash
-# Install Dagster
-pip install dagster dagster-webserver dagster-dbt
-
-# Verify installation
-dagster --version
-
-# Run development server
-dagster dev
-
-# Materialize assets
-dagster asset materialize
-dagster asset materialize --select asset_name
-
-# List assets
-dagster asset list
+dagster dev                    # Development server
+dagster asset materialize      # Materialize assets
+dagster asset list             # List assets
+dagster job execute -j my_job  # Run job
 ```
 
-## Important Version Notes
+## Metadata
 
-- **Dagster 1.x**: Major API stabilization, `ConfigurableResource` recommended
-- **Python Support**: 3.9 - 3.13 (as of 2025)
-- **dagster-dbt**: Separate package for dbt integration
-- **Breaking Changes**: v0.x → v1.x had significant API changes
+```python
+from dagster import Output, MetadataValue
 
-## References
+@asset
+def asset_with_metadata():
+    df = compute()
+    return Output(
+        df,
+        metadata={
+            "row_count": MetadataValue.int(len(df)),
+            "schema": MetadataValue.json(df.schema),
+        },
+    )
+```
 
-- [Dagster Docs](https://docs.dagster.io)
-- [Software-Defined Assets](https://docs.dagster.io/concepts/assets/software-defined-assets)
-- [Resources API](https://docs.dagster.io/api/dagster/resources)
-- [IO Managers API](https://docs.dagster.io/api/python-api/io-managers)
-- [dagster-dbt](https://docs.dagster.io/_apidocs/libraries/dagster-dbt)
-- [GitHub Repository](https://github.com/dagster-io/dagster)
+---
+
+**Reference**: https://docs.dagster.io/api/python-api

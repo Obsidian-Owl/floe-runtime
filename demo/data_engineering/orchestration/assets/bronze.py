@@ -33,7 +33,6 @@ from floe_synthetic.dagster.resources import (
     group_name="bronze",
     description="Raw customer data (bronze layer) - 1000 synthetic customers",
     compute_kind="synthetic",
-    required_resource_keys={"_floe_observability_orchestrator"},
 )
 def raw_customers(
     context: AssetExecutionContext,
@@ -81,7 +80,6 @@ def raw_customers(
     group_name="bronze",
     description="Raw product data (bronze layer) - 100 synthetic products",
     compute_kind="synthetic",
-    required_resource_keys={"_floe_observability_orchestrator"},
 )
 def raw_products(
     context: AssetExecutionContext,

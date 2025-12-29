@@ -1,322 +1,329 @@
 ---
 name: dagster-orchestration
-description: ALWAYS USE when working with Dagster assets, resources, IO managers, schedules, or sensors. MUST be loaded before creating @asset decorators, ConfigurableResource classes, or orchestration code. Provides SDK research steps and integration patterns.
+description: |
+  ALWAYS USE when working with Dagster assets, resources, IO managers, schedules, sensors, or dbt integration.
+  CRITICAL for: @asset decorators, @dbt_assets, DbtCliResource, ConfigurableResource, IO managers, partitions.
+  Enforces CATALOG-AS-CONTROL-PLANE architecture - ALL Iceberg writes via catalog (Polaris/Glue).
+  Provides pluggable orchestration patterns abstractable to Airflow/Prefect.
+  Compute abstraction: DuckDB (default), Spark, Snowflake - all via dbt.
 ---
 
-# Dagster Orchestration Development (Research-Driven)
+# Dagster Orchestration with dbt Integration
 
-## Philosophy
+## Critical Architecture: Catalog-as-Control-Plane
 
-This skill does NOT prescribe specific implementation patterns. Instead, it guides you to:
-1. **Research** the current Dagster version and API capabilities
-2. **Discover** existing asset definitions and orchestration patterns in the codebase
-3. **Validate** your implementations against Dagster SDK documentation
-4. **Verify** integration with dbt, Iceberg, and other components
+**⚠️ NEVER write directly to storage. ALL table operations MUST flow through catalog:**
 
-## Pre-Implementation Research Protocol
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   DAGSTER ORCHESTRATION                      │
+│  (Schedule → Sensor → Asset Graph → Materialization)         │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    dbt TRANSFORMATIONS                       │
+│  (SQL owns transformations - NEVER parse SQL in Python)      │
+└─────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              │               │               │
+              ▼               ▼               ▼
+        ┌─────────┐     ┌─────────┐     ┌─────────┐
+        │ DuckDB  │     │  Spark  │     │Snowflake│
+        │(default)│     │ (scale) │     │(analytic)│
+        └────┬────┘     └────┬────┘     └────┬────┘
+              │               │               │
+              └───────────────┼───────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│               POLARIS / GLUE CATALOG (REST API)              │
+│     ⚡ CONTROL PLANE - ACID, Schema, Access, Governance ⚡   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    ICEBERG TABLES                            │
+│                   (S3 / Azure / GCS)                         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Why Catalog-as-Control-Plane?**
+- ACID transactions across ALL compute engines
+- Schema evolution coordination (engines see same schema)
+- Access control and governance (row/column masking)
+- Multi-engine interoperability (DuckDB + Spark + dbt query same tables)
+- **See**: `references/catalog-control-plane.md`
+
+## Pluggable Orchestration Design
+
+Design assets as **pure functions** runnable in ANY orchestrator:
+
+| Concept | Dagster | Airflow | Prefect |
+|---------|---------|---------|---------|
+| Unit of Work | `@asset` | `@task` | `@task` |
+| Dependencies | Asset deps | Task deps | Task deps |
+| Scheduling | `@schedule` | DAG schedule | Deployment |
+| Event-driven | `@sensor` | Sensor | Event handlers |
+| Configuration | `ConfigurableResource` | Connection/Variable | Block |
+
+**See**: `references/orchestration-abstraction.md`
+
+## Pre-Implementation Checklist
 
 ### Step 1: Verify Runtime Environment
 
-**ALWAYS run this first**:
 ```bash
+# ALWAYS run first
 python -c "import dagster; print(f'Dagster {dagster.__version__}')"
+python -c "import dagster_dbt; print(f'dagster-dbt {dagster_dbt.__version__}')"
+python -c "import dagster_iceberg; print(f'dagster-iceberg installed')"
+dbt --version
 ```
 
-**Critical Questions to Answer**:
-- What version is installed?
-- Does it support Python 3.9-3.13? (check compatibility)
-- Are there breaking changes from previous versions?
-
-### Step 2: Research SDK State (if unfamiliar)
-
-**When to research**: If you encounter unfamiliar Dagster features or need to validate patterns
-
-**Research queries** (use WebSearch):
-- "Dagster software-defined assets documentation 2025"
-- "Dagster [feature] Python API 2025" (e.g., "Dagster IO managers Python API 2025")
-- "Dagster dbt integration best practices 2025"
-
-**Official documentation**: https://docs.dagster.io
-
-**Key API documentation**:
-- Assets: https://docs.dagster.io/api/dagster/assets
-- Resources: https://docs.dagster.io/api/dagster/resources
-- IO Managers: https://docs.dagster.io/api/python-api/io-managers
-- Definitions: https://docs.dagster.io/api/python-api/definitions
-
-### Step 3: Discover Existing Patterns
-
-**BEFORE creating new assets or resources**, search for existing implementations:
+### Step 2: Discover Existing Patterns
 
 ```bash
-# Find existing asset definitions
-rg "@asset|@multi_asset|@graph_asset" --type py
+# Find Dagster definitions
+rg "@asset|@multi_asset|@dbt_assets" --type py
+rg "ConfigurableResource|IOManager" --type py
+rg "dg.Definitions|Definitions\(" --type py
 
-# Find resource definitions
-rg "ConfigurableResource|ResourceDefinition" --type py
+# Find dbt project
+find . -name "dbt_project.yml"
+find . -name "manifest.json" -path "*/target/*"
 
-# Find IO manager definitions
-rg "IOManager|io_manager_key" --type py
-
-# Find schedules and sensors
-rg "@schedule|@sensor|ScheduleDefinition|SensorDefinition" --type py
+# Check catalog configuration
+cat platform.yaml | grep -A 20 "catalogs:"
 ```
 
-**Key questions**:
-- What asset patterns are already in use?
-- How are resources configured?
-- What IO managers exist?
-- Are there existing dbt integrations?
+### Step 3: Understand Platform Configuration
 
-### Step 4: Validate Against Architecture
+```bash
+# Two-tier config: platform.yaml (credentials) + floe.yaml (logical refs)
+cat platform.yaml    # Engineers NEVER see credentials in code
+cat floe.yaml        # Data engineers reference: catalog: default
+```
 
-Check architecture docs for integration requirements:
-- Read `/docs/` for CompiledArtifacts contract requirements
-- Understand how Dagster consumes CompiledArtifacts
-- Verify dbt integration patterns (dagster-dbt library)
-- Check observability requirements (OpenTelemetry, OpenLineage)
+## dbt Integration (Primary Pattern)
 
-## Implementation Guidance (Not Prescriptive)
+### Pattern 1: Load dbt Assets from Manifest
 
-### Software-Defined Assets
+```python
+from pathlib import Path
+from dagster import AssetExecutionContext, Definitions
+from dagster_dbt import DbtCliResource, DbtProject, dbt_assets
 
-**Core concept**: Assets represent logical data units (tables, datasets, ML models)
+dbt_project = DbtProject(
+    project_dir=Path(__file__).parent / "dbt",
+    packaged_project_dir=Path(__file__).parent / "dbt-project",
+)
+dbt_project.prepare_if_dev()  # Hot-reload in dev
 
-**Research questions**:
-- What data products need to be materialized?
-- What are the asset dependencies (data lineage)?
-- How should assets be partitioned (time-based, dimension-based)?
-- What metadata should be attached to assets?
+@dbt_assets(manifest=dbt_project.manifest_path)
+def my_dbt_assets(context: AssetExecutionContext, dbt: DbtCliResource):
+    """Execute dbt build - yields Dagster events for each model."""
+    yield from dbt.cli(["build"], context=context).stream()
 
-**SDK features to research**:
-- `@asset` decorator: Basic asset definition
-- `@multi_asset`: Assets with shared computation
-- `@graph_asset`: Assets composed of ops
-- Asset dependencies: `deps` parameter, `AssetIn`
-- Asset metadata: `metadata` parameter, `MetadataValue`
-- Partitions: `PartitionsDefinition`, `DailyPartitionsDefinition`
+defs = Definitions(
+    assets=[my_dbt_assets],
+    resources={"dbt": DbtCliResource(project_dir=dbt_project)},
+)
+```
 
-### Resources and Configuration
+### Pattern 2: Custom DagsterDbtTranslator
 
-**Core concept**: Resources provide external services to assets (databases, APIs, file systems)
+```python
+from typing import Any, Mapping, Optional
+from dagster import AssetKey
+from dagster_dbt import DagsterDbtTranslator, DagsterDbtTranslatorSettings
 
-**Research questions**:
-- What external services do assets need? (databases, S3, APIs)
-- How should resources be configured? (environment variables, secrets)
-- Are resources shared across multiple assets?
-- What resource lifecycle management is needed?
+class FloeDbTranslator(DagsterDbtTranslator):
+    """Translator for floe-runtime architecture."""
+    
+    def __init__(self):
+        super().__init__(
+            settings=DagsterDbtTranslatorSettings(
+                enable_code_references=True,
+                enable_source_tests_as_checks=True,
+            )
+        )
+    
+    def get_asset_key(self, dbt_resource_props: Mapping[str, Any]) -> AssetKey:
+        """Map dbt models to Dagster asset keys with namespace."""
+        schema = dbt_resource_props.get("schema", "default")
+        name = dbt_resource_props["name"]
+        return AssetKey([schema, name])
+    
+    def get_group_name(self, dbt_resource_props: Mapping[str, Any]) -> Optional[str]:
+        """Group by dbt folder structure."""
+        fqn = dbt_resource_props.get("fqn", [])
+        return fqn[1] if len(fqn) > 2 else None
+    
+    def get_metadata(self, dbt_resource_props: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Extract governance metadata from dbt model meta."""
+        meta = dbt_resource_props.get("meta", {})
+        return {
+            "classification": meta.get("classification"),
+            "owner": meta.get("owner"),
+            "sla": meta.get("sla"),
+        }
+```
 
-**SDK features to research**:
-- `ConfigurableResource`: Structured config base class
-- `ResourceDefinition`: Raw resource definitions
-- `with_resources()`: Binding resources to assets
-- Resource context: `ResourceContext`, `InitResourceContext`
+**See**: `references/dbt-integration.md` for complete patterns
 
-### IO Managers
+### Pattern 3: Partitioned dbt Assets
 
-**Core concept**: IO managers control how asset data is stored and retrieved
+```python
+from dagster import DailyPartitionsDefinition
 
-**Research questions**:
-- Where should asset outputs be stored? (filesystem, database, object storage)
-- What format should be used? (Parquet, CSV, Iceberg tables)
-- How should data be partitioned on storage?
-- Are there performance considerations for large datasets?
+daily_partitions = DailyPartitionsDefinition(start_date="2024-01-01")
 
-**SDK features to research**:
-- `IOManager` interface: `handle_output()`, `load_input()`
-- `io_manager_key`: Attaching IO managers to assets
-- `IOManagerDefinition`: Configuring IO managers
-- Built-in IO managers: `FilesystemIOManager`, `InMemoryIOManager`
-- Third-party IO managers: `dagster-aws`, `dagster-gcp`, `dagster-iceberg`
+@dbt_assets(
+    manifest=dbt_project.manifest_path,
+    partitions_def=daily_partitions,
+)
+def partitioned_dbt_assets(context: AssetExecutionContext, dbt: DbtCliResource):
+    partition_date = context.partition_key
+    yield from dbt.cli(
+        ["build", "--vars", f'{{"run_date": "{partition_date}"}}'],
+        context=context,
+    ).stream()
+```
 
-### Schedules and Sensors
+## Compute Target Integration
 
-**Core concept**: Automate asset materialization based on time or events
+### DuckDB (Default - Ephemeral Compute via dbt-duckdb)
 
-**Research questions**:
-- What assets should run on a schedule? (daily ETL, hourly refresh)
-- What events should trigger asset materialization? (file uploads, API events)
-- How should failures be handled?
-- What notifications are needed?
+DuckDB reads/writes via catalog ATTACH:
 
-**SDK features to research**:
-- `@schedule`: Time-based automation
-- `@sensor`: Event-based automation
-- `@asset_sensor`: Monitor asset materializations
-- `RunRequest`: Triggering asset runs
-- `RunConfig`: Parameterizing runs
+```sql
+-- dbt-duckdb plugin automatically executes:
+ATTACH 'demo_catalog' AS polaris_catalog (
+    TYPE ICEBERG,
+    CLIENT_ID '{{ env_var("POLARIS_CLIENT_ID") }}',
+    CLIENT_SECRET '{{ env_var("POLARIS_CLIENT_SECRET") }}',
+    ENDPOINT '{{ env_var("POLARIS_URI") }}'
+);
+```
 
-### dbt Integration
+### Snowflake (Analytical Compute)
 
-**Core concept**: Dagster assets can be created from dbt models
+```sql
+-- External Iceberg via Polaris integration
+CREATE OR REPLACE ICEBERG TABLE gold.metrics
+    CATALOG = 'polaris_catalog'
+    EXTERNAL_VOLUME = 'iceberg_volume'
+AS SELECT * FROM silver.orders;
+```
 
-**Research questions**:
-- How should dbt models be represented as Dagster assets?
-- What dbt commands should be run? (compile, run, test, build)
-- How should dbt artifacts (manifest.json) be loaded?
-- What metadata from dbt should be propagated?
+### Spark (Distributed Compute)
 
-**SDK features to research**:
-- `dagster-dbt` library: dbt integration utilities
-- `load_assets_from_dbt_project()`: Generate assets from dbt
-- `load_assets_from_dbt_manifest()`: Generate assets from manifest.json
-- `DbtCliResource`: Execute dbt CLI commands
-- dbt asset metadata: `materialize_to_messages()`, lineage extraction
+```python
+@asset(kinds={"spark"})
+def spark_asset(spark: SparkResource):
+    spark.spark_session.sql("""
+        INSERT INTO polaris_catalog.gold.metrics
+        SELECT * FROM polaris_catalog.silver.orders
+    """)
+```
+
+**See**: `references/compute-abstraction.md`
+
+## IO Manager Patterns
+
+### Iceberg IO Manager (Catalog-Controlled)
+
+```python
+from dagster_iceberg.config import IcebergCatalogConfig
+from dagster_iceberg.io_manager.arrow import PyArrowIcebergIOManager
+
+iceberg_io_manager = PyArrowIcebergIOManager(
+    name="polaris_catalog",
+    config=IcebergCatalogConfig(
+        properties={
+            "type": "rest",
+            "uri": "http://polaris:8181/api/catalog",
+            "credential": f"{client_id}:{client_secret}",
+            "warehouse": "demo_catalog",
+        }
+    ),
+    namespace="default",
+)
+```
+
+**See**: `references/io-managers.md`
+
+### Environment-Based Resource Switching
+
+```python
+import os
+from dagster import EnvVar
+
+def get_resources_for_env() -> dict:
+    env = os.getenv("DAGSTER_DEPLOYMENT", "local")
+    
+    base_resources = {"dbt": DbtCliResource(project_dir=dbt_project)}
+    
+    if env == "local":
+        return {**base_resources, "io_manager": local_iceberg_io()}
+    elif env == "production":
+        return {**base_resources, "io_manager": prod_iceberg_io()}
+```
 
 ## Validation Workflow
 
 ### Before Implementation
-1. ✅ Verified Dagster version
-2. ✅ Searched for existing asset/resource patterns in codebase
-3. ✅ Read architecture docs to understand CompiledArtifacts contract
-4. ✅ Identified integration requirements (dbt, Iceberg, observability)
-5. ✅ Researched unfamiliar Dagster features
+- [ ] Verified Dagster + dagster-dbt versions
+- [ ] Located dbt project and manifest.json
+- [ ] Understood catalog configuration (Polaris/Glue)
+- [ ] Identified compute targets (DuckDB/Snowflake/Spark)
+- [ ] Read `/docs/` for CompiledArtifacts contract
 
 ### During Implementation
-1. ✅ Using `@asset` decorator for asset definitions
-2. ✅ Type hints on ALL functions and parameters
-3. ✅ Proper resource binding with `with_resources()`
-4. ✅ IO managers configured for storage requirements
-5. ✅ Asset dependencies correctly specified
-6. ✅ Metadata attached to assets for observability
+- [ ] Using `@dbt_assets` for dbt models
+- [ ] Custom DagsterDbtTranslator for metadata
+- [ ] IO manager uses catalog (NOT direct storage writes)
+- [ ] Resources configured per environment
+- [ ] Partitions aligned with dbt vars
 
 ### After Implementation
-1. ✅ Run Dagster development server: `dagster dev`
-2. ✅ Verify assets appear in Dagster UI
-3. ✅ Test asset materialization manually
-4. ✅ Verify data lineage in UI
-5. ✅ Test schedules/sensors trigger correctly
-6. ✅ Check OpenTelemetry/OpenLineage integration
+- [ ] Run `dagster dev` - verify assets appear
+- [ ] Materialize assets manually
+- [ ] Verify data lineage in UI
+- [ ] Check Polaris catalog for table metadata
+- [ ] Test schedules/sensors
 
-## Context Injection (For Future Claude Instances)
+## Anti-Patterns to Avoid
 
-When this skill is invoked, you should:
+❌ **Don't** write to Iceberg without going through catalog
+❌ **Don't** hardcode compute logic (use dbt for SQL transforms)
+❌ **Don't** mix Dagster partitions with dbt incremental without alignment
+❌ **Don't** use deprecated `load_assets_from_dbt_manifest()` 
+❌ **Don't** bypass `DbtCliResource` for dbt execution
+❌ **Don't** store credentials in code (use `EnvVar` or `secret_ref`)
+❌ **Don't** parse SQL in Python (dbt owns SQL)
 
-1. **Verify runtime state** (don't assume):
-   ```bash
-   python -c "import dagster; print(dagster.__version__)"
-   dagster --version
-   ```
+## Reference Documentation
 
-2. **Discover existing patterns** (don't invent):
-   ```bash
-   rg "@asset" --type py
-   rg "ConfigurableResource" --type py
-   ```
+| Document | Purpose |
+|----------|---------|
+| `references/dbt-integration.md` | Complete dbt-Dagster patterns |
+| `references/compute-abstraction.md` | DuckDB, Spark, Snowflake patterns |
+| `references/io-managers.md` | Iceberg IO managers, storage layer |
+| `references/orchestration-abstraction.md` | Pluggable Airflow/Prefect patterns |
+| `references/catalog-control-plane.md` | **CRITICAL** architecture doc |
+| `API-REFERENCE.md` | Dagster SDK quick reference |
 
-3. **Research when uncertain** (don't guess):
-   - Use WebSearch for "Dagster [feature] documentation 2025"
-   - Check official docs: https://docs.dagster.io
+## Quick Reference: Research Queries
 
-4. **Validate against architecture** (don't assume requirements):
-   - Read relevant architecture docs in `/docs/`
-   - Understand CompiledArtifacts contract (input to Dagster)
-   - Check for existing Dagster Definitions
-
-5. **Check dbt integration** (if working with dbt assets):
-   - Verify `dagster-dbt` is installed
-   - Check for existing dbt project paths
-   - Understand dbt manifest.json location
-
-## Quick Reference: Common Research Queries
-
-Use these WebSearch queries when encountering specific needs:
-
-- **Assets**: "Dagster software-defined assets examples 2025"
-- **Resources**: "Dagster ConfigurableResource best practices 2025"
-- **IO Managers**: "Dagster IOManager custom implementation 2025"
-- **dbt integration**: "Dagster dbt integration load_assets_from_dbt_project 2025"
-- **Partitions**: "Dagster partitions DailyPartitionsDefinition examples 2025"
-- **Schedules**: "Dagster schedule decorator cron syntax 2025"
-- **Sensors**: "Dagster sensor asset_sensor examples 2025"
-- **Metadata**: "Dagster asset metadata MetadataValue 2025"
-- **Observability**: "Dagster OpenTelemetry OpenLineage integration 2025"
-
-## Integration Points to Research
-
-### CompiledArtifacts → Dagster Assets
-
-**Key question**: How does Dagster consume CompiledArtifacts?
-
-Research areas:
-- Where are CompiledArtifacts loaded from? (file path, environment variable)
-- How are dbt models converted to Dagster assets?
-- How are compute targets (from CompiledArtifacts) mapped to Dagster resources?
-- What metadata from CompiledArtifacts propagates to asset metadata?
-
-### dbt → Dagster Integration
-
-**Key question**: How are dbt models represented as Dagster assets?
-
-Research areas:
-- `load_assets_from_dbt_manifest()` vs `load_assets_from_dbt_project()`
-- dbt profile configuration (connection to compute targets)
-- dbt command execution (`DbtCliResource`)
-- dbt test results as Dagster asset checks
-- dbt metadata extraction (classifications, lineage)
-
-### Iceberg → Dagster IO Managers
-
-**Key question**: How should Iceberg tables be read/written by Dagster?
-
-Research areas:
-- Custom IOManager for Iceberg tables
-- PyIceberg integration with Dagster
-- Polaris catalog integration
-- Partition mapping (Dagster partitions → Iceberg partitions)
-
-### Observability Integration
-
-**Key question**: How should Dagster emit telemetry and lineage?
-
-Research areas:
-- OpenTelemetry exporter configuration
-- OpenLineage integration (`dagster-openlineage`)
-- Custom metadata extraction
-- Trace context propagation
-
-## Dagster Development Workflow
-
-### Local Development
-```bash
-# Install Dagster
-pip install dagster dagster-webserver dagster-dbt
-
-# Verify installation
-dagster --version
-
-# Run development server
-dagster dev
-
-# Access UI at http://localhost:3000
-```
-
-### Testing Assets
-```bash
-# Materialize specific asset
-dagster asset materialize --select asset_name
-
-# Materialize all assets
-dagster asset materialize
-
-# Run tests
-pytest tests/
-```
-
-## References
-
-- [Dagster Documentation](https://docs.dagster.io): Official documentation
-- [Software-Defined Assets](https://docs.dagster.io/concepts/assets/software-defined-assets): Core concept guide
-- [dagster-dbt Integration](https://docs.dagster.io/_apidocs/libraries/dagster-dbt): dbt integration library
-- [API Reference - Assets](https://docs.dagster.io/api/dagster/assets): Asset decorators and classes
-- [API Reference - Resources](https://docs.dagster.io/api/dagster/resources): Resource definitions
-- [API Reference - IO Managers](https://docs.dagster.io/api/python-api/io-managers): IO manager interfaces
+When uncertain, search:
+- "Dagster dbt_assets decorator examples 2025"
+- "DagsterDbtTranslator custom implementation 2025"
+- "dagster-iceberg PyArrowIcebergIOManager 2025"
+- "DuckDB Iceberg REST catalog ATTACH 2025"
 
 ---
 
-**Remember**: This skill provides research guidance, NOT prescriptive patterns. Always:
-1. Verify the runtime environment and Dagster version
-2. Discover existing codebase patterns for assets and resources
-3. Research SDK capabilities when needed (use WebSearch liberally)
-4. Validate against actual CompiledArtifacts contract requirements
-5. Test in Dagster UI before considering implementation complete
+**Remember**: Design for abstraction. Dagster orchestrates, dbt owns SQL, catalog controls storage.
