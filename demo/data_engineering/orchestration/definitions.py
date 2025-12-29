@@ -42,7 +42,15 @@ because Dagster 1.12.x's type validation uses identity checks that break with
 PEP 563 string annotations.
 """
 
+import os
+
+from dagster import Definitions
+
 from floe_dagster import FloeDefinitions
+from floe_synthetic.dagster.resources import (
+    EcommerceGeneratorResource,
+    IcebergLoaderResource,
+)
 
 # =============================================================================
 # Definitions - Everything Auto-Loaded from floe.yaml
@@ -54,8 +62,8 @@ from floe_dagster import FloeDefinitions
 #   ✅ Bronze assets from: demo.data_engineering.orchestration.assets.bronze
 #   ✅ Ops assets from: demo.data_engineering.orchestration.assets.ops
 #   ✅ dbt models as individual assets with per-model observability
-#   ✅ Jobs: demo_bronze, demo_pipeline, maintenance
-#   ✅ Schedules: bronze_refresh_schedule, transform_pipeline_schedule
+#   ✅ Jobs: seed_bronze, demo_pipeline, maintenance
+#   ✅ Schedules: transform_pipeline_schedule
 #   ✅ Sensors: file_arrival_sensor
 #
 # Auto-loaded from platform.yaml (via FLOE_PLATFORM_FILE):
@@ -63,9 +71,34 @@ from floe_dagster import FloeDefinitions
 #   ✅ ObservabilityOrchestrator (Jaeger tracing + Marquez lineage)
 #   ✅ DbtCliResource (dbt execution)
 #
+# Synthetic Data Resources (bronze layer):
+#   ✅ EcommerceGeneratorResource (floe-synthetic)
+#   ✅ IcebergLoaderResource (floe-synthetic)
+#
 # To run the demo:
 #   export FLOE_PLATFORM_ENV=local  # or dev, staging, prod
 #   dagster dev
 #
 
-defs = FloeDefinitions.from_compiled_artifacts(namespace="data_engineering")
+# Create base definitions from floe.yaml + platform.yaml
+base_defs = FloeDefinitions.from_compiled_artifacts(namespace="data_engineering")
+
+# Add floe-synthetic resources for bronze layer data generation
+# These resources are used by bronze.py assets to generate and load synthetic data
+synthetic_resources = {
+    "ecommerce_generator": EcommerceGeneratorResource(seed=42),
+    "iceberg_loader": IcebergLoaderResource(
+        catalog_uri=os.getenv("POLARIS_URI", "http://floe-infra-polaris:8181/api/catalog"),
+        catalog_name="polaris_catalog",
+        warehouse=os.getenv("POLARIS_WAREHOUSE", "demo_catalog"),
+        credential=os.getenv("POLARIS_CREDENTIAL", "client-id:client-secret"),
+        s3_endpoint=os.getenv("AWS_ENDPOINT_URL", "http://floe-infra-localstack:4566"),
+        s3_region="us-east-1",
+    ),
+}
+
+# Merge synthetic resources with auto-loaded resources
+defs = Definitions.merge(
+    base_defs,
+    Definitions(resources=synthetic_resources),
+)

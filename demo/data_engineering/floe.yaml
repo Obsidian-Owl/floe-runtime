@@ -40,6 +40,7 @@ transforms:
 orchestration:
   # Auto-discover Python assets from modules
   asset_modules:
+    - data_engineering.orchestration.assets.bronze
     - data_engineering.orchestration.assets.ops
 
   # Auto-load dbt models as individual assets with per-model observability
@@ -50,6 +51,11 @@ orchestration:
 
   # Jobs - declarative asset selection
   jobs:
+    seed_bronze:
+      type: batch
+      selection: ["group:bronze"]
+      description: "Seed bronze layer: Generate synthetic raw data (customers, products, orders)"
+
     demo_pipeline:
       type: batch
       selection: ["tag:silver", "tag:gold"]
