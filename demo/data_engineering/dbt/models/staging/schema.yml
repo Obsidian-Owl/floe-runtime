@@ -20,8 +20,6 @@ models:
         description: "Customer name"
         tests:
           - not_null
-      - name: segment
-        description: "Customer segment (enterprise, mid-market, smb)"
       - name: region
         description: "Customer region"
       - name: created_at

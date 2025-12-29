@@ -23,7 +23,6 @@ deduped as (
         name,
         lower(trim(email)) as email,
         region,
-        segment,
         created_at,
         row_number() over (partition by customer_id order by created_at desc) as rn
     from source
@@ -38,7 +37,6 @@ final as (
         name,
         email,
         region,
-        segment,
         cast(created_at as timestamp) as created_at
     from deduped
     where rn = 1
