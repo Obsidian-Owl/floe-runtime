@@ -74,6 +74,14 @@ spec:
           envFrom:
             {{- toYaml .Values.api.envFrom | nindent 12 }}
           {{- end }}
+          startupProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 20  # Allow 1.5 minutes for startup (schema loading)
+            timeoutSeconds: 3
           livenessProbe:
             httpGet:
               path: /readyz

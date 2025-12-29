@@ -57,6 +57,14 @@ spec:
             {{- end }}
             - name: AWS_REGION
               value: {{ .Values.localstack.region | default "us-east-1" | quote }}
+          startupProbe:
+            httpGet:
+              path: /q/health/ready
+              port: management
+            initialDelaySeconds: {{ ((.Values.polaris).startupProbe).initialDelaySeconds | default 15 }}
+            periodSeconds: {{ ((.Values.polaris).startupProbe).periodSeconds | default 5 }}
+            failureThreshold: {{ ((.Values.polaris).startupProbe).failureThreshold | default 24 }}  # Allow 2 minutes for startup
+            timeoutSeconds: {{ ((.Values.polaris).startupProbe).timeoutSeconds | default 3 }}
           livenessProbe:
             httpGet:
               path: /q/health/live

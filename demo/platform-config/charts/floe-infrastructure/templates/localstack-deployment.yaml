@@ -52,6 +52,14 @@ spec:
             - name: localstack-data
               mountPath: /var/lib/localstack
           {{- end }}
+          startupProbe:
+            httpGet:
+              path: /_localstack/health
+              port: gateway
+            initialDelaySeconds: {{ ((.Values.localstack).startupProbe).initialDelaySeconds | default 5 }}
+            periodSeconds: {{ ((.Values.localstack).startupProbe).periodSeconds | default 3 }}
+            failureThreshold: {{ ((.Values.localstack).startupProbe).failureThreshold | default 30 }}  # Allow 1.5 minutes for service initialization
+            timeoutSeconds: {{ ((.Values.localstack).startupProbe).timeoutSeconds | default 3 }}
           livenessProbe:
             httpGet:
               path: /_localstack/health

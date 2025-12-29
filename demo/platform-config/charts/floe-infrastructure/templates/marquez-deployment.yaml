@@ -117,6 +117,14 @@ spec:
             - name: marquez-config
               mountPath: /etc/marquez
               readOnly: true
+          startupProbe:
+            httpGet:
+              path: /api/v1/namespaces
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 30  # Allow 2.5 minutes for DB migration
+            timeoutSeconds: 3
           livenessProbe:
             httpGet:
               path: /api/v1/namespaces

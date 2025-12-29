@@ -215,6 +215,34 @@ dagster:
       annotations:
         description: "Dagster Webserver UI - internal ClusterIP"
 
+    # Production-grade health probes
+    startupProbe:
+      httpGet:
+        path: /server_info
+        port: 80
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      failureThreshold: 30  # Allow 2.5 minutes to start (Dagster can be slow)
+      timeoutSeconds: 3
+
+    readinessProbe:
+      httpGet:
+        path: /server_info
+        port: 80
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+
+    livenessProbe:
+      httpGet:
+        path: /server_info
+        port: 80
+      initialDelaySeconds: 60
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
+
   dagsterDaemon:
     enabled: true
     resources:
