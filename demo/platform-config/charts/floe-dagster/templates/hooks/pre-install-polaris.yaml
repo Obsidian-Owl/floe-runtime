@@ -1,0 +1,199 @@
+{{- if .Values.polarisInit.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "floe-dagster.fullname" . }}-init-polaris
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "floe-dagster.labels" . | nindent 4 }}
+    app.kubernetes.io/component: init-job
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  ttlSecondsAfterFinished: 300  # Auto-cleanup after 5 minutes
+  template:
+    metadata:
+      labels:
+        {{- include "floe-dagster.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: init-job
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: init-polaris
+        image: python:3.11-slim
+        command:
+        - python
+        - -c
+        - |
+          import os
+          import sys
+          import time
+          import json
+          import urllib.request
+          import urllib.error
+          from urllib.parse import urljoin
+
+          # Configuration from environment
+          POLARIS_URI = os.getenv("POLARIS_URI")
+          CLIENT_ID = os.getenv("POLARIS_CLIENT_ID")
+          CLIENT_SECRET = os.getenv("POLARIS_CLIENT_SECRET")
+          WAREHOUSE = os.getenv("POLARIS_WAREHOUSE", "demo_catalog")
+          NAMESPACE = os.getenv("POLARIS_NAMESPACE", "demo")
+          S3_ENDPOINT = os.getenv("S3_ENDPOINT", "http://floe-infra-localstack:4566")
+
+          print("=" * 60)
+          print("POLARIS INITIALIZATION")
+          print("=" * 60)
+          print(f"Polaris URI: {POLARIS_URI}")
+          print(f"Warehouse: {WAREHOUSE}")
+          print(f"Namespace: {NAMESPACE}")
+          print(f"S3 Endpoint: {S3_ENDPOINT}")
+          print()
+
+          # Retry configuration
+          MAX_RETRIES = 5
+          RETRY_DELAY = 5  # seconds
+
+          def make_request(method, path, data=None, headers=None, retries=MAX_RETRIES):
+              """Make HTTP request with retry logic."""
+              url = urljoin(POLARIS_URI, path)
+              req_headers = headers or {}
+
+              for attempt in range(retries):
+                  try:
+                      if data is not None:
+                          data_bytes = json.dumps(data).encode('utf-8')
+                          req_headers['Content-Type'] = 'application/json'
+                      else:
+                          data_bytes = None
+
+                      req = urllib.request.Request(
+                          url,
+                          data=data_bytes,
+                          headers=req_headers,
+                          method=method
+                      )
+
+                      with urllib.request.urlopen(req, timeout=10) as response:
+                          return json.loads(response.read().decode('utf-8'))
+
+                  except urllib.error.HTTPError as e:
+                      if e.code in [409, 200]:  # Conflict or OK
+                          return {"status": e.code, "message": e.read().decode('utf-8')}
+                      elif attempt < retries - 1:
+                          print(f"  HTTP {e.code} error, retrying in {RETRY_DELAY}s... ({attempt + 1}/{retries})")
+                          time.sleep(RETRY_DELAY)
+                      else:
+                          raise
+                  except Exception as e:
+                      if attempt < retries - 1:
+                          print(f"  Error: {e}, retrying in {RETRY_DELAY}s... ({attempt + 1}/{retries})")
+                          time.sleep(RETRY_DELAY)
+                      else:
+                          raise
+
+              raise Exception(f"Failed after {retries} attempts")
+
+          # Step 1: Get OAuth2 token
+          print("Step 1: Obtaining OAuth2 token...")
+          try:
+              token_data = {
+                  "grant_type": "client_credentials",
+                  "client_id": CLIENT_ID,
+                  "client_secret": CLIENT_SECRET,
+                  "scope": "PRINCIPAL_ROLE:ALL"
+              }
+
+              token_resp = make_request("POST", "/api/catalog/v1/oauth/tokens", data=token_data)
+              access_token = token_resp.get("access_token")
+
+              if not access_token:
+                  print(f"✗ Failed to get access token: {token_resp}")
+                  sys.exit(1)
+
+              print("  ✓ OAuth2 token obtained")
+          except Exception as e:
+              print(f"✗ Failed to get token: {e}")
+              sys.exit(1)
+
+          headers = {"Authorization": f"Bearer {access_token}"}
+
+          # Step 2: Create warehouse (idempotent)
+          print(f"\nStep 2: Creating warehouse '{WAREHOUSE}'...")
+          try:
+              warehouse_data = {
+                  "catalog": {
+                      "name": WAREHOUSE,
+                      "type": "INTERNAL",
+                      "properties": {
+                          "default-base-location": f"s3://iceberg-bronze/{WAREHOUSE}"
+                      },
+                      "storageConfigInfo": {
+                          "storageType": "S3",
+                          "allowedLocations": [
+                              f"s3://iceberg-bronze/{WAREHOUSE}",
+                              "s3://iceberg-bronze",
+                              "s3://iceberg-silver",
+                              "s3://iceberg-gold"
+                          ]
+                      }
+                  }
+              }
+
+              result = make_request("POST", "/api/management/v1/catalogs", data=warehouse_data, headers=headers)
+
+              if isinstance(result, dict) and result.get("status") == 409:
+                  print(f"  ✓ Warehouse '{WAREHOUSE}' already exists")
+              else:
+                  print(f"  ✓ Warehouse '{WAREHOUSE}' created")
+          except Exception as e:
+              print(f"✗ Failed to create warehouse: {e}")
+              sys.exit(1)
+
+          # Step 3: Create namespace (idempotent)
+          print(f"\nStep 3: Creating namespace '{NAMESPACE}'...")
+          try:
+              namespace_data = {"namespace": [NAMESPACE]}
+
+              result = make_request(
+                  "POST",
+                  f"/api/catalog/v1/{WAREHOUSE}/namespaces",
+                  data=namespace_data,
+                  headers=headers
+              )
+
+              if isinstance(result, dict) and result.get("status") == 409:
+                  print(f"  ✓ Namespace '{NAMESPACE}' already exists")
+              else:
+                  print(f"  ✓ Namespace '{NAMESPACE}' created")
+          except Exception as e:
+              # Namespace creation might fail if it already exists - that's okay
+              if "already exists" in str(e).lower() or "409" in str(e):
+                  print(f"  ✓ Namespace '{NAMESPACE}' already exists")
+              else:
+                  print(f"⚠️  Namespace creation warning: {e}")
+                  # Don't fail - namespace might exist from previous run
+
+          print("\n" + "=" * 60)
+          print("✅ Polaris initialization complete!")
+          print("=" * 60)
+          sys.exit(0)
+        env:
+        - name: POLARIS_URI
+          value: {{ .Values.polarisInit.uri | quote }}
+        - name: POLARIS_CLIENT_ID
+          value: {{ .Values.polarisInit.clientId | quote }}
+        - name: POLARIS_CLIENT_SECRET
+          value: {{ .Values.polarisInit.clientSecret | quote }}
+        - name: POLARIS_WAREHOUSE
+          value: {{ .Values.polarisInit.warehouse | default "demo_catalog" | quote }}
+        - name: POLARIS_NAMESPACE
+          value: {{ .Values.polarisInit.namespace | default "demo" | quote }}
+        {{- if .Values.polarisInit.s3Endpoint }}
+        - name: S3_ENDPOINT
+          value: {{ .Values.polarisInit.s3Endpoint | quote }}
+        {{- end }}
+  backoffLimit: 3
+{{- end }}

@@ -375,6 +375,17 @@ dagster:
           jobSpecConfig:
             ttlSecondsAfterFinished: 600
 
+# Polaris Initialization Job (pre-install hook)
+# Creates warehouse and namespace before Dagster starts
+polarisInit:
+  enabled: true
+  uri: "http://floe-infra-polaris:8181"
+  clientId: "demo_client"
+  clientSecret: "demo_secret"
+  warehouse: "demo_catalog"
+  namespace: "demo"
+  s3Endpoint: "http://floe-infra-localstack:4566"
+
 # Floe-specific configuration
 floe:
   compiledArtifacts:
