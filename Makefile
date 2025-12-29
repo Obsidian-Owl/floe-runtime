@@ -1,7 +1,7 @@
 # floe-runtime Makefile
 # Provides consistent commands that mirror CI exactly
 
-.PHONY: check lint typecheck security test test-unit test-contract test-integration test-helm helm-lint format install hooks docker-up docker-down docker-logs deploy-local-infra deploy-local-dagster deploy-local-cube deploy-local-full undeploy-local port-forward-all port-forward-stop show-urls demo-status demo-cleanup demo-logs demo-image-build demo-image-push demo-clean demo-validate demo-materialize demo-e2e demo-full-e2e demo-quickstart help
+.PHONY: check lint typecheck security test test-unit test-contract test-integration test-helm helm-lint format install hooks docker-up docker-down docker-logs deploy-local-infra deploy-local-dagster deploy-local-cube deploy-local-full undeploy-local port-forward-all port-forward-stop show-urls demo-status demo-cleanup demo-cleanup-full demo-deploy-clean demo-reset demo-logs demo-image-build demo-image-push demo-clean demo-validate demo-materialize demo-e2e demo-full-e2e demo-quickstart help
 
 # Default target
 help:
@@ -39,8 +39,11 @@ help:
 	@echo ""
 	@echo "Demo Operations:"
 	@echo "  make demo-quickstart      - 🚀 One-command: clean, build, deploy, validate"
+	@echo "  make demo-reset           - 🔄 Complete reset: cleanup + deploy from scratch"
+	@echo "  make demo-deploy-clean    - 📦 Clean slate deployment (automated)"
+	@echo "  make demo-cleanup-full    - 🧹 Complete cleanup (S3 + Helm + namespace)"
 	@echo "  make demo-full-e2e        - 🔬 Deploy + materialize + E2E validation (full pipeline)"
-	@echo "  make demo-materialize     - Trigger Dagster jobs (bronze + full pipeline)"
+	@echo "  make demo-materialize     - Trigger Dagster jobs (dbt pipeline)"
 	@echo "  make demo-e2e             - E2E validation: data + observability + cube"
 	@echo "  make demo-clean           - Clean deployment (keep images)"
 	@echo "  make demo-validate        - Validate deployment health (pods + endpoints)"
@@ -386,6 +389,19 @@ dev-clean-monthly-dry-run:
 # Legacy cleanup for backward compatibility (maps to daily)
 demo-cleanup:
 	@./scripts/claude-cleanup.sh daily
+
+# Complete cleanup for fresh deployment (S3 + Helm + namespace)
+demo-cleanup-full:
+	@./scripts/cleanup-local.sh
+
+# Clean slate deployment (cleanup + deploy + validate)
+demo-deploy-clean:
+	@./scripts/deploy-local-clean.sh
+
+# Complete reset: cleanup + deploy in one command
+demo-reset: demo-cleanup-full demo-deploy-clean
+	@echo ""
+	@echo "✅ Demo environment reset complete!"
 
 # Nuclear option: complete environment reset (requires confirmation)
 dev-reset:

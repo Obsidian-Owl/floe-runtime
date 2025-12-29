@@ -158,11 +158,90 @@ spec:
 
               print()
               print("="*60)
-              print("✅ Demo seed data complete!")
+              print("VALIDATION: Verifying Seed Success")
               print("="*60)
+
+              validation_passed = True
+
+              for table_id, expected_data in tables:
+                  print(f"\nValidating {table_id}...")
+
+                  try:
+                      # 1. Check Polaris catalog has the table
+                      table = catalog.inner_catalog.load_table(table_id)
+                      print(f"  ✅ Table exists in Polaris catalog")
+
+                      # 2. Check table has snapshots (data was written)
+                      snapshots = list(table.snapshots())
+                      if not snapshots:
+                          print(f"  ❌ No snapshots found - data write failed!")
+                          validation_passed = False
+                          continue
+                      print(f"  ✅ Found {len(snapshots)} snapshot(s)")
+
+                      # 3. Check row count matches expected
+                      actual_rows = table.scan().to_arrow().num_rows
+                      expected_rows = expected_data.num_rows
+                      if actual_rows != expected_rows:
+                          print(f"  ❌ Row count mismatch: expected {expected_rows}, got {actual_rows}")
+                          validation_passed = False
+                      else:
+                          print(f"  ✅ Row count validated: {actual_rows} rows")
+
+                      # 4. Check physical files exist in S3
+                      import boto3
+                      s3 = boto3.client(
+                          's3',
+                          endpoint_url=S3_ENDPOINT,
+                          aws_access_key_id=S3_ACCESS_KEY,
+                          aws_secret_access_key=S3_SECRET_KEY,
+                          region_name=S3_REGION
+                      )
+
+                      # Parse S3 location from table metadata
+                      table_location = table.location()
+                      bucket = table_location.split('/')[2]
+                      prefix = '/'.join(table_location.split('/')[3:])
+
+                      # List files under table location
+                      response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
+                      if 'Contents' not in response or len(response['Contents']) == 0:
+                          print(f"  ❌ No files found in S3 at {table_location}")
+                          validation_passed = False
+                      else:
+                          file_count = len(response['Contents'])
+                          parquet_files = [f for f in response['Contents'] if f['Key'].endswith('.parquet')]
+                          metadata_files = [f for f in response['Contents'] if f['Key'].endswith(('.avro', '.json'))]
+
+                          print(f"  ✅ Found {file_count} files in S3:")
+                          print(f"     - {len(parquet_files)} data files (.parquet)")
+                          print(f"     - {len(metadata_files)} metadata files (.avro/.json)")
+
+                          if len(parquet_files) == 0:
+                              print(f"  ❌ No parquet data files found!")
+                              validation_passed = False
+
+                  except Exception as e:
+                      print(f"  ❌ Validation failed: {e}")
+                      import traceback
+                      traceback.print_exc()
+                      validation_passed = False
+
               print()
-              print("Raw layer tables are ready for bronze layer assets to process.")
-              print("Run the Dagster demo_bronze job to transform raw → bronze.")
+              print("="*60)
+              if validation_passed:
+                  print("✅ ALL VALIDATIONS PASSED")
+                  print("="*60)
+                  print()
+                  print("Bronze layer (Parquet + Iceberg) is ready for Silver layer (dbt) processing.")
+                  sys.exit(0)
+              else:
+                  print("❌ VALIDATION FAILED")
+                  print("="*60)
+                  print()
+                  print("One or more tables failed validation.")
+                  print("Check logs above for details.")
+                  sys.exit(1)
           env:
             - name: POLARIS_URI
               value: "http://{{ .Release.Name }}-polaris:8181/api/catalog"

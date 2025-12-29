@@ -2,7 +2,10 @@
 # Materialize Demo Data - Automated Dagster Job Execution
 #
 # This script triggers Dagster jobs via GraphQL API (no UI interaction required).
-# It materializes the full demo pipeline: Raw → Bronze → Silver → Gold
+# It runs the dbt transformation pipeline: Bronze (raw_*) → Silver → Gold
+#
+# Note: Bronze layer is created by the seed-data Helm hook (Parquet + Iceberg).
+#       This script only runs the dbt transformations (silver + gold layers).
 #
 # Prerequisites:
 #   - Dagster deployed and running (make deploy-local-dagster)
@@ -11,9 +14,8 @@
 # Usage: ./scripts/materialize-demo.sh [OPTIONS]
 #
 # Options:
-#   --bronze    : Materialize bronze layer only (demo_bronze job)
-#   --pipeline  : Run full pipeline (demo_pipeline job)
-#   --all       : Run bronze first, then full pipeline (default)
+#   --pipeline  : Run dbt pipeline (silver + gold layers) [default]
+#   --all       : Same as --pipeline (kept for compatibility)
 #
 # Exit codes:
 #   0 - All jobs completed successfully
@@ -283,65 +285,23 @@ execute_jobs() {
     local mode="${1:---all}"
 
     case "$mode" in
-        --bronze)
-            echo "Mode: Bronze layer only"
-            echo ""
-            local run_id=$(launch_job "demo_bronze")
-            if [ -n "$run_id" ]; then
-                wait_for_run "$run_id" "demo_bronze"
-            fi
-            ;;
-        --pipeline)
-            echo "Mode: Full pipeline (bronze → silver → gold)"
+        --pipeline|--all)
+            echo "Mode: dbt transformation pipeline (silver + gold layers)"
+            echo "Bronze layer already exists from seed-data job (Parquet + Iceberg)."
             echo ""
             local run_id=$(launch_job "demo_pipeline")
             if [ -n "$run_id" ]; then
                 wait_for_run "$run_id" "demo_pipeline"
             fi
             ;;
-        --all)
-            echo "Mode: Bronze first, then full pipeline"
-            echo ""
-
-            # Step 1: Bronze layer
-            echo "Step 1/2: Bronze Layer"
-            local bronze_run_id=$(launch_job "demo_bronze")
-            if [ -n "$bronze_run_id" ]; then
-                if wait_for_run "$bronze_run_id" "demo_bronze"; then
-                    echo "✅ Bronze layer materialized"
-                else
-                    echo "❌ Bronze layer failed - aborting"
-                    return 1
-                fi
-            else
-                echo "❌ Failed to launch bronze job - aborting"
-                return 1
-            fi
-
-            # Brief pause between jobs
-            echo "⏳ Waiting 5 seconds before next job..."
-            sleep 5
-            echo ""
-
-            # Step 2: Full pipeline
-            echo "Step 2/2: Full Pipeline (Bronze → Silver → Gold)"
-            local pipeline_run_id=$(launch_job "demo_pipeline")
-            if [ -n "$pipeline_run_id" ]; then
-                wait_for_run "$pipeline_run_id" "demo_pipeline"
-            else
-                echo "❌ Failed to launch pipeline job"
-                return 1
-            fi
-            ;;
         *)
             echo "❌ Invalid option: $mode"
             echo ""
-            echo "Usage: $0 [--bronze|--pipeline|--all]"
+            echo "Usage: $0 [--pipeline|--all]"
             echo ""
             echo "Options:"
-            echo "  --bronze    : Materialize bronze layer only"
-            echo "  --pipeline  : Run full pipeline (bronze → silver → gold)"
-            echo "  --all       : Run bronze first, then full pipeline (default)"
+            echo "  --pipeline  : Run dbt pipeline (silver + gold layers) [default]"
+            echo "  --all       : Same as --pipeline (kept for compatibility)"
             exit 1
             ;;
     esac
