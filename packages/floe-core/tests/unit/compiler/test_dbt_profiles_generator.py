@@ -151,15 +151,17 @@ class TestGenerateProfiles:
         assert "iceberg" in output["extensions"]
         assert "httpfs" in output["extensions"]
 
-    def test_output_contains_persistent_secrets_setting(
-        self, generator: DbtProfilesGenerator
-    ) -> None:
-        """Verify output enables persistent secrets."""
+    def test_output_no_persistent_secrets_setting(self, generator: DbtProfilesGenerator) -> None:
+        """Verify output does not include persistent secrets setting.
+
+        This prevents DuckDB secret manager conflicts during ATTACH operations.
+        """
         profiles = generator.generate_profiles()
         output = profiles["test_project"]["outputs"]["dev"]
 
-        assert "settings" in output
-        assert output["settings"]["allow_persistent_secrets"] == "true"
+        # No settings section should be present since allow_persistent_secrets is removed
+        # to prevent "Changing Secret Manager settings after the secret manager is used" error
+        assert "settings" not in output
 
 
 class TestBuildAttachConfig:

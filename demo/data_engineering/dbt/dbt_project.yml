@@ -19,6 +19,9 @@ clean-targets:
   - "target"
   - "dbt_packages"
 
+on-run-start:
+  - "SELECT COUNT(*) FROM duckdb_secrets()"
+
 models:
   floe_demo:
     # Staging models (Bronze → Silver)

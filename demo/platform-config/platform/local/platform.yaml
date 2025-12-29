@@ -257,7 +257,7 @@ compute:
   default:
     type: duckdb
     properties:
-      path: ":memory:"
+      path: "/tmp/floe.duckdb"
       threads: 4
     credentials:
       mode: static

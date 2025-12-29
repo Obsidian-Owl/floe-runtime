@@ -186,9 +186,6 @@ class DbtProfilesGenerator:
             "path": database_path,
             "threads": threads,
             "extensions": ["iceberg", "httpfs"],
-            "settings": {
-                "allow_persistent_secrets": "true",
-            },
         }
 
         catalog_mappings = self._build_catalog_mappings(catalog)

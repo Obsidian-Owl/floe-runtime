@@ -10,33 +10,35 @@ python -c "import data_engineering.orchestration.definitions" 2>&1 || {
     # Continue anyway to let Dagster gRPC server provide better diagnostics
 }
 
-# Initialize DuckDB Iceberg catalog (ATTACH statement)
-# This creates a persistent secret and attaches the Polaris catalog
-# so dbt models can reference tables via: polaris_catalog.namespace.table
-echo "Initializing DuckDB Iceberg catalog connection..."
-CATALOG_INIT_SQL="/tmp/init_catalog.sql"
+# Pre-install DuckDB extensions
+# Extensions must be installed before dbt runs to avoid timing issues
+# INSTALL persists across sessions for file databases
+echo "Pre-installing DuckDB extensions..."
 
-cat > "$CATALOG_INIT_SQL" <<EOF
--- Load extensions
-INSTALL iceberg;
-INSTALL httpfs;
-LOAD iceberg;
-LOAD httpfs;
+python3 << 'PYTHON_EOF'
+import duckdb
+import os
 
--- Create secret for Polaris OAuth2 authentication
-CREATE SECRET IF NOT EXISTS polaris_secret (
-    TYPE iceberg,
-    CLIENT_ID '${POLARIS_CLIENT_ID}',
-    CLIENT_SECRET '${POLARIS_CLIENT_SECRET}'
-);
+try:
+    db_path = '/tmp/floe.duckdb'
+    conn = duckdb.connect(db_path)
 
--- Attach Polaris catalog for read operations
--- dbt-duckdb ATTACH configuration will handle this at session startup
--- This script is here for debugging and manual testing
--- SELECT * FROM polaris_catalog.demo.bronze_customers LIMIT 5;
-EOF
+    conn.execute("INSTALL iceberg")
+    conn.execute("INSTALL httpfs")
 
-echo "✓ Catalog initialization SQL prepared at $CATALOG_INIT_SQL"
+    print(f"✓ Installed DuckDB extensions (iceberg, httpfs)")
+    print(f"  Database: {db_path}")
+    print(f"  Extensions will be available for dbt execution")
+
+    conn.close()
+
+except Exception as e:
+    print(f"WARNING: Failed to pre-install DuckDB extensions: {e}")
+    import traceback
+    traceback.print_exc()
+    print("  Continuing anyway - dbt will attempt to install extensions")
+
+PYTHON_EOF
 
 # Generate dbt profiles.yml from platform.yaml (Two-Tier Architecture)
 PROFILES_PATH="/app/demo/data_engineering/dbt/profiles.yml"
@@ -68,15 +70,11 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Run dbt compile to update manifest.json with runtime platform config
-# Note: manifest.json already exists from build time (dbt parse), this updates it
-echo "Running dbt compile to update manifest with platform config..."
-if (cd "$PROJECT_DIR" && dbt compile --profiles-dir "$(dirname $PROFILES_PATH)" --target dev 2>&1); then
-    echo "✓ manifest.json updated successfully"
-else
-    echo "WARNING: dbt compile failed, using build-time manifest"
-    echo "  This is non-fatal - dbt assets will use build-time schema"
-fi
+# SKIP dbt compile - it triggers secret manager errors during DuckDB connection init
+# The build-time manifest.json from 'dbt parse' is sufficient for Dagster asset discovery
+# The actual dbt run will use the runtime profiles.yml with proper ATTACH configuration
+echo "Skipping dbt compile - using build-time manifest.json"
+echo "  Runtime profiles.yml will be used during actual dbt execution"
 
 # Copy instance.yaml from ConfigMap mount to writable DAGSTER_HOME
 # ConfigMap is mounted at /opt/dagster/instance/dagster.yaml (read-only)

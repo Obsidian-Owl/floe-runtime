@@ -121,18 +121,9 @@ class Plugin(BasePlugin):
     def configure_connection(self, conn: Any) -> None:
         """ATTACH Polaris catalog to DuckDB for native Iceberg writes.
 
-        This method is called by dbt-duckdb BEFORE running any queries.
-        The ATTACH enables dbt models to write directly to Iceberg via:
-            CREATE TABLE polaris_catalog.demo.gold.{table} AS SELECT ...
-
-        DuckDB v1.4+ supports native Iceberg writes via ATTACH, eliminating
-        the need for complex plugin store() logic.
-
-        Architecture:
-            1. Create DuckDB SECRET with Polaris OAuth2 credentials
-            2. ATTACH Polaris warehouse as 'polaris_catalog' alias
-            3. DuckDB SQL can now reference: polaris_catalog.{namespace}.{table}
-            4. Custom table.sql macro uses ATTACH to write to Iceberg
+        Uses inline OAuth2 credentials to avoid DuckDB secret manager initialization issues.
+        The secret manager is already initialized when this method runs, preventing
+        CREATE SECRET operations. Inline credentials bypass this limitation.
 
         Args:
             conn: DuckDB connection object.
@@ -143,24 +134,19 @@ class Plugin(BasePlugin):
         catalog_uri = self.config["catalog_uri"]
         warehouse = self.config["warehouse"]
 
-        client_id = self.config.get("client_id") or os.getenv("POLARIS_CLIENT_ID", "")
-        client_secret = self.config.get("client_secret") or os.getenv("POLARIS_CLIENT_SECRET", "")
+        client_id = self.config.get("client_id") or os.getenv("POLARIS_CLIENT_ID")
+        client_secret = self.config.get("client_secret") or os.getenv("POLARIS_CLIENT_SECRET")
 
         try:
-            polaris_secret_sql = f"""
-            CREATE OR REPLACE SECRET polaris_secret (
+            oauth2_server_uri = f"{catalog_uri}/v1/oauth/tokens"
+
+            attach_sql = f"""
+            ATTACH IF NOT EXISTS '{warehouse}' AS polaris_catalog (
                 TYPE ICEBERG,
                 CLIENT_ID '{client_id}',
                 CLIENT_SECRET '{client_secret}',
+                OAUTH2_SERVER_URI '{oauth2_server_uri}',
                 ENDPOINT '{catalog_uri}'
-            )
-            """
-            conn.execute(polaris_secret_sql)
-
-            attach_sql = f"""
-            ATTACH '{warehouse}' AS polaris_catalog (
-                TYPE ICEBERG,
-                SECRET polaris_secret
             )
             """
             conn.execute(attach_sql)
@@ -169,8 +155,7 @@ class Plugin(BasePlugin):
             import traceback
 
             traceback.print_exc()
+
             raise RuntimeError(
-                f"Failed to ATTACH Polaris catalog '{warehouse}' at {catalog_uri}. "
-                f"Ensure catalog is running and credentials are correct. "
-                f"Error: {e}"
+                f"Failed to ATTACH Polaris catalog '{warehouse}' at {catalog_uri}. Error: {e}"
             ) from e
