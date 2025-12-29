@@ -57,6 +57,30 @@ import sys
 from pydantic import SecretStr
 
 
+def _detect_s3_endpoint() -> str:
+    """Detect S3 endpoint based on execution context.
+
+    Returns:
+        S3 endpoint URL appropriate for execution context
+
+    Notes:
+        - Explicit AWS_ENDPOINT_URL environment variable takes precedence
+        - Detects K8s execution by checking for service account token
+        - Falls back to NodePort for local machine execution
+    """
+    # Explicit override takes precedence
+    if endpoint := os.environ.get("AWS_ENDPOINT_URL"):
+        return endpoint
+
+    # Detect K8s execution context
+    if os.path.exists("/var/run/secrets/kubernetes.io/serviceaccount"):
+        # Running in K8s pod - use internal service DNS
+        return "http://floe-infra-localstack:4566"
+
+    # Local execution - use NodePort (survives pod restarts)
+    return "http://localhost:30566"
+
+
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
@@ -90,8 +114,8 @@ def parse_args() -> argparse.Namespace:
     # S3 configuration
     parser.add_argument(
         "--s3-endpoint",
-        default=os.environ.get("AWS_ENDPOINT_URL", "http://localhost:4566"),
-        help="S3-compatible endpoint",
+        default=_detect_s3_endpoint(),
+        help="S3-compatible endpoint (auto-detected based on context)",
     )
     parser.add_argument(
         "--s3-region",
