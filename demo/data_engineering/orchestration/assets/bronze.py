@@ -128,7 +128,6 @@ def raw_products(
     group_name="bronze",
     description="Raw order data (bronze layer) - 5000 synthetic orders",
     compute_kind="synthetic",
-    required_resource_keys={"_floe_observability_orchestrator"},
     deps=[raw_customers, raw_products],
 )
 def raw_orders(
@@ -176,7 +175,6 @@ def raw_orders(
     group_name="bronze",
     description="Raw order item data (bronze layer) - ~15000 synthetic line items",
     compute_kind="synthetic",
-    required_resource_keys={"_floe_observability_orchestrator"},
     deps=[raw_orders],
 )
 def raw_order_items(
