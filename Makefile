@@ -390,18 +390,28 @@ dev-clean-monthly-dry-run:
 demo-cleanup:
 	@./scripts/claude-cleanup.sh daily
 
-# Complete cleanup for fresh deployment (S3 + Helm + namespace)
+# Complete cleanup (Polaris + Dagster + Marquez + S3 + K8s)
 demo-cleanup-full:
+	@echo "🧹 Running full demo cleanup..."
 	@./scripts/cleanup-local.sh
 
 # Clean slate deployment (cleanup + deploy + validate)
 demo-deploy-clean:
 	@./scripts/deploy-local-clean.sh
 
-# Complete reset: cleanup + deploy in one command
+# Reset demo environment (cleanup + fresh deploy)
 demo-reset: demo-cleanup-full demo-deploy-clean
 	@echo ""
 	@echo "✅ Demo environment reset complete!"
+	@echo ""
+	@echo "Services cleaned:"
+	@echo "  • Polaris: Catalog metadata (namespaces, tables, roles)"
+	@echo "  • Dagster: Run history (runs, event logs, asset materializations)"
+	@echo "  • Marquez: Lineage graphs (datasets, jobs, runs)"
+	@echo "  • S3: All Iceberg data files"
+	@echo "  • K8s: All pods, services, configmaps"
+	@echo ""
+	@echo "Run 'make demo-status' to verify clean deployment"
 
 # Nuclear option: complete environment reset (requires confirmation)
 dev-reset:

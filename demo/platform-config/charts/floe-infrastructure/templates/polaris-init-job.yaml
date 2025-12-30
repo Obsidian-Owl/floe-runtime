@@ -106,15 +106,44 @@ spec:
                   sys.exit(1)
               print("  Token acquired successfully")
 
-              # 1. Create or update catalog with proper credential vending config
+              # Check for stale catalog state (validates cleanup worked)
+              print("Checking for stale catalog state...")
+              status, resp = api_request("GET", f"/api/catalog/v1/{CATALOG_NAME}/namespaces", token=token)
+              if resp and resp.get('namespaces'):
+                  existing_ns = ['.'.join(ns) for ns in resp['namespaces']]
+                  print(f"⚠️  WARNING: Found existing namespaces: {existing_ns}")
+                  print(f"⚠️  This may indicate incomplete cleanup.")
+                  print(f"⚠️  Run 'make demo-cleanup-full' first for a clean deployment.")
+                  print(f"⚠️  Continuing anyway (will attempt to work with existing state)...")
+              else:
+                  print("  ✅ No stale catalog state detected")
+
+              # 1. Parse layer config to build allowed locations
+              # Each layer has its own bucket, all must be in allowedLocations
+              layers = json.loads(LAYER_CONFIG)
+              allowed_locations = []
+              default_base_location = None
+
+              for layer_name, layer_data in layers.items():
+                  bucket = layer_data["storage"]["bucket"]
+                  location = f"s3://{bucket}/"
+                  allowed_locations.append(location)
+                  # Use first layer (bronze) as default base location
+                  if default_base_location is None:
+                      default_base_location = location
+
+              print(f"Configuring catalog: {CATALOG_NAME}")
+              print(f"  Allowed locations: {allowed_locations}")
+              print(f"  Default base location: {default_base_location}")
+
+              # 2. Create or update catalog with proper credential vending config
               # For vended credentials to work, Polaris needs (per OpenAPI spec):
               # - roleArn: The IAM role to assume when vending credentials
               # - endpoint: S3-compatible endpoint for LocalStack/MinIO
               # - pathStyleAccess: Required for LocalStack/MinIO
-              print(f"Configuring catalog: {CATALOG_NAME}")
               storage_config = {
                   "storageType": "S3",
-                  "allowedLocations": [STORAGE_LOCATION],
+                  "allowedLocations": allowed_locations,
                   # Polaris AwsStorageConfigInfo uses flat keys per OpenAPI spec
                   "endpoint": STORAGE_ENDPOINT,
                   "pathStyleAccess": True,
@@ -134,7 +163,7 @@ spec:
                   status, resp = api_request("PUT", f"/api/management/v1/catalogs/{CATALOG_NAME}", {
                       "currentEntityVersion": entity_version,
                       "properties": {
-                          "default-base-location": STORAGE_LOCATION
+                          "default-base-location": default_base_location
                       },
                       "storageConfigInfo": storage_config
                   }, token)
@@ -151,7 +180,7 @@ spec:
                           "name": CATALOG_NAME,
                           "type": "INTERNAL",
                           "properties": {
-                              "default-base-location": STORAGE_LOCATION
+                              "default-base-location": default_base_location
                           },
                           "storageConfigInfo": storage_config
                       }
@@ -163,31 +192,32 @@ spec:
               else:
                   print(f"  Failed to check catalog status: {status} - {resp}")
 
-              # 2. Create layer namespaces with per-layer storage
+              # 3. Create layer namespaces with per-layer storage
               print("Creating layer namespaces from declarative config")
-              layers = json.loads(LAYER_CONFIG)
 
-              # Extract parent namespaces first
+              # Extract parent namespaces first (excluding catalog name itself)
               parents = set()
               for layer_name, layer_data in layers.items():
                   namespace = layer_data["namespace"]
                   parts = namespace.split(".")
-                  if len(parts) > 1:
+                  # Skip catalog prefix if present (e.g., "demo_catalog.bronze" -> no parent needed)
+                  if len(parts) > 1 and parts[0] != CATALOG_NAME:
                       parents.add(parts[0])
 
-              # Create parent namespaces
-              for parent in sorted(parents):
-                  print(f"Creating parent namespace: {parent}")
-                  status, resp = api_request("POST", f"/api/catalog/v1/{CATALOG_NAME}/namespaces", {
-                      "namespace": [parent],
-                      "properties": {}
-                  }, token)
-                  if status == 200:
-                      print(f"  Created parent namespace: {parent}")
-                  elif status == 409:
-                      print(f"  Parent namespace already exists: {parent}")
-                  else:
-                      print(f"  Failed to create parent namespace: {status} - {resp}")
+              # Create parent namespaces (if any)
+              if parents:
+                  for parent in sorted(parents):
+                      print(f"Creating parent namespace: {parent}")
+                      status, resp = api_request("POST", f"/api/catalog/v1/{CATALOG_NAME}/namespaces", {
+                          "namespace": [parent],
+                          "properties": {}
+                      }, token)
+                      if status == 200:
+                          print(f"  Created parent namespace: {parent}")
+                      elif status == 409:
+                          print(f"  Parent namespace already exists: {parent}")
+                      else:
+                          print(f"  Failed to create parent namespace: {status} - {resp}")
 
               # Create layer-specific namespaces with per-layer storage
               for layer_name, layer_data in layers.items():
@@ -197,36 +227,58 @@ spec:
                   retention_days = layer_data.get("retention_days")
                   properties = layer_data.get("properties", {})
 
-                  # Build namespace properties
-                  ns_properties = {
-                      "layer": layer_name,
-                      # PER-LAYER STORAGE LOCATION (fixes NoSuchBucketException)
-                      "location": f"s3://{storage_bucket}/",
-                      **properties
-                  }
-                  if retention_days:
-                      ns_properties["retention_days"] = str(retention_days)
-
+                  # Strip catalog name from namespace (e.g., "demo_catalog.bronze" -> ["bronze"])
+                  # The catalog is already in the URL path: /api/catalog/v1/{CATALOG_NAME}/namespaces
                   ns_parts = namespace.split(".")
+                  if ns_parts[0] == CATALOG_NAME:
+                      ns_parts = ns_parts[1:]  # Remove catalog prefix
+
                   print(f"Creating layer namespace: {namespace} (layer={layer_name}, bucket={storage_bucket})")
+
+                  # Create namespace with ONLY location property first (Polaris requirement)
+                  # The location property is required and must be set at namespace creation time
+                  # IMPORTANT: Polaris expects namespaces as subdirectories, not at bucket root
+                  # e.g., s3://iceberg-bronze/bronze/ not s3://iceberg-bronze/
+                  create_properties = {
+                      "location": f"s3://{storage_bucket}/{layer_name}/"
+                  }
+                  print(f"  Request payload: namespace={ns_parts}, properties={create_properties}")
                   status, resp = api_request("POST", f"/api/catalog/v1/{CATALOG_NAME}/namespaces", {
                       "namespace": ns_parts,
-                      "properties": ns_properties
+                      "properties": create_properties
                   }, token)
                   if status == 200:
                       print(f"  Created layer namespace: {namespace}")
+
+                      # Now add custom metadata properties (layer, owner, retention, etc.)
+                      metadata_properties = {
+                          "layer": layer_name,
+                          **properties
+                      }
+                      if retention_days:
+                          metadata_properties["retention_days"] = str(retention_days)
+
+                      if metadata_properties:
+                          print(f"  Adding metadata properties: {metadata_properties}")
+                          # Build namespace identifier (without catalog prefix for properties API)
+                          ns_identifier = ".".join(ns_parts)
+                          status, resp = api_request(
+                              "POST",
+                              f"/api/catalog/v1/{CATALOG_NAME}/namespaces/{ns_identifier}/properties",
+                              metadata_properties,
+                              token
+                          )
+                          if status in [200, 204]:
+                              print(f"  Updated properties for: {namespace}")
+                          else:
+                              print(f"  Warning: Failed to add metadata properties: {status} - {resp}")
+
                   elif status == 409:
                       print(f"  Layer namespace already exists: {namespace}")
-                      # Update properties if namespace exists
-                      print(f"  Updating namespace properties...")
-                      status, resp = api_request("POST", f"/api/catalog/v1/{CATALOG_NAME}/namespaces/{namespace}/properties",
-                          ns_properties, token)
-                      if status in [200, 204]:
-                          print(f"  Updated properties for: {namespace}")
                   else:
                       print(f"  Failed to create layer namespace: {status} - {resp}")
 
-              # 3. Create a catalog role with full table privileges
+              # 4. Create a catalog role with full table privileges
               catalog_role_name = "demo_data_admin"
               print(f"Creating catalog role: {catalog_role_name}")
               status, resp = api_request("POST", f"/api/management/v1/catalogs/{CATALOG_NAME}/catalog-roles", {
@@ -241,7 +293,7 @@ spec:
               else:
                   print(f"  Failed to create catalog role: {status} - {resp}")
 
-              # 4. Grant privileges to the catalog role on the catalog
+              # 5. Grant privileges to the catalog role on the catalog
               # These privileges allow table creation and data writes
               privileges = [
                   "CATALOG_MANAGE_CONTENT",  # Create/drop tables and namespaces
@@ -274,7 +326,7 @@ spec:
                   else:
                       print(f"    Failed to grant {priv}: {status} - {resp}")
 
-              # 5. Assign the catalog role to the principal role "service_admin"
+              # 6. Assign the catalog role to the principal role "service_admin"
               # The demo_client principal has service_admin role by default
               principal_role = "service_admin"
               print(f"Assigning catalog role {catalog_role_name} to principal role {principal_role}")
