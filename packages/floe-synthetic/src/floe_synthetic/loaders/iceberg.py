@@ -63,6 +63,10 @@ class IcebergLoaderConfig(BaseSettings):
         default=None,
         description="OAuth credential (client_id:client_secret)",
     )
+    scope: str | None = Field(
+        default=None,
+        description="OAuth scope (e.g., PRINCIPAL_ROLE:service_admin)",
+    )
     s3_endpoint: str | None = Field(
         default=None,
         description="S3 endpoint override for LocalStack",
@@ -176,6 +180,15 @@ class IcebergLoader:  # pragma: no cover - integration tested
             client_secret = os.environ.get("POLARIS_CLIENT_SECRET")
             if client_id and client_secret:
                 catalog_props["credential"] = f"{client_id}:{client_secret}"
+
+        # Add OAuth scope if provided
+        if self._config.scope:
+            catalog_props["scope"] = self._config.scope
+        else:
+            # Try environment variable
+            scope = os.environ.get("POLARIS_SCOPE")
+            if scope:
+                catalog_props["scope"] = scope
 
         # Add S3 configuration
         if self._config.s3_endpoint:

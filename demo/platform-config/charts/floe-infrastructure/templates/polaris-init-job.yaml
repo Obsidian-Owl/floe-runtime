@@ -50,8 +50,7 @@ spec:
 
               POLARIS_URI = os.environ["POLARIS_URI"]
               CATALOG_NAME = os.environ["CATALOG_NAME"]
-              NAMESPACES = os.environ["NAMESPACES"].split(",")
-              STORAGE_LOCATION = os.environ["STORAGE_LOCATION"]
+              LAYER_CONFIG = os.environ["LAYER_CONFIG"]  # Required - no fallback
               STORAGE_ENDPOINT = os.environ["STORAGE_ENDPOINT"]
               CLIENT_ID = os.environ["POLARIS_CLIENT_ID"]
               CLIENT_SECRET = os.environ["POLARIS_CLIENT_SECRET"]
@@ -164,15 +163,19 @@ spec:
               else:
                   print(f"  Failed to check catalog status: {status} - {resp}")
 
-              # 2. Create namespaces (parent namespaces first, then children)
-              # Extract all unique parent namespaces that need to be created first
-              parents = set()
-              for ns in NAMESPACES:
-                  parts = ns.strip().split(".")
-                  if len(parts) > 1:
-                      parents.add(parts[0])  # e.g., "demo" from "demo.bronze"
+              # 2. Create layer namespaces with per-layer storage
+              print("Creating layer namespaces from declarative config")
+              layers = json.loads(LAYER_CONFIG)
 
-              # Create parent namespaces first
+              # Extract parent namespaces first
+              parents = set()
+              for layer_name, layer_data in layers.items():
+                  namespace = layer_data["namespace"]
+                  parts = namespace.split(".")
+                  if len(parts) > 1:
+                      parents.add(parts[0])
+
+              # Create parent namespaces
               for parent in sorted(parents):
                   print(f"Creating parent namespace: {parent}")
                   status, resp = api_request("POST", f"/api/catalog/v1/{CATALOG_NAME}/namespaces", {
@@ -186,23 +189,42 @@ spec:
                   else:
                       print(f"  Failed to create parent namespace: {status} - {resp}")
 
-              # Create child namespaces
-              for ns in NAMESPACES:
-                  ns_parts = ns.strip().split(".")
-                  # Skip if this is a parent-only namespace (already created above)
-                  if len(ns_parts) == 1 and ns_parts[0] in parents:
-                      continue
-                  print(f"Creating namespace: {ns}")
+              # Create layer-specific namespaces with per-layer storage
+              for layer_name, layer_data in layers.items():
+                  namespace = layer_data["namespace"]
+                  storage_bucket = layer_data["storage"]["bucket"]
+                  storage_endpoint = layer_data["storage"].get("endpoint", STORAGE_ENDPOINT)
+                  retention_days = layer_data.get("retention_days")
+                  properties = layer_data.get("properties", {})
+
+                  # Build namespace properties
+                  ns_properties = {
+                      "layer": layer_name,
+                      # PER-LAYER STORAGE LOCATION (fixes NoSuchBucketException)
+                      "location": f"s3://{storage_bucket}/",
+                      **properties
+                  }
+                  if retention_days:
+                      ns_properties["retention_days"] = str(retention_days)
+
+                  ns_parts = namespace.split(".")
+                  print(f"Creating layer namespace: {namespace} (layer={layer_name}, bucket={storage_bucket})")
                   status, resp = api_request("POST", f"/api/catalog/v1/{CATALOG_NAME}/namespaces", {
                       "namespace": ns_parts,
-                      "properties": {}
+                      "properties": ns_properties
                   }, token)
                   if status == 200:
-                      print(f"  Created namespace: {ns}")
+                      print(f"  Created layer namespace: {namespace}")
                   elif status == 409:
-                      print(f"  Namespace already exists: {ns}")
+                      print(f"  Layer namespace already exists: {namespace}")
+                      # Update properties if namespace exists
+                      print(f"  Updating namespace properties...")
+                      status, resp = api_request("POST", f"/api/catalog/v1/{CATALOG_NAME}/namespaces/{namespace}/properties",
+                          ns_properties, token)
+                      if status in [200, 204]:
+                          print(f"  Updated properties for: {namespace}")
                   else:
-                      print(f"  Failed to create namespace: {status} - {resp}")
+                      print(f"  Failed to create layer namespace: {status} - {resp}")
 
               # 3. Create a catalog role with full table privileges
               catalog_role_name = "demo_data_admin"
@@ -277,10 +299,8 @@ spec:
               value: "http://{{ .Release.Name }}-polaris:8181"
             - name: CATALOG_NAME
               value: {{ .Values.polarisInit.catalogName | quote }}
-            - name: NAMESPACES
-              value: {{ .Values.polarisInit.namespaces | join "," | quote }}
-            - name: STORAGE_LOCATION
-              value: {{ .Values.polarisInit.storageLocation | quote }}
+            - name: LAYER_CONFIG
+              value: {{ .Values.polarisInit.layerConfig | toJson | quote }}
             - name: STORAGE_ENDPOINT
               value: {{ include "floe-infrastructure.storage.endpoint" . | quote }}
             - name: POLARIS_CLIENT_ID

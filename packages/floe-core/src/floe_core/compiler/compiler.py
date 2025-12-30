@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 import yaml
 
 from floe_core.compiler.extractor import extract_column_classifications
+from floe_core.compiler.layer_resolver import LayerResolver
 from floe_core.compiler.models import (
     ArtifactMetadata,
     CompiledArtifacts,
@@ -57,6 +58,7 @@ class Compiler:
     - Parsing and validating floe.yaml
     - Loading and resolving platform.yaml
     - Resolving profile references (catalog: "default" → CatalogProfile)
+    - Resolving layer configurations (bronze/silver/gold → ResolvedLayerConfig)
     - Computing source hash for caching
     - Detecting dbt projects
     - Extracting column classifications from dbt manifest
@@ -128,6 +130,13 @@ class Compiler:
         # Resolve profile references
         resolved_profiles = self._resolve_profiles(spec, platform)
 
+        # Resolve layer configurations if present (v1.1.0)
+        resolved_layers = None
+        if platform.layers:
+            layer_resolver = LayerResolver()
+            resolved_layers = layer_resolver.resolve_all(platform)
+            logger.info(f"Resolved {len(resolved_layers)} layer configurations")
+
         # Create metadata
         metadata = ArtifactMetadata(
             compiled_at=datetime.now(timezone.utc),
@@ -171,6 +180,7 @@ class Compiler:
             governance=spec.governance,
             observability=spec.observability,
             resolved_profiles=resolved_profiles,
+            resolved_layers=resolved_layers,
             dbt_project_path=dbt_project_path,
             dbt_manifest_path=dbt_manifest_path,
             column_classifications=column_classifications,

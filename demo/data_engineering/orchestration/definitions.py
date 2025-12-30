@@ -88,7 +88,10 @@ _synthetic_resources = {
         catalog_uri=os.getenv("POLARIS_URI", "http://floe-infra-polaris:8181/api/catalog"),
         catalog_name="polaris_catalog",
         warehouse=os.getenv("POLARIS_WAREHOUSE", "demo_catalog"),
-        credential=os.getenv("POLARIS_CREDENTIAL", "client-id:client-secret"),
+        # Don't pass credential - let IcebergLoader read from POLARIS_CLIENT_ID/SECRET env vars
+        # credential=os.getenv("POLARIS_CREDENTIAL"),  # Removed placeholder fallback
+        # Don't pass scope - let IcebergLoader read from POLARIS_SCOPE env var
+        # scope=os.getenv("POLARIS_SCOPE"),  # Will be auto-detected from env
         s3_endpoint=os.getenv("AWS_ENDPOINT_URL", "http://floe-infra-localstack:4566"),
         s3_region="us-east-1",
     ),

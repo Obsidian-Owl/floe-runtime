@@ -137,6 +137,12 @@ class CatalogResource(ConfigurableResource):  # type: ignore[type-arg]
         ...     # ... business logic ...
     """
 
+    # Layer bindings from CompiledArtifacts (v1.2.0)
+    layer_bindings: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Layer configuration from platform.yaml (resolved_layers)",
+    )
+
     @abstractmethod
     def get_catalog(self) -> CatalogProtocol:
         """Get the configured catalog instance.
@@ -285,6 +291,121 @@ class CatalogResource(ConfigurableResource):  # type: ignore[type-arg]
         manager = IcebergTableManager(catalog.inner_catalog)
         return manager.scan(
             identifier,
+            columns=columns,
+            row_filter=row_filter,
+            limit=limit,
+        )
+
+    # -------------------------------------------------------------------------
+    # Layer-Aware Operations (v1.2.0) - Declarative Medallion Architecture
+    # -------------------------------------------------------------------------
+
+    def write_to_layer(
+        self,
+        layer: str,
+        table_name: str,
+        data: pa.Table | pd.DataFrame,
+        *,
+        mode: Literal["overwrite", "append"] = "overwrite",
+        create_if_not_exists: bool = True,
+    ) -> SnapshotInfo:
+        """Write data to a layer-specific namespace (declarative API).
+
+        This is the RECOMMENDED API for writing to medallion layers (bronze/silver/gold)
+        as it eliminates hardcoded namespaces and centralizes layer configuration
+        in platform.yaml.
+
+        The layer name is resolved against `layer_bindings` (populated from
+        CompiledArtifacts.resolved_layers) to determine the target namespace.
+
+        Args:
+            layer: Layer name from platform.yaml (e.g., "bronze", "silver", "gold")
+            table_name: Table name WITHOUT namespace (e.g., "customers")
+            data: PyArrow Table or Pandas DataFrame to write
+            mode: Write mode - "overwrite" or "append"
+            create_if_not_exists: Auto-create table if missing
+
+        Returns:
+            SnapshotInfo with snapshot_id and write metadata
+
+        Raises:
+            ValueError: If layer not configured in layer_bindings
+            WriteError: If write operation fails
+
+        Example:
+            >>> @floe_asset
+            ... def bronze_customers(context, catalog: CatalogResource):
+            ...     customers = generate_customers(1000)
+            ...     snapshot = catalog.write_to_layer("bronze", "customers", customers)
+            ...     return {"rows": customers.num_rows, "snapshot_id": snapshot.snapshot_id}
+        """
+        if layer not in self.layer_bindings:
+            raise ValueError(
+                f"Layer '{layer}' not configured. "
+                f"Available layers: {list(self.layer_bindings.keys())}"
+            )
+
+        layer_config = self.layer_bindings[layer]
+        namespace = layer_config["namespace"]
+        full_identifier = f"{namespace}.{table_name}"
+
+        return self.write_table(
+            full_identifier,
+            data,
+            mode=mode,
+            create_if_not_exists=create_if_not_exists,
+        )
+
+    def read_from_layer(
+        self,
+        layer: str,
+        table_name: str,
+        columns: list[str] | None = None,
+        row_filter: str | None = None,
+        limit: int | None = None,
+    ) -> pa.Table:
+        """Read data from a layer-specific namespace (declarative API).
+
+        Companion to `write_to_layer()` for reading from medallion layers
+        without hardcoded namespaces.
+
+        Args:
+            layer: Layer name from platform.yaml (e.g., "bronze", "silver")
+            table_name: Table name WITHOUT namespace (e.g., "customers")
+            columns: Optional list of columns to project
+            row_filter: Optional Iceberg filter expression
+            limit: Optional maximum rows to return
+
+        Returns:
+            PyArrow Table with query results
+
+        Raises:
+            ValueError: If layer not configured
+            TableNotFoundError: If table doesn't exist
+
+        Example:
+            >>> @floe_asset
+            ... def silver_customers(context, catalog: CatalogResource):
+            ...     bronze_customers = catalog.read_from_layer(
+            ...         "bronze",
+            ...         "customers",
+            ...         columns=["id", "email", "created_at"]
+            ...     )
+            ...     # Transform data...
+            ...     catalog.write_to_layer("silver", "customers", transformed)
+        """
+        if layer not in self.layer_bindings:
+            raise ValueError(
+                f"Layer '{layer}' not configured. "
+                f"Available layers: {list(self.layer_bindings.keys())}"
+            )
+
+        layer_config = self.layer_bindings[layer]
+        namespace = layer_config["namespace"]
+        full_identifier = f"{namespace}.{table_name}"
+
+        return self.read_table(
+            full_identifier,
             columns=columns,
             row_filter=row_filter,
             limit=limit,
@@ -526,6 +647,7 @@ class PolarisCatalogResource(CatalogResource):
             s3_endpoint=resolved_catalog.get("s3_endpoint"),
             s3_region=resolved_catalog.get("s3_region", "us-east-1"),
             s3_path_style_access=resolved_catalog.get("s3_path_style_access", False),
+            layer_bindings=artifacts.get("resolved_layers", {}),
         )
 
 

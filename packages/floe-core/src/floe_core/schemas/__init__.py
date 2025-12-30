@@ -101,6 +101,7 @@ from floe_core.schemas.infrastructure_config import (
     TlsProvider,
 )
 from floe_core.schemas.job_definition import BatchJob, JobDefinition, OpsJob
+from floe_core.schemas.layer_config import LayerConfig
 from floe_core.schemas.observability import (
     AlertRule,
     AlertSeverity,
@@ -198,6 +199,8 @@ __all__: list[str] = [
     "AccessDelegation",
     # Compute profiles
     "ComputeProfile",
+    # Layer configuration (v1.2.0)
+    "LayerConfig",
     # Infrastructure (v1.1.0)
     "InfrastructureConfig",
     "NetworkConfig",

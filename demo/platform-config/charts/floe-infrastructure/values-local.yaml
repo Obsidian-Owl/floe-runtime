@@ -209,23 +209,48 @@ marquez:
     enabled: true
 
 # Polaris initialization for demo
-# Note: These credentials are used for both bootstrap and init
+# Declarative layer configuration (v1.2.0) - Single source of truth
+# Defines complete medallion architecture with per-layer storage locations
 polarisInit:
   enabled: true
   catalogName: "demo_catalog"
-  # Medallion architecture namespaces (bronze/silver/gold)
-  namespaces:
-    - "demo.bronze"  # Raw + lightly cleaned layer
-    - "demo.silver"  # Cleaned + enriched layer
-    - "demo.gold"    # Aggregated marts layer
-  # Default storage location (bronze bucket for backward compatibility)
-  # Individual tables can override with table-specific locations
-  storageLocation: "s3://iceberg-bronze/"
   oauthClientId: "demo_client"
   oauthClientSecret: "demo_secret_k8s"
-  # IAM role ARN for credential vending (Polaris uses STS AssumeRole)
-  # This role is created by LocalStack init job with S3 read/write permissions
   storageRoleArn: "arn:aws:iam::000000000000:role/polaris-storage-role"
+
+  # Layer configuration - REQUIRED (no legacy fallback)
+  # Each layer defines: namespace, storage bucket, retention, properties
+  layerConfig:
+    bronze:
+      namespace: "demo_catalog.bronze"
+      storage:
+        bucket: "iceberg-bronze"
+        endpoint: "http://floe-infra-localstack:4566"
+      retention_days: 30
+      properties:
+        layer: "bronze"
+        owner: "data-engineering"
+        purpose: "raw-ingestion"
+    silver:
+      namespace: "demo_catalog.silver"
+      storage:
+        bucket: "iceberg-silver"
+        endpoint: "http://floe-infra-localstack:4566"
+      retention_days: 30
+      properties:
+        layer: "silver"
+        owner: "data-engineering"
+        purpose: "transformation"
+    gold:
+      namespace: "demo_catalog.gold"
+      storage:
+        bucket: "iceberg-gold"
+        endpoint: "http://floe-infra-localstack:4566"
+      retention_days: 30
+      properties:
+        layer: "gold"
+        owner: "analytics"
+        purpose: "consumption"
 
 # Seed data initialization for demo
 # Creates demo.raw_* tables with synthetic e-commerce data

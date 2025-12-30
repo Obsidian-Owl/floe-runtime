@@ -15,15 +15,16 @@ Covers: 009-US2 (Enterprise Platform Configuration)
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from floe_core.schemas.catalog_profile import CatalogProfile
 from floe_core.schemas.compute_profile import ComputeProfile
 from floe_core.schemas.governance_config import EnterpriseGovernanceConfig
 from floe_core.schemas.infrastructure_config import InfrastructureConfig
+from floe_core.schemas.layer_config import LayerConfig
 from floe_core.schemas.observability import ObservabilityConfig
 from floe_core.schemas.security_config import SecurityConfig
 from floe_core.schemas.storage_profile import StorageProfile
@@ -34,7 +35,8 @@ ENVIRONMENT_TYPES = frozenset({"local", "dev", "staging", "prod"})
 # Platform spec version for schema compatibility
 # v1.0.0: Initial release (storage, catalogs, compute, observability)
 # v1.1.0: Enterprise features (infrastructure, security, governance)
-PLATFORM_SPEC_VERSION = "1.1.0"
+# v1.2.0: Declarative layer configuration (layers)
+PLATFORM_SPEC_VERSION = "1.2.0"
 
 # Pattern for valid profile names
 PROFILE_NAME_PATTERN = r"^[a-zA-Z][a-zA-Z0-9_-]*$"
@@ -54,9 +56,11 @@ class PlatformSpec(BaseModel):
     Schema Version History:
         v1.0.0: Initial release (storage, catalogs, compute, observability)
         v1.1.0: Enterprise features (infrastructure, security, governance)
+        v1.2.0: Declarative layer configuration (layers)
 
     Attributes:
         version: Schema version for forward compatibility.
+        layers: Named layer configurations (bronze/silver/gold, etc.) - v1.2.0.
         infrastructure: Network, DNS, and cloud configuration (v1.1.0).
         security: Authentication, authorization, secrets (v1.1.0).
         governance: Classification, retention, compliance (v1.1.0).
@@ -93,6 +97,12 @@ class PlatformSpec(BaseModel):
         default=PLATFORM_SPEC_VERSION,
         pattern=r"^\d+\.\d+\.\d+$",
         description="Schema version (semver)",
+    )
+
+    # v1.2.0: Declarative layer configuration (optional for backward compatibility)
+    layers: dict[str, LayerConfig] = Field(
+        default_factory=dict,
+        description="Named layer configurations (bronze/silver/gold, etc.) - v1.2.0",
     )
 
     # v1.1.0: Enterprise configuration sections (optional for backward compatibility)
@@ -140,6 +150,32 @@ class PlatformSpec(BaseModel):
                     f"Names must match pattern: {PROFILE_NAME_PATTERN}"
                 )
         return v
+
+    @model_validator(mode="after")
+    def validate_layer_references(self) -> Self:
+        """Validate that layer storage_ref and catalog_ref exist in profile dicts.
+
+        Raises:
+            ValueError: If layer references non-existent storage or catalog profile.
+        """
+        for layer_name, layer in self.layers.items():
+            # Validate storage_ref
+            if layer.storage_ref not in self.storage:
+                available = list(self.storage.keys())
+                raise ValueError(
+                    f"Layer '{layer_name}' references non-existent storage profile "
+                    f"'{layer.storage_ref}'. Available storage profiles: {available}"
+                )
+
+            # Validate catalog_ref
+            if layer.catalog_ref not in self.catalogs:
+                available = list(self.catalogs.keys())
+                raise ValueError(
+                    f"Layer '{layer_name}' references non-existent catalog profile "
+                    f"'{layer.catalog_ref}'. Available catalog profiles: {available}"
+                )
+
+        return self
 
     @classmethod
     def from_yaml(cls, path: Path) -> PlatformSpec:
@@ -225,3 +261,27 @@ class PlatformSpec(BaseModel):
                 f"Available profiles: {list(self.compute.keys())}"
             )
         return self.compute[name]
+
+    def get_layer(self, name: str) -> LayerConfig:
+        """Get a layer configuration by name.
+
+        Args:
+            name: Layer name (e.g., "bronze", "silver", "gold").
+
+        Returns:
+            LayerConfig for the given name.
+
+        Raises:
+            KeyError: If layer not found.
+
+        Example:
+            >>> spec = PlatformSpec.from_yaml(Path("platform/local/platform.yaml"))
+            >>> bronze_layer = spec.get_layer("bronze")
+            >>> bronze_layer.namespace
+            'demo_catalog.bronze'
+        """
+        if name not in self.layers:
+            raise KeyError(
+                f"Layer '{name}' not found. Available layers: {list(self.layers.keys())}"
+            )
+        return self.layers[name]

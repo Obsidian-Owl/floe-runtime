@@ -62,6 +62,7 @@ class IcebergLoaderResource(ConfigurableResource):  # type: ignore[type-arg]
     catalog_name: str = Field(default="polaris", description="Catalog name")
     warehouse: str = Field(default="warehouse", description="Warehouse name")
     credential: str | None = Field(default=None, description="OAuth credential")
+    scope: str | None = Field(default=None, description="OAuth scope")
     s3_endpoint: str | None = Field(default=None, description="S3 endpoint override")
     s3_region: str = Field(default="us-east-1", description="S3 region")
 
@@ -72,6 +73,7 @@ class IcebergLoaderResource(ConfigurableResource):  # type: ignore[type-arg]
             catalog_uri=self.catalog_uri,
             warehouse=self.warehouse,
             credential=self.credential,
+            scope=self.scope,
             s3_endpoint=self.s3_endpoint,
             s3_region=self.s3_region,
         )

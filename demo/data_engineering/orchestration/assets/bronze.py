@@ -6,12 +6,13 @@ and load it into Iceberg tables via the Polaris catalog.
 
 Per medallion architecture best practices:
 - Bronze layer = Raw data (single source of truth)
-- Naming: raw_* tables in demo namespace
+- Layer-aware writes using catalog.write_to_layer() (v1.2.0)
+- No hardcoded namespaces - layer config in platform.yaml
 - One-time generation: These assets create the foundation data
 
 Architecture:
 - Uses EcommerceGeneratorResource (from floe-synthetic package)
-- Uses IcebergLoaderResource (from floe-synthetic package)
+- Uses CatalogResource with layer-aware writes (declarative API)
 - Writes to Polaris catalog → Iceberg tables → S3 storage
 - Observability via ObservabilityOrchestrator (traces + lineage)
 """
@@ -23,10 +24,8 @@ from typing import Any
 from dagster import asset
 
 from floe_dagster.observability import ObservabilityOrchestrator
-from floe_synthetic.dagster.resources import (
-    EcommerceGeneratorResource,
-    IcebergLoaderResource,
-)
+from floe_dagster.resources.catalog import CatalogResource
+from floe_synthetic.dagster.resources import EcommerceGeneratorResource
 
 
 @asset(
@@ -39,14 +38,17 @@ from floe_synthetic.dagster.resources import (
 def raw_customers(
     context,
     ecommerce_generator: EcommerceGeneratorResource,
-    iceberg_loader: IcebergLoaderResource,
+    catalog: CatalogResource,
 ) -> dict[str, Any]:
-    """Generate and load raw customer data.
+    """Generate and load raw customer data using layer-aware writes.
+
+    Uses catalog.write_to_layer() for declarative writes - no hardcoded namespaces.
+    The target namespace (e.g., demo_catalog.bronze) is resolved from platform.yaml.
 
     Args:
         context: Dagster execution context
         ecommerce_generator: Synthetic data generator
-        iceberg_loader: Iceberg table loader
+        catalog: Catalog resource with layer bindings
 
     Returns:
         Dictionary with row count and snapshot ID
@@ -60,20 +62,18 @@ def raw_customers(
         group_name="bronze",
     ):
         generator = ecommerce_generator.get_generator()
-        loader = iceberg_loader.get_loader()
 
         # Generate 1000 customers
         customers = generator.generate_customers(count=1000)
-        context.log.info(f"Generated {len(customers)} customers")
+        context.log.info(f"Generated {customers.num_rows} customers")
 
-        # Load to Iceberg table
-        result = loader.overwrite("demo.raw_customers", customers)
+        # Layer-aware write - namespace resolved from platform.yaml
+        snapshot = catalog.write_to_layer("bronze", "raw_customers", customers)
         context.log.info(
-            f"Loaded {result.rows_loaded} rows to demo.raw_customers, "
-            f"snapshot: {result.snapshot_id}"
+            f"Loaded {customers.num_rows} rows to bronze layer, snapshot: {snapshot.snapshot_id}"
         )
 
-        return {"rows": result.rows_loaded, "snapshot_id": result.snapshot_id}
+        return {"rows": customers.num_rows, "snapshot_id": snapshot.snapshot_id}
 
 
 @asset(
@@ -86,14 +86,14 @@ def raw_customers(
 def raw_products(
     context,
     ecommerce_generator: EcommerceGeneratorResource,
-    iceberg_loader: IcebergLoaderResource,
+    catalog: CatalogResource,
 ) -> dict[str, Any]:
-    """Generate and load raw product data.
+    """Generate and load raw product data using layer-aware writes.
 
     Args:
         context: Dagster execution context
         ecommerce_generator: Synthetic data generator
-        iceberg_loader: Iceberg table loader
+        catalog: Catalog resource with layer bindings
 
     Returns:
         Dictionary with row count and snapshot ID
@@ -107,19 +107,18 @@ def raw_products(
         group_name="bronze",
     ):
         generator = ecommerce_generator.get_generator()
-        loader = iceberg_loader.get_loader()
 
         # Generate 100 products
         products = generator.generate_products(count=100)
-        context.log.info(f"Generated {len(products)} products")
+        context.log.info(f"Generated {products.num_rows} products")
 
-        # Load to Iceberg table
-        result = loader.overwrite("demo.raw_products", products)
+        # Layer-aware write - namespace resolved from platform.yaml
+        snapshot = catalog.write_to_layer("bronze", "raw_products", products)
         context.log.info(
-            f"Loaded {result.rows_loaded} rows to demo.raw_products, snapshot: {result.snapshot_id}"
+            f"Loaded {products.num_rows} rows to bronze layer, snapshot: {snapshot.snapshot_id}"
         )
 
-        return {"rows": result.rows_loaded, "snapshot_id": result.snapshot_id}
+        return {"rows": products.num_rows, "snapshot_id": snapshot.snapshot_id}
 
 
 @asset(
@@ -133,14 +132,14 @@ def raw_products(
 def raw_orders(
     context,
     ecommerce_generator: EcommerceGeneratorResource,
-    iceberg_loader: IcebergLoaderResource,
+    catalog: CatalogResource,
 ) -> dict[str, Any]:
-    """Generate and load raw order data.
+    """Generate and load raw order data using layer-aware writes.
 
     Args:
         context: Dagster execution context
         ecommerce_generator: Synthetic data generator
-        iceberg_loader: Iceberg table loader
+        catalog: Catalog resource with layer bindings
 
     Returns:
         Dictionary with row count and snapshot ID
@@ -154,19 +153,18 @@ def raw_orders(
         group_name="bronze",
     ):
         generator = ecommerce_generator.get_generator()
-        loader = iceberg_loader.get_loader()
 
         # Generate 5000 orders (depends on customers existing)
         orders = generator.generate_orders(count=5000)
-        context.log.info(f"Generated {len(orders)} orders")
+        context.log.info(f"Generated {orders.num_rows} orders")
 
-        # Load to Iceberg table
-        result = loader.overwrite("demo.raw_orders", orders)
+        # Layer-aware write - namespace resolved from platform.yaml
+        snapshot = catalog.write_to_layer("bronze", "raw_orders", orders)
         context.log.info(
-            f"Loaded {result.rows_loaded} rows to demo.raw_orders, snapshot: {result.snapshot_id}"
+            f"Loaded {orders.num_rows} rows to bronze layer, snapshot: {snapshot.snapshot_id}"
         )
 
-        return {"rows": result.rows_loaded, "snapshot_id": result.snapshot_id}
+        return {"rows": orders.num_rows, "snapshot_id": snapshot.snapshot_id}
 
 
 @asset(
@@ -180,14 +178,14 @@ def raw_orders(
 def raw_order_items(
     context,
     ecommerce_generator: EcommerceGeneratorResource,
-    iceberg_loader: IcebergLoaderResource,
+    catalog: CatalogResource,
 ) -> dict[str, Any]:
-    """Generate and load raw order item data.
+    """Generate and load raw order item data using layer-aware writes.
 
     Args:
         context: Dagster execution context
         ecommerce_generator: Synthetic data generator
-        iceberg_loader: Iceberg table loader
+        catalog: Catalog resource with layer bindings
 
     Returns:
         Dictionary with row count and snapshot ID
@@ -201,17 +199,15 @@ def raw_order_items(
         group_name="bronze",
     ):
         generator = ecommerce_generator.get_generator()
-        loader = iceberg_loader.get_loader()
 
         # Generate order items (depends on orders existing)
         order_items = generator.generate_order_items()
-        context.log.info(f"Generated {len(order_items)} order items")
+        context.log.info(f"Generated {order_items.num_rows} order items")
 
-        # Load to Iceberg table
-        result = loader.overwrite("demo.raw_order_items", order_items)
+        # Layer-aware write - namespace resolved from platform.yaml
+        snapshot = catalog.write_to_layer("bronze", "raw_order_items", order_items)
         context.log.info(
-            f"Loaded {result.rows_loaded} rows to demo.raw_order_items, "
-            f"snapshot: {result.snapshot_id}"
+            f"Loaded {order_items.num_rows} rows to bronze layer, snapshot: {snapshot.snapshot_id}"
         )
 
-        return {"rows": result.rows_loaded, "snapshot_id": result.snapshot_id}
+        return {"rows": order_items.num_rows, "snapshot_id": snapshot.snapshot_id}

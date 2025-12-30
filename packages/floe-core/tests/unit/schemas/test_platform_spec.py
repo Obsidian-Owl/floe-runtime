@@ -41,7 +41,7 @@ class TestPlatformSpecConstants:
 
     def test_platform_spec_version(self) -> None:
         """Verify platform spec version is set."""
-        assert PLATFORM_SPEC_VERSION == "1.1.0"
+        assert PLATFORM_SPEC_VERSION == "1.2.0"
 
     def test_profile_name_pattern(self) -> None:
         """Verify profile name pattern is defined."""
@@ -523,3 +523,198 @@ class TestPlatformSpecValidationErrors:
         with pytest.raises(ValidationError):
             # Missing required fields - CatalogProfile requires uri and warehouse
             CatalogProfile()  # type: ignore[call-arg]
+
+
+class TestPlatformSpecLayersValidation:
+    """Tests for PlatformSpec layers field and validation (v1.2.0)."""
+
+    def test_empty_layers_valid(self) -> None:
+        """PlatformSpec with empty layers dict is valid."""
+
+        spec = PlatformSpec(
+            storage={"bronze": StorageProfile(bucket="iceberg-bronze")},
+            catalogs={
+                "default": CatalogProfile(
+                    uri="http://polaris:8181/api/catalog",
+                    warehouse="demo",
+                )
+            },
+        )
+        assert spec.layers == {}
+
+    def test_layers_with_valid_references(self) -> None:
+        """Layers with valid storage_ref and catalog_ref accepted."""
+        from floe_core.schemas.layer_config import LayerConfig
+
+        spec = PlatformSpec(
+            storage={
+                "bronze": StorageProfile(bucket="iceberg-bronze"),
+                "silver": StorageProfile(bucket="iceberg-silver"),
+            },
+            catalogs={
+                "default": CatalogProfile(
+                    uri="http://polaris:8181/api/catalog",
+                    warehouse="demo",
+                )
+            },
+            layers={
+                "bronze": LayerConfig(
+                    name="bronze",
+                    storage_ref="bronze",
+                    catalog_ref="default",
+                    namespace="demo.bronze",
+                    retention_days=2555,
+                ),
+                "silver": LayerConfig(
+                    name="silver",
+                    storage_ref="silver",
+                    namespace="demo.silver",
+                ),
+            },
+        )
+        assert "bronze" in spec.layers
+        assert "silver" in spec.layers
+        assert spec.layers["bronze"].storage_ref == "bronze"
+        assert spec.layers["silver"].storage_ref == "silver"
+
+    def test_layer_invalid_storage_ref(self) -> None:
+        """Layer with non-existent storage_ref rejected."""
+        from floe_core.schemas.layer_config import LayerConfig
+
+        with pytest.raises(ValidationError, match="non-existent storage profile"):
+            PlatformSpec(
+                storage={"bronze": StorageProfile(bucket="iceberg-bronze")},
+                catalogs={
+                    "default": CatalogProfile(
+                        uri="http://polaris:8181/api/catalog",
+                        warehouse="demo",
+                    )
+                },
+                layers={
+                    "bronze": LayerConfig(
+                        name="bronze",
+                        storage_ref="nonexistent",  # This doesn't exist!
+                        namespace="demo.bronze",
+                    )
+                },
+            )
+
+    def test_layer_invalid_catalog_ref(self) -> None:
+        """Layer with non-existent catalog_ref rejected."""
+        from floe_core.schemas.layer_config import LayerConfig
+
+        with pytest.raises(ValidationError, match="non-existent catalog profile"):
+            PlatformSpec(
+                storage={"bronze": StorageProfile(bucket="iceberg-bronze")},
+                catalogs={
+                    "default": CatalogProfile(
+                        uri="http://polaris:8181/api/catalog",
+                        warehouse="demo",
+                    )
+                },
+                layers={
+                    "bronze": LayerConfig(
+                        name="bronze",
+                        storage_ref="bronze",
+                        catalog_ref="nonexistent",  # This doesn't exist!
+                        namespace="demo.bronze",
+                    )
+                },
+            )
+
+    def test_get_layer_valid(self) -> None:
+        """get_layer returns layer config by name."""
+        from floe_core.schemas.layer_config import LayerConfig
+
+        spec = PlatformSpec(
+            storage={"bronze": StorageProfile(bucket="iceberg-bronze")},
+            catalogs={
+                "default": CatalogProfile(
+                    uri="http://polaris:8181/api/catalog",
+                    warehouse="demo",
+                )
+            },
+            layers={
+                "bronze": LayerConfig(
+                    name="bronze",
+                    storage_ref="bronze",
+                    namespace="demo.bronze",
+                    retention_days=2555,
+                )
+            },
+        )
+        bronze = spec.get_layer("bronze")
+        assert bronze.name == "bronze"
+        assert bronze.retention_days == 2555
+
+    def test_get_layer_not_found(self) -> None:
+        """get_layer raises KeyError for missing layer."""
+        spec = PlatformSpec(
+            storage={"bronze": StorageProfile(bucket="iceberg-bronze")},
+            catalogs={
+                "default": CatalogProfile(
+                    uri="http://polaris:8181/api/catalog",
+                    warehouse="demo",
+                )
+            },
+        )
+        with pytest.raises(KeyError, match="Layer 'silver' not found"):
+            spec.get_layer("silver")
+
+    def test_layers_from_yaml_with_medallion_architecture(self) -> None:
+        """from_yaml loads layers with medallion architecture."""
+        yaml_content = """
+version: "1.2.0"
+layers:
+  bronze:
+    name: bronze
+    description: "Raw data layer"
+    storage_ref: bronze
+    catalog_ref: default
+    namespace: demo_catalog.bronze
+    retention_days: 2555
+    properties:
+      layer: bronze
+      owner: data-engineering
+  silver:
+    name: silver
+    description: "Cleaned data layer"
+    storage_ref: silver
+    namespace: demo_catalog.silver
+    retention_days: 730
+  gold:
+    name: gold
+    description: "Analytics layer"
+    storage_ref: gold
+    namespace: demo_catalog.gold
+    retention_days: 90
+storage:
+  bronze:
+    type: s3
+    bucket: iceberg-bronze
+  silver:
+    type: s3
+    bucket: iceberg-silver
+  gold:
+    type: s3
+    bucket: iceberg-gold
+catalogs:
+  default:
+    type: polaris
+    uri: "http://polaris:8181/api/catalog"
+    warehouse: demo_catalog
+"""
+        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False, mode="w") as f:
+            f.write(yaml_content)
+            f.flush()
+            spec = PlatformSpec.from_yaml(Path(f.name))
+
+        assert spec.version == "1.2.0"
+        assert len(spec.layers) == 3
+        assert "bronze" in spec.layers
+        assert "silver" in spec.layers
+        assert "gold" in spec.layers
+        assert spec.layers["bronze"].retention_days == 2555
+        assert spec.layers["silver"].retention_days == 730
+        assert spec.layers["gold"].retention_days == 90
+        assert spec.layers["bronze"].properties["owner"] == "data-engineering"

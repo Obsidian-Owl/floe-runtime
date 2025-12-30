@@ -400,6 +400,192 @@ class TestCompilerOutput:
         assert artifacts.resolved_profiles.platform_env in ("production", "local")
 
 
+class TestCompilerLayerResolution:
+    """Tests for layer configuration resolution (v1.1.0)."""
+
+    def test_compile_with_layers_resolves_layers(
+        self,
+        tmp_path: Path,
+        sample_floe_yaml: dict[str, Any],
+    ) -> None:
+        """Test compile() resolves layers when defined in platform.yaml."""
+        from floe_core.compiler import Compiler
+
+        # Create platform.yaml with layer configuration
+        platform_yaml = {
+            "version": "1.2.0",
+            "storage": {
+                "bronze": {"bucket": "iceberg-bronze"},
+                "silver": {"bucket": "iceberg-silver"},
+                "gold": {"bucket": "iceberg-gold"},
+            },
+            "catalogs": {
+                "default": {
+                    "uri": "http://localhost:8181/api/catalog",
+                    "warehouse": "demo_catalog",
+                }
+            },
+            "compute": {"default": {"type": "duckdb"}},
+            "layers": {
+                "bronze": {
+                    "name": "bronze",
+                    "description": "Raw data",
+                    "storage_ref": "bronze",
+                    "catalog_ref": "default",
+                    "namespace": "demo_catalog.bronze",
+                    "retention_days": 2555,
+                },
+                "silver": {
+                    "name": "silver",
+                    "description": "Cleaned data",
+                    "storage_ref": "silver",
+                    "catalog_ref": "default",
+                    "namespace": "demo_catalog.silver",
+                    "retention_days": 730,
+                },
+                "gold": {
+                    "name": "gold",
+                    "description": "Analytics marts",
+                    "storage_ref": "gold",
+                    "catalog_ref": "default",
+                    "namespace": "demo_catalog.gold",
+                    "retention_days": 365,
+                },
+            },
+        }
+
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+        (project_dir / "floe.yaml").write_text(yaml.dump(sample_floe_yaml))
+        (project_dir / "platform.yaml").write_text(yaml.dump(platform_yaml))
+
+        compiler = Compiler()
+        artifacts = compiler.compile(project_dir / "floe.yaml")
+
+        # Check that resolved_layers is populated
+        assert artifacts.resolved_layers is not None
+        assert len(artifacts.resolved_layers) == 3
+        assert "bronze" in artifacts.resolved_layers
+        assert "silver" in artifacts.resolved_layers
+        assert "gold" in artifacts.resolved_layers
+
+        # Check bronze layer resolution
+        bronze = artifacts.resolved_layers["bronze"]
+        assert bronze.name == "bronze"
+        assert bronze.storage.bucket == "iceberg-bronze"
+        assert bronze.catalog.warehouse == "demo_catalog"
+        assert bronze.namespace == "demo_catalog.bronze"
+        assert bronze.retention_days == 2555
+
+    def test_compile_without_layers_returns_none(
+        self,
+        tmp_floe_project: Path,
+    ) -> None:
+        """Test compile() returns None for resolved_layers when no layers defined."""
+        from floe_core.compiler import Compiler
+
+        compiler = Compiler()
+        artifacts = compiler.compile(tmp_floe_project / "floe.yaml")
+
+        # Backward compatibility: resolved_layers is None
+        assert artifacts.resolved_layers is None
+
+    def test_compile_with_layers_preserves_properties(
+        self,
+        tmp_path: Path,
+        sample_floe_yaml: dict[str, Any],
+    ) -> None:
+        """Test compile() preserves layer properties."""
+        from floe_core.compiler import Compiler
+
+        platform_yaml = {
+            "version": "1.2.0",
+            "storage": {"bronze": {"bucket": "iceberg-bronze"}},
+            "catalogs": {
+                "default": {
+                    "uri": "http://localhost:8181/api/catalog",
+                    "warehouse": "demo_catalog",
+                }
+            },
+            "compute": {"default": {"type": "duckdb"}},
+            "layers": {
+                "bronze": {
+                    "name": "bronze",
+                    "storage_ref": "bronze",
+                    "namespace": "demo_catalog.bronze",
+                    "properties": {
+                        "owner": "data-engineering",
+                        "sensitivity": "internal",
+                    },
+                }
+            },
+        }
+
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+        (project_dir / "floe.yaml").write_text(yaml.dump(sample_floe_yaml))
+        (project_dir / "platform.yaml").write_text(yaml.dump(platform_yaml))
+
+        compiler = Compiler()
+        artifacts = compiler.compile(project_dir / "floe.yaml")
+
+        assert artifacts.resolved_layers is not None
+        bronze = artifacts.resolved_layers["bronze"]
+        assert bronze.properties["owner"] == "data-engineering"
+        assert bronze.properties["sensitivity"] == "internal"
+
+    def test_compile_with_flexible_layer_names(
+        self,
+        tmp_path: Path,
+        sample_floe_yaml: dict[str, Any],
+    ) -> None:
+        """Test compile() supports flexible layer names (not just bronze/silver/gold)."""
+        from floe_core.compiler import Compiler
+
+        platform_yaml = {
+            "version": "1.2.0",
+            "storage": {
+                "raw": {"bucket": "iceberg-raw"},
+                "curated": {"bucket": "iceberg-curated"},
+            },
+            "catalogs": {
+                "default": {
+                    "uri": "http://localhost:8181/api/catalog",
+                    "warehouse": "demo_catalog",
+                }
+            },
+            "compute": {"default": {"type": "duckdb"}},
+            "layers": {
+                "raw": {
+                    "name": "raw",
+                    "description": "Raw ingestion layer",
+                    "storage_ref": "raw",
+                    "namespace": "demo_catalog.raw",
+                },
+                "curated": {
+                    "name": "curated",
+                    "description": "Curated analytics layer",
+                    "storage_ref": "curated",
+                    "namespace": "demo_catalog.curated",
+                },
+            },
+        }
+
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+        (project_dir / "floe.yaml").write_text(yaml.dump(sample_floe_yaml))
+        (project_dir / "platform.yaml").write_text(yaml.dump(platform_yaml))
+
+        compiler = Compiler()
+        artifacts = compiler.compile(project_dir / "floe.yaml")
+
+        assert artifacts.resolved_layers is not None
+        assert "raw" in artifacts.resolved_layers
+        assert "curated" in artifacts.resolved_layers
+        assert artifacts.resolved_layers["raw"].storage.bucket == "iceberg-raw"
+        assert artifacts.resolved_layers["curated"].storage.bucket == "iceberg-curated"
+
+
 class TestCompilerTwoTierIntegration:
     """Integration tests for Two-Tier Configuration Architecture."""
 

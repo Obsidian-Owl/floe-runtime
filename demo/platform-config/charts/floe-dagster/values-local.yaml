@@ -183,6 +183,16 @@ dagster:
         # envSecrets would create env vars with kebab-case names (polaris-client-id)
         # but Python code expects SCREAMING_SNAKE_CASE (POLARIS_CLIENT_ID)
 
+        # Resource limits for user code deployment
+        # Increased from default 512Mi to handle data generation + PyIceberg operations
+        resources:
+          requests:
+            cpu: 250m        # 0.25 cores requested
+            memory: 1Gi      # 1GiB requested (enough for synthetic data generation)
+          limits:
+            cpu: "1"         # 1 core max
+            memory: 2Gi      # 2GiB max (handles bronze job with 1000 customers)
+
   # Don't generate a separate PostgreSQL secret - use existing floe-demo-credentials
   generatePostgresqlPasswordSecret: false
 

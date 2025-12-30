@@ -6,6 +6,10 @@ T042: [US2] Implement CompiledArtifacts contract model
 T024: [US2] Update CompiledArtifacts v2.0 with resolved platform profiles
 
 This module defines the output contract models produced by the Compiler.
+
+Version History:
+- v1.0.0: Initial release with resolved_profiles (two-tier configuration)
+- v1.1.0: Added resolved_layers for declarative layer configuration (v1.2.0 platform.yaml)
 """
 
 from __future__ import annotations
@@ -16,6 +20,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from floe_core.compiler.layer_resolver import ResolvedLayerConfig
 from floe_core.schemas import (
     CatalogConfig,
     CatalogProfile,
@@ -190,8 +195,13 @@ class CompiledArtifacts(BaseModel):
     - Data engineers reference profiles by logical name in floe.yaml
     - Same floe.yaml works across dev/staging/prod environments
 
+    Declarative Layer Configuration (v1.1.0):
+    - resolved_layers contains per-layer (bronze/silver/gold) resolved configurations
+    - Each layer has its own storage profile, catalog namespace, and retention policy
+    - Enables medallion architecture with separate buckets per layer
+
     Attributes:
-        version: Contract version (semver). Default "1.0.0".
+        version: Contract version (semver). Default "1.1.0".
         metadata: Compilation metadata.
         compute: Compute target configuration.
         transforms: List of transform configurations.
@@ -201,6 +211,7 @@ class CompiledArtifacts(BaseModel):
         orchestration: Orchestration configuration for auto-discovery.
         catalog: Optional Iceberg catalog configuration (legacy).
         resolved_profiles: Resolved platform profiles from platform.yaml.
+        resolved_layers: Per-layer resolved configurations (v1.1.0).
         dbt_manifest_path: Path to dbt manifest.json (if available).
         dbt_project_path: Path to dbt project directory (if detected).
         dbt_profiles_path: Path to profiles directory. Default ".floe/profiles".
@@ -221,7 +232,7 @@ class CompiledArtifacts(BaseModel):
 
     # Contract versioning
     version: str = Field(
-        default="1.0.0",
+        default="1.1.0",
         description="Contract version (semver)",
     )
 
@@ -270,6 +281,12 @@ class CompiledArtifacts(BaseModel):
     resolved_profiles: ResolvedPlatformProfiles | None = Field(
         default=None,
         description="Resolved platform profiles from platform.yaml",
+    )
+
+    # Declarative Layer Configuration (v1.1.0)
+    resolved_layers: dict[str, ResolvedLayerConfig] | None = Field(
+        default=None,
+        description="Per-layer resolved configurations (bronze/silver/gold) - v1.1.0",
     )
 
     # dbt integration paths

@@ -34,7 +34,7 @@
 #
 # Covers: 009-US2 (Same floe.yaml works across dev/staging/prod)
 
-version: "1.1.0"
+version: "1.2.0"
 
 # =============================================================================
 # Infrastructure Configuration (v1.1.0)
@@ -233,6 +233,57 @@ storage:
     credentials:
       mode: static
       secret_ref: aws-credentials
+
+# =============================================================================
+# Declarative Layer Configuration (v1.2.0) - Single Source of Truth
+# =============================================================================
+# Layers define the complete medallion architecture in ONE place:
+# - Eliminates configuration duplication across 16+ files
+# - Per-layer namespace-to-storage binding (fixes NoSuchBucketException)
+# - Platform engineers control all infrastructure in platform.yaml
+# - Data engineers reference layers without seeing infrastructure details
+#
+# Each layer automatically gets:
+# - Dedicated S3 bucket (from storage_ref)
+# - Catalog namespace (from namespace field)
+# - Retention policy (metadata only in v1.2.0)
+# - Custom properties (tags, owner, compliance, etc.)
+layers:
+  bronze:
+    name: bronze
+    description: "Raw and lightly cleaned data for long-term audit compliance"
+    storage_ref: bronze  # → storage.bronze (iceberg-bronze bucket)
+    catalog_ref: default  # → catalogs.default
+    namespace: demo_catalog.bronze  # Full namespace path
+    retention_days: 30  # Short for local dev (7 years in production)
+    properties:
+      layer: bronze
+      owner: data-engineering
+      purpose: raw-ingestion
+
+  silver:
+    name: silver
+    description: "Cleaned, deduplicated, and enriched data for analytics"
+    storage_ref: silver  # → storage.silver (iceberg-silver bucket)
+    catalog_ref: default
+    namespace: demo_catalog.silver
+    retention_days: 30  # Short for local dev (2 years in production)
+    properties:
+      layer: silver
+      owner: data-engineering
+      purpose: transformation
+
+  gold:
+    name: gold
+    description: "Aggregated analytical marts for business intelligence"
+    storage_ref: gold  # → storage.gold (iceberg-gold bucket)
+    catalog_ref: default
+    namespace: demo_catalog.gold
+    retention_days: 30  # Short for local dev (90 days in production)
+    properties:
+      layer: gold
+      owner: analytics
+      purpose: consumption
 
 catalogs:
   default:
