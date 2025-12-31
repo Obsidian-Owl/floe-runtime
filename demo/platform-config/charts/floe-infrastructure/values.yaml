@@ -232,6 +232,7 @@ polarisInit:
     - "gold"
   storageLocation: "s3://iceberg-data/"
   oauthClientId: "demo_client"
+  storageRoleArn: ""  # Empty for LocalStack (static credentials), set for production AWS
 
 # Seed data initialization for demo
 # Creates demo.raw_* tables with synthetic e-commerce data
@@ -251,3 +252,32 @@ seedData:
   productsCount: 100
   ordersCount: 5000
   orderItemsCount: 10000
+
+# Resource quotas (disabled for local development)
+resourceQuota:
+  enabled: false
+  limits:
+    pods: "50"
+    requests_cpu: "10"
+    limits_cpu: "20"
+    requests_memory: "20Gi"
+    limits_memory: "24Gi"
+
+# Limit ranges (disabled for local development)
+limitRange:
+  enabled: false
+  limits:
+    container:
+      min_cpu: "50m"
+      max_cpu: "4"
+      min_memory: "64Mi"
+      max_memory: "8Gi"
+
+# Local access configuration
+localAccess:
+  nodeports:
+    jaeger: 30686
+    marquez: 30500
+    polaris: 30181
+    dagster: 30000
+    cube: 30400
