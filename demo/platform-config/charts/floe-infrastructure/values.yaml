@@ -227,9 +227,9 @@ polarisInit:
   enabled: true
   catalogName: "demo_catalog"
   namespaces:
-    - "demo.bronze"
-    - "demo.silver"
-    - "demo.gold"
+    - "bronze"
+    - "silver"
+    - "gold"
   storageLocation: "s3://iceberg-data/"
   oauthClientId: "demo_client"
 
