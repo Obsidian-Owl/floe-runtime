@@ -281,3 +281,7 @@ localAccess:
     polaris: 30181
     dagster: 30000
     cube: 30400
+
+# Demo credentials (disabled - use environment variables or secrets)
+demoCredentials:
+  enabled: false
