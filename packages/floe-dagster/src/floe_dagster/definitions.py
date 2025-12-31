@@ -33,23 +33,22 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from dagster import Definitions, IOManager, io_manager
-
 from floe_dagster.assets import FloeAssetFactory
 from floe_dagster.decorators import ORCHESTRATOR_RESOURCE_KEY
 from floe_dagster.observability import ObservabilityOrchestrator
 from floe_dagster.resources import PolarisCatalogResource, create_dbt_cli_resource
 
 if TYPE_CHECKING:
+    from dagster._core.definitions.unresolved_asset_job_definition import (
+        UnresolvedAssetJobDefinition,
+    )
+
     from dagster import (
         AssetsDefinition,
         JobDefinition,
         ScheduleDefinition,
         SensorDefinition,
     )
-    from dagster._core.definitions.unresolved_asset_job_definition import (
-        UnresolvedAssetJobDefinition,
-    )
-
     from floe_core.schemas.floe_spec import FloeSpec
     from floe_core.schemas.platform_spec import PlatformSpec
 
@@ -750,9 +749,21 @@ class FloeDefinitions:
         if floe_spec and floe_spec.orchestration:
             orchestration_config = floe_spec.orchestration.model_dump(mode="json")
 
+        # Extract layer bindings from platform.yaml (v1.2.0)
+        # Convert platform.layers to resolved_layers format for CatalogResource
+        resolved_layers = {}
+        if hasattr(platform, "layers") and platform.layers:
+            for layer_name, layer_config in platform.layers.items():
+                resolved_layers[layer_name] = {
+                    "namespace": layer_config.namespace,
+                    "storage_ref": getattr(layer_config, "storage_ref", None),
+                    "catalog_ref": getattr(layer_config, "catalog_ref", "default"),
+                }
+
         return {
             "version": "2.0.0",
             "resolved_catalog": resolved_catalog,
+            "resolved_layers": resolved_layers,
             "observability": observability_config,
             "orchestration": orchestration_config,
         }

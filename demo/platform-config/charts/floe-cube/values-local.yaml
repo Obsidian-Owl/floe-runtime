@@ -59,12 +59,9 @@ api:
     # DuckDB S3/LocalStack connection for Iceberg files
     # DuckDB endpoint format: host:port (no http:// prefix)
     # Protocol determined by CUBEJS_DB_DUCKDB_S3_USE_SSL
-    # Values come from platform ConfigMap (Three-Tier Architecture)
+    # Fix: Direct value instead of broken ConfigMapKeyRef
     - name: CUBEJS_DB_DUCKDB_S3_ENDPOINT
-      valueFrom:
-        configMapKeyRef:
-          name: floe-infra-platform-config
-          key: storage.bronze.endpoint
+      value: "http://floe-infra-localstack:4566"
     - name: CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID
       valueFrom:
         secretKeyRef:
@@ -76,10 +73,7 @@ api:
           name: floe-demo-credentials
           key: aws-secret-access-key
     - name: CUBEJS_DB_DUCKDB_S3_REGION
-      valueFrom:
-        configMapKeyRef:
-          name: floe-infra-platform-config
-          key: storage.bronze.region
+      value: "us-east-1"
     - name: CUBEJS_DB_DUCKDB_S3_USE_SSL
       value: "false"
     # Path-style URLs required for LocalStack (not virtual-hosted style)
@@ -101,6 +95,16 @@ api:
         secretKeyRef:
           name: floe-demo-credentials
           key: cube-api-secret
+    # Fix: Enable OpenTelemetry tracing
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: "http://floe-infra-jaeger-collector:4317"
+    - name: OTEL_SERVICE_NAME
+      value: "floe-cube-api"
+    # Fix: Enable OpenLineage
+    - name: OPENLINEAGE_URL
+      value: "http://floe-infra-marquez:5000/api/v1/lineage"
+    - name: OPENLINEAGE_NAMESPACE
+      value: "demo"
 
 # Cube refresh worker configuration
 refreshWorker:
@@ -122,11 +126,9 @@ refreshWorker:
   # Values come from platform ConfigMap (Three-Tier Architecture)
   extraEnv:
     # DuckDB endpoint format: host:port (no http:// prefix)
+    # Fix: Direct value instead of broken ConfigMapKeyRef
     - name: CUBEJS_DB_DUCKDB_S3_ENDPOINT
-      valueFrom:
-        configMapKeyRef:
-          name: floe-infra-platform-config
-          key: storage.bronze.endpoint
+      value: "http://floe-infra-localstack:4566"
     - name: CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID
       valueFrom:
         secretKeyRef:
@@ -138,10 +140,7 @@ refreshWorker:
           name: floe-demo-credentials
           key: aws-secret-access-key
     - name: CUBEJS_DB_DUCKDB_S3_REGION
-      valueFrom:
-        configMapKeyRef:
-          name: floe-infra-platform-config
-          key: storage.bronze.region
+      value: "us-east-1"
     - name: CUBEJS_DB_DUCKDB_S3_USE_SSL
       value: "false"
     # Path-style URLs required for LocalStack (not virtual-hosted style)
@@ -152,6 +151,16 @@ refreshWorker:
         secretKeyRef:
           name: floe-demo-credentials
           key: cube-api-secret
+    # Fix: Enable OpenTelemetry tracing
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: "http://floe-infra-jaeger-collector:4317"
+    - name: OTEL_SERVICE_NAME
+      value: "floe-cube-refresh-worker"
+    # Fix: Enable OpenLineage
+    - name: OPENLINEAGE_URL
+      value: "http://floe-infra-marquez:5000/api/v1/lineage"
+    - name: OPENLINEAGE_NAMESPACE
+      value: "demo"
 
 # Pre-aggregation configuration
 preAggregations:

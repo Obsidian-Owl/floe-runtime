@@ -10,13 +10,12 @@ These demonstrate ops-style assets for maintenance operations:
 from typing import Any
 
 from dagster import OpExecutionContext, op
-
 from floe_dagster.observability import ObservabilityOrchestrator
 
 
 @op(
     description="Vacuum old Iceberg table snapshots",
-    required_resource_keys={"_floe_observability_orchestrator"},
+    required_resource_keys={"floe_observability_orchestrator"},
 )
 def vacuum_old_snapshots(context: OpExecutionContext, retention_days: int = 30) -> dict[str, Any]:
     """Remove old table snapshots older than retention period.
@@ -28,7 +27,7 @@ def vacuum_old_snapshots(context: OpExecutionContext, retention_days: int = 30) 
     Returns:
         Dictionary with operation results
     """
-    orchestrator: ObservabilityOrchestrator = context.resources._floe_observability_orchestrator
+    orchestrator: ObservabilityOrchestrator = context.resources.floe_observability_orchestrator
 
     with orchestrator.asset_run(
         context=context,
@@ -49,7 +48,7 @@ def vacuum_old_snapshots(context: OpExecutionContext, retention_days: int = 30) 
 
 @op(
     description="Compact Iceberg data files",
-    required_resource_keys={"_floe_observability_orchestrator"},
+    required_resource_keys={"floe_observability_orchestrator"},
 )
 def compact_data_files(
     context: OpExecutionContext,
@@ -66,7 +65,7 @@ def compact_data_files(
     Returns:
         Dictionary with operation results
     """
-    orchestrator: ObservabilityOrchestrator = context.resources._floe_observability_orchestrator
+    orchestrator: ObservabilityOrchestrator = context.resources.floe_observability_orchestrator
 
     with orchestrator.asset_run(
         context=context,

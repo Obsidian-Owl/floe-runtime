@@ -349,10 +349,23 @@ dagster:
                 mountPath: /tmp
           podSpecConfig:
             automountServiceAccountToken: true
+            # Fix: Set fsGroup for emptyDir ownership and runAsUser for non-root verification
+            securityContext:
+              runAsUser: 1000
+              runAsGroup: 1000
+              fsGroup: 1000
+              runAsNonRoot: true
+              fsGroupChangePolicy: "OnRootMismatch"
             # Init container to copy instance.yaml from ConfigMap to writable location
             initContainers:
               - name: copy-instance-config
                 image: busybox:1.36
+                # Fix: Run as same user as main container
+                securityContext:
+                  runAsUser: 1000
+                  runAsGroup: 1000
+                  runAsNonRoot: true
+                  allowPrivilegeEscalation: false
                 command: ['sh', '-c']
                 args:
                   - |
@@ -388,10 +401,10 @@ dagster:
 # Polaris Initialization Job (pre-install hook)
 # Creates warehouse and namespace before Dagster starts
 polarisInit:
-  enabled: true
+  enabled: false  # Disabled - warehouse already initialized manually
   uri: "http://floe-infra-polaris:8181"
   clientId: "demo_client"
-  clientSecret: "demo_secret"
+  clientSecret: "demo_secret_k8s"
   warehouse: "demo_catalog"
   namespace: "demo"
   s3Endpoint: "http://floe-infra-localstack:4566"

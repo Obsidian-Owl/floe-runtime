@@ -22,10 +22,7 @@ from __future__ import annotations
 from typing import Any
 
 from dagster import asset
-
 from floe_dagster.observability import ObservabilityOrchestrator
-from floe_dagster.resources.catalog import CatalogResource
-from floe_synthetic.dagster.resources import EcommerceGeneratorResource
 
 
 @asset(
@@ -34,11 +31,10 @@ from floe_synthetic.dagster.resources import EcommerceGeneratorResource
     group_name="bronze",
     description="Raw customer data (bronze layer) - 1000 synthetic customers",
     compute_kind="synthetic",
+    required_resource_keys={"ecommerce_generator", "catalog", "floe_observability_orchestrator"},
 )
 def raw_customers(
     context,
-    ecommerce_generator: EcommerceGeneratorResource,
-    catalog: CatalogResource,
 ) -> dict[str, Any]:
     """Generate and load raw customer data using layer-aware writes.
 
@@ -47,19 +43,18 @@ def raw_customers(
 
     Args:
         context: Dagster execution context
-        ecommerce_generator: Synthetic data generator
-        catalog: Catalog resource with layer bindings
 
     Returns:
         Dictionary with row count and snapshot ID
     """
-    orchestrator: ObservabilityOrchestrator = context.resources._floe_observability_orchestrator
+    ecommerce_generator = context.resources.ecommerce_generator
+    catalog = context.resources.catalog
+    orchestrator: ObservabilityOrchestrator = context.resources.floe_observability_orchestrator
 
     with orchestrator.asset_run(
-        context=context,
-        asset_key="bronze/raw_customers",
-        compute_kind="synthetic",
-        group_name="bronze",
+        "bronze/raw_customers",
+        outputs=["demo_catalog.bronze.raw_customers"],
+        attributes={"compute_kind": "synthetic", "group_name": "bronze"},
     ):
         generator = ecommerce_generator.get_generator()
 
@@ -82,29 +77,27 @@ def raw_customers(
     group_name="bronze",
     description="Raw product data (bronze layer) - 100 synthetic products",
     compute_kind="synthetic",
+    required_resource_keys={"ecommerce_generator", "catalog", "floe_observability_orchestrator"},
 )
 def raw_products(
     context,
-    ecommerce_generator: EcommerceGeneratorResource,
-    catalog: CatalogResource,
 ) -> dict[str, Any]:
     """Generate and load raw product data using layer-aware writes.
 
     Args:
         context: Dagster execution context
-        ecommerce_generator: Synthetic data generator
-        catalog: Catalog resource with layer bindings
 
     Returns:
         Dictionary with row count and snapshot ID
     """
-    orchestrator: ObservabilityOrchestrator = context.resources._floe_observability_orchestrator
+    ecommerce_generator = context.resources.ecommerce_generator
+    catalog = context.resources.catalog
+    orchestrator: ObservabilityOrchestrator = context.resources.floe_observability_orchestrator
 
     with orchestrator.asset_run(
-        context=context,
-        asset_key="bronze/raw_products",
-        compute_kind="synthetic",
-        group_name="bronze",
+        "bronze/raw_products",
+        outputs=["demo_catalog.bronze.raw_products"],
+        attributes={"compute_kind": "synthetic", "group_name": "bronze"},
     ):
         generator = ecommerce_generator.get_generator()
 
@@ -128,29 +121,27 @@ def raw_products(
     description="Raw order data (bronze layer) - 5000 synthetic orders",
     compute_kind="synthetic",
     deps=[raw_customers, raw_products],
+    required_resource_keys={"ecommerce_generator", "catalog", "floe_observability_orchestrator"},
 )
 def raw_orders(
     context,
-    ecommerce_generator: EcommerceGeneratorResource,
-    catalog: CatalogResource,
 ) -> dict[str, Any]:
     """Generate and load raw order data using layer-aware writes.
 
     Args:
         context: Dagster execution context
-        ecommerce_generator: Synthetic data generator
-        catalog: Catalog resource with layer bindings
 
     Returns:
         Dictionary with row count and snapshot ID
     """
-    orchestrator: ObservabilityOrchestrator = context.resources._floe_observability_orchestrator
+    ecommerce_generator = context.resources.ecommerce_generator
+    catalog = context.resources.catalog
+    orchestrator: ObservabilityOrchestrator = context.resources.floe_observability_orchestrator
 
     with orchestrator.asset_run(
-        context=context,
-        asset_key="bronze/raw_orders",
-        compute_kind="synthetic",
-        group_name="bronze",
+        "bronze/raw_orders",
+        outputs=["demo_catalog.bronze.raw_orders"],
+        attributes={"compute_kind": "synthetic", "group_name": "bronze"},
     ):
         generator = ecommerce_generator.get_generator()
 
@@ -174,29 +165,27 @@ def raw_orders(
     description="Raw order item data (bronze layer) - ~15000 synthetic line items",
     compute_kind="synthetic",
     deps=[raw_orders],
+    required_resource_keys={"ecommerce_generator", "catalog", "floe_observability_orchestrator"},
 )
 def raw_order_items(
     context,
-    ecommerce_generator: EcommerceGeneratorResource,
-    catalog: CatalogResource,
 ) -> dict[str, Any]:
     """Generate and load raw order item data using layer-aware writes.
 
     Args:
         context: Dagster execution context
-        ecommerce_generator: Synthetic data generator
-        catalog: Catalog resource with layer bindings
 
     Returns:
         Dictionary with row count and snapshot ID
     """
-    orchestrator: ObservabilityOrchestrator = context.resources._floe_observability_orchestrator
+    ecommerce_generator = context.resources.ecommerce_generator
+    catalog = context.resources.catalog
+    orchestrator: ObservabilityOrchestrator = context.resources.floe_observability_orchestrator
 
     with orchestrator.asset_run(
-        context=context,
-        asset_key="bronze/raw_order_items",
-        compute_kind="synthetic",
-        group_name="bronze",
+        "bronze/raw_order_items",
+        outputs=["demo_catalog.bronze.raw_order_items"],
+        attributes={"compute_kind": "synthetic", "group_name": "bronze"},
     ):
         generator = ecommerce_generator.get_generator()
 

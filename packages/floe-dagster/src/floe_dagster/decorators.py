@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 F = TypeVar("F", bound=Callable[..., Any])
 
 # Resource key for the ObservabilityOrchestrator in Definitions
-ORCHESTRATOR_RESOURCE_KEY = "_floe_observability_orchestrator"
+ORCHESTRATOR_RESOURCE_KEY = "floe_observability_orchestrator"
 
 
 def floe_asset(
