@@ -182,6 +182,48 @@ catalogs:
 | `rest` | Generic Iceberg REST | Other REST catalogs |
 | `hive` | Hive Metastore | Legacy systems |
 
+**Namespace Format:**
+
+Namespaces in `platform.yaml` follow the Iceberg REST specification:
+
+- **Warehouse**: Defined in `catalogs.<catalog_name>.warehouse` (catalog-level config parameter)
+- **Namespace**: Logical grouping within warehouse (NO warehouse prefix)
+
+The warehouse and namespace are separate concepts in Iceberg REST:
+
+```yaml
+catalogs:
+  default:
+    type: polaris
+    warehouse: demo_catalog  # ← Warehouse defined here
+
+layers:
+  bronze:
+    catalog_ref: default
+    namespace: bronze  # ← Simple namespace (NOT demo_catalog.bronze)
+```
+
+**Why separate warehouse from namespace**:
+- Aligns with Iceberg REST API specification
+- Warehouse is a config parameter, not part of the namespace path
+- Supports multi-warehouse scenarios via `catalog_ref` indirection
+- Enables clean namespace hierarchies without warehouse prefix duplication
+
+**REST URL Construction**:
+```
+/api/catalog/v1/{warehouse}/namespaces/{namespace}/tables
+                 ^^^^^^^^^              ^^^^^^^^^
+                 From catalog           From layer
+```
+
+**Namespace Examples**:
+
+| Format | Description | Use Case |
+|--------|-------------|----------|
+| `bronze` | Simple namespace | Single-level organization |
+| `analytics.bronze` | Nested namespace | Team-based organization |
+| `prod.analytics.bronze` | Multi-level | Environment + team + layer |
+
 **Access Delegation Modes:**
 
 | Mode | Description | When to Use |

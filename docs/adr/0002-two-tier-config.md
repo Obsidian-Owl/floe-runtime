@@ -718,3 +718,39 @@ Since floe-runtime has no prior releases, no migration is required. New projects
 - [Yelp detect-secrets](https://github.com/Yelp/detect-secrets)
 - [Kubernetes Secrets](https://kubernetes.io/docs/concepts/configuration/secret/)
 - [OAuth2 Client Credentials](https://oauth.net/2/grant-types/client-credentials/)
+
+---
+
+## Amendment 1: Namespace Format (2025-12-31)
+
+**Status**: Amended
+
+**Context**: An early iteration (v1.2.0) introduced a warehouse prefix requirement in namespace validation (`demo_catalog.bronze`) for configuration clarity. However, this conflicted with the Iceberg REST specification, which treats warehouse as a separate catalog-level config parameter, not part of the namespace path.
+
+The conflict manifested as 404 errors when PyIceberg REST client constructed URLs:
+- Expected: `/api/catalog/v1/{warehouse}/namespaces/{namespace}/tables`
+- Actual (broken): `/api/catalog/v1/demo_catalog/namespaces/demo_catalog.bronze/tables`
+
+This double-prefixing violated the Iceberg REST API specification and required workarounds in infrastructure code.
+
+**Decision**: Align namespace format with Iceberg REST specification (v1.3.0):
+- **Namespace**: Simple or nested name (`bronze`, `analytics.bronze`) - NO warehouse prefix
+- **Warehouse**: Catalog-level config parameter (`catalogs.default.warehouse`)
+
+**Changes**:
+1. Updated `LayerConfig.validate_namespace_format()` to accept simple namespaces
+2. Updated `platform.yaml` layer definitions to use simple namespaces
+3. Removed warehouse prefix stripping workaround from Polaris init job
+4. Added comprehensive unit tests for namespace validation
+5. Updated platform-config.md with namespace format documentation
+
+**Consequences**:
+- ✅ **Iceberg REST spec compliant** - No double-prefixing workarounds needed
+- ✅ **Industry standard pattern** - Matches Databricks, Snowflake, Nessie naming conventions
+- ✅ **Multi-warehouse support** - Preserved via `catalog_ref` indirection
+- ✅ **Cleaner configuration** - Warehouse explicit in catalog config, not duplicated in namespace
+- ⚠️ **Breaking change** - Pre-alpha stage, acceptable to break backward compatibility
+
+**Migration**: Pre-alpha project - no production deployments to migrate. Future releases will use simple namespace format from the start.
+
+**Rationale**: This amendment corrects an early design decision that conflicted with the Iceberg REST specification. The architectural intent (explicit warehouse configuration) is preserved through the catalog-level warehouse parameter, while namespace format now aligns with industry standards and Iceberg REST API expectations.

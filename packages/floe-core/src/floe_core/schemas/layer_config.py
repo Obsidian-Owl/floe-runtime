@@ -29,7 +29,7 @@ class LayerConfig(BaseModel):
         description: Human-readable layer description.
         storage_ref: Storage profile reference (must exist in storage dict).
         catalog_ref: Catalog profile reference (must exist in catalogs dict).
-        namespace: Catalog namespace for this layer (e.g., "demo_catalog.bronze").
+        namespace: Catalog namespace for this layer (e.g., "bronze").
         retention_days: Data retention policy in days (metadata only, not enforced).
         properties: Additional layer-specific properties (tags, owner, etc.).
 
@@ -39,7 +39,7 @@ class LayerConfig(BaseModel):
         ...     description="Raw and lightly cleaned data",
         ...     storage_ref="bronze",
         ...     catalog_ref="default",
-        ...     namespace="demo_catalog.bronze",
+        ...     namespace="bronze",
         ...     retention_days=2555,  # 7 years for audit compliance
         ...     properties={"owner": "data-engineering", "sensitivity": "internal"}
         ... )
@@ -73,7 +73,7 @@ class LayerConfig(BaseModel):
         ...,
         min_length=1,
         max_length=255,
-        description="Catalog namespace for this layer (e.g., 'demo_catalog.bronze')",
+        description="Catalog namespace for this layer (e.g., 'bronze')",
     )
     retention_days: int | None = Field(
         default=None,
@@ -89,7 +89,11 @@ class LayerConfig(BaseModel):
     @field_validator("namespace")
     @classmethod
     def validate_namespace_format(cls, v: str) -> str:
-        """Validate namespace format (must include warehouse prefix).
+        """Validate namespace format per Iceberg REST specification.
+
+        Namespace should NOT include warehouse prefix - warehouse is a separate
+        catalog config parameter. Supports both simple ('bronze') and nested
+        ('analytics.bronze') namespaces.
 
         Args:
             v: Namespace string to validate.
@@ -98,19 +102,31 @@ class LayerConfig(BaseModel):
             Validated namespace string.
 
         Raises:
-            ValueError: If namespace doesn't contain '.' separator.
+            ValueError: If namespace format is invalid.
 
         Examples:
-            >>> LayerConfig.validate_namespace_format("demo_catalog.bronze")
-            'demo_catalog.bronze'
             >>> LayerConfig.validate_namespace_format("bronze")
+            'bronze'
+            >>> LayerConfig.validate_namespace_format("analytics.bronze")
+            'analytics.bronze'
+            >>> LayerConfig.validate_namespace_format(".bronze")
             Traceback (most recent call last):
             ...
-            ValueError: Catalog namespace must include warehouse prefix...
+            ValueError: Namespace cannot start or end with '.'
+            >>> LayerConfig.validate_namespace_format("bronze..silver")
+            Traceback (most recent call last):
+            ...
+            ValueError: Namespace cannot contain consecutive dots
         """
-        if "." not in v:
+        # Validate format (no leading/trailing dots, no consecutive dots)
+        if v.startswith(".") or v.endswith("."):
+            raise ValueError(f"Namespace cannot start or end with '.', got '{v}'")
+        if ".." in v:
+            raise ValueError(f"Namespace cannot contain consecutive dots, got '{v}'")
+        # Validate characters (alphanumeric + underscore + dot)
+        if not all(c.isalnum() or c in ("_", ".") for c in v):
             raise ValueError(
-                f"Catalog namespace must include warehouse prefix "
-                f"(e.g., 'demo_catalog.bronze'), got '{v}'"
+                f"Namespace must contain only alphanumeric, underscore, "
+                f"and dot characters, got '{v}'"
             )
         return v

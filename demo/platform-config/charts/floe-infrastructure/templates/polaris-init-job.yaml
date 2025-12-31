@@ -227,12 +227,8 @@ spec:
                   retention_days = layer_data.get("retention_days")
                   properties = layer_data.get("properties", {})
 
-                  # Strip catalog name from namespace (e.g., "demo_catalog.bronze" -> ["bronze"])
-                  # The catalog is already in the URL path: /api/catalog/v1/{CATALOG_NAME}/namespaces
-                  ns_parts = namespace.split(".")
-                  if ns_parts[0] == CATALOG_NAME:
-                      ns_parts = ns_parts[1:]  # Remove catalog prefix
-
+                  # Namespace is already simple (e.g., "bronze") per Iceberg REST spec
+                  # No warehouse prefix stripping needed - warehouse is in URL path
                   print(f"Creating layer namespace: {namespace} (layer={layer_name}, bucket={storage_bucket})")
 
                   # Create namespace with ONLY location property first (Polaris requirement)
@@ -242,9 +238,12 @@ spec:
                   create_properties = {
                       "location": f"s3://{storage_bucket}/{layer_name}/"
                   }
-                  print(f"  Request payload: namespace={ns_parts}, properties={create_properties}")
+                  # Convert namespace to list format per Iceberg REST spec
+                  # Simple: "bronze" -> ["bronze"], Nested: "analytics.bronze" -> ["analytics", "bronze"]
+                  namespace_parts = namespace.split(".")
+                  print(f"  Request payload: namespace={namespace_parts}, properties={create_properties}")
                   status, resp = api_request("POST", f"/api/catalog/v1/{CATALOG_NAME}/namespaces", {
-                      "namespace": ns_parts,
+                      "namespace": namespace_parts,
                       "properties": create_properties
                   }, token)
                   if status == 200:
