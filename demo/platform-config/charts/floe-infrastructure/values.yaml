@@ -21,6 +21,8 @@ platformConfig:
 # PostgreSQL configuration (Dagster + Marquez metadata)
 postgresql:
   enabled: true
+  image:
+    tag: "latest"
   auth:
     postgresPassword: "floe-postgres"
     database: "dagster"
@@ -67,7 +69,7 @@ polaris:
   enabled: true
   image:
     repository: apache/polaris
-    tag: "0.9.0"
+    tag: "latest"
     pullPolicy: IfNotPresent
   replicaCount: 1
   service:

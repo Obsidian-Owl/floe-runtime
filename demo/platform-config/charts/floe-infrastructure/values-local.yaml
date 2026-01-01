@@ -220,9 +220,20 @@ polarisInit:
 
   # Layer configuration - REQUIRED (no legacy fallback)
   # Each layer defines: namespace, storage bucket, retention, properties
+  # IMPORTANT: Namespace should NOT include catalog prefix (catalog is in URL path)
   layerConfig:
+    demo:
+      namespace: "demo"
+      storage:
+        bucket: "iceberg-bronze"
+        endpoint: "http://floe-infra-localstack:4566"
+      retention_days: 30
+      properties:
+        layer: "demo"
+        owner: "data-engineering"
+        purpose: "demo-raw-data"
     bronze:
-      namespace: "demo_catalog.bronze"
+      namespace: "bronze"
       storage:
         bucket: "iceberg-bronze"
         endpoint: "http://floe-infra-localstack:4566"
@@ -232,7 +243,7 @@ polarisInit:
         owner: "data-engineering"
         purpose: "raw-ingestion"
     silver:
-      namespace: "demo_catalog.silver"
+      namespace: "silver"
       storage:
         bucket: "iceberg-silver"
         endpoint: "http://floe-infra-localstack:4566"
@@ -242,7 +253,7 @@ polarisInit:
         owner: "data-engineering"
         purpose: "transformation"
     gold:
-      namespace: "demo_catalog.gold"
+      namespace: "gold"
       storage:
         bucket: "iceberg-gold"
         endpoint: "http://floe-infra-localstack:4566"

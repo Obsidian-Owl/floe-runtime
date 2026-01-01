@@ -1,5 +1,5 @@
 #!/bin/bash
-# cleanup-local.sh - Complete cleanup of local Floe deployment
+# cleanup/all.sh - Complete cleanup of local Floe deployment
 #
 # This script performs a complete teardown of the local Kubernetes deployment:
 # 0. Cleans service-level metadata (Polaris, Dagster, Marquez)
@@ -9,9 +9,18 @@
 # 4. Recreates clean namespace
 #
 # Usage:
-#   ./scripts/cleanup-local.sh
+#   ./scripts/cleanup/all.sh
 
 set -e
+
+# Resolve script directory (follow symlinks)
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+    SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [[ $SOURCE != /* ]] && SOURCE="$SCRIPT_DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 
 echo "🧹 Cleaning up local Floe deployment..."
 echo ""
@@ -19,16 +28,16 @@ echo ""
 # Step 0: Clean service-level metadata BEFORE killing pods
 echo "Step 0/5: Cleaning service metadata..."
 echo "  Cleaning Polaris catalog..."
-./scripts/cleanup-polaris.sh || echo "    ⚠️  Polaris cleanup skipped (not critical)"
+"$SCRIPT_DIR/polaris.sh" || echo "    ⚠️  Polaris cleanup skipped (not critical)"
 echo "  Cleaning Dagster run history..."
-./scripts/cleanup-dagster.sh || echo "    ⚠️  Dagster cleanup skipped (not critical)"
+"$SCRIPT_DIR/dagster.sh" || echo "    ⚠️  Dagster cleanup skipped (not critical)"
 echo "  Cleaning Marquez lineage..."
-./scripts/cleanup-marquez.sh || echo "    ⚠️  Marquez cleanup skipped (not critical)"
+"$SCRIPT_DIR/marquez.sh" || echo "    ⚠️  Marquez cleanup skipped (not critical)"
 
 # Step 1: Clean S3 data
 echo ""
 echo "Step 1/5: Cleaning S3 buckets..."
-./scripts/cleanup-s3.sh || echo "  ⚠️  S3 cleanup skipped (LocalStack not running)"
+"$SCRIPT_DIR/s3.sh" || echo "  ⚠️  S3 cleanup skipped (LocalStack not running)"
 
 # Step 2: Delete Helm releases
 echo ""

@@ -105,14 +105,15 @@ Floe-runtime uses Kubernetes-native validation for production-grade deployments:
 ### Quick Start
 
 ```bash
-# Deploy with built-in validation
-helm install floe-dagster charts/floe-dagster/ -n floe --wait
+# Full clean deployment with validation (RECOMMENDED)
+./scripts/deploy.sh --clean --validate
 
-# Verify deployment health (post-install hook runs automatically)
-kubectl logs -n floe job/floe-dagster-validate
+# Or manual deployment steps
+./scripts/deploy/local.sh         # Clean + deploy all services
+./scripts/validate/e2e.sh          # E2E validation
 
-# Run full E2E validation
-./scripts/validate-e2e.sh
+# Quick deployment (skip cleanup)
+./scripts/deploy.sh --quick
 ```
 
 ### Architecture
@@ -140,17 +141,49 @@ Helm Install
 | Marquez | 2.5 min | Namespaces API | 10s interval | `/api/v1/namespaces` |
 | PostgreSQL | 1.5 min | DB exists check | 30s interval | `pg_isready` |
 
-### Job Management Scripts
+### Script Organization
 
-```bash
-# Launch Dagster job programmatically
-./scripts/launch-dagster-job.sh demo_bronze
+All operational scripts are organized in `scripts/` subdirectories:
 
-# Monitor run status with timeout
-./scripts/monitor-dagster-run.sh <run-id> 120
+```
+scripts/
+├── deploy/           # Deployment automation
+│   ├── local.sh      # Clean deployment (CANONICAL)
+│   ├── e2e.sh        # E2E deployment with tests
+│   └── quickstart.sh # Interactive wizard
+├── cleanup/          # Cleanup utilities
+│   ├── all.sh        # Full cleanup (RECOMMENDED)
+│   ├── dagster.sh    # Dagster run history
+│   ├── polaris.sh    # Polaris catalog
+│   └── s3.sh         # S3 buckets
+├── validate/         # Validation scripts
+│   ├── e2e.sh        # Comprehensive validation
+│   └── basic.sh      # Quick smoke test
+└── dagster/          # Dagster operations
+    ├── materialize-demo.sh  # Demo pipeline
+    ├── launch-job.sh        # Job launcher
+    └── monitor-run.sh       # Run monitor
 ```
 
-See [docs/troubleshooting/deployment-debugging.md](docs/troubleshooting/deployment-debugging.md) for complete debugging guide.
+**Common Commands:**
+```bash
+# Full deployment
+./scripts/deploy.sh --clean --validate     # Recommended
+./scripts/deploy/local.sh                  # Manual clean deployment
+
+# Cleanup
+./scripts/cleanup/all.sh                   # Full cleanup
+
+# Validation
+./scripts/validate/e2e.sh                  # E2E validation
+
+# Dagster operations
+./scripts/dagster/materialize-demo.sh      # Run demo pipeline
+./scripts/dagster/launch-job.sh <job-name>   # Launch job
+./scripts/dagster/monitor-run.sh <run-id>    # Monitor run
+```
+
+See [scripts/README.md](scripts/README.md) for complete reference.
 
 ## SonarQube Quality Gates
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# deploy-local-clean.sh - Clean Slate Local Deployment
+# deploy/local.sh - Clean Slate Local Deployment
 #
 # This script performs a complete deployment from clean state:
 # 1. Complete cleanup (S3 buckets, Helm releases, namespace)
@@ -11,9 +11,18 @@
 # 7. Run E2E validation
 #
 # Usage:
-#   ./scripts/deploy-local-clean.sh
+#   ./scripts/deploy/local.sh
 
 set -e
+
+# Resolve script directory (follow symlinks)
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+    SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [[ $SOURCE != /* ]] && SOURCE="$SCRIPT_DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 
 echo "🚀 Floe Runtime - Clean Slate Deployment"
 echo "========================================="
@@ -22,7 +31,7 @@ echo ""
 # Step 1: Complete cleanup
 echo "Phase 1: Cleanup"
 echo "================"
-./scripts/cleanup-local.sh
+"$SCRIPT_DIR/../cleanup/all.sh"
 
 # Step 2: Deploy infrastructure
 echo ""

@@ -120,17 +120,27 @@ spec:
 
               # 1. Parse layer config to build allowed locations
               # Each layer has its own bucket, all must be in allowedLocations
-              layers = json.loads(LAYER_CONFIG)
+              # Handle null/empty LAYER_CONFIG gracefully (fallback to standard bronze/silver/gold)
+              layers = json.loads(LAYER_CONFIG) if LAYER_CONFIG and LAYER_CONFIG != "null" else {}
               allowed_locations = []
               default_base_location = None
 
-              for layer_name, layer_data in layers.items():
-                  bucket = layer_data["storage"]["bucket"]
-                  location = f"s3://{bucket}/"
-                  allowed_locations.append(location)
-                  # Use first layer (bronze) as default base location
-                  if default_base_location is None:
-                      default_base_location = location
+              if layers:
+                  for layer_name, layer_data in layers.items():
+                      bucket = layer_data["storage"]["bucket"]
+                      location = f"s3://{bucket}/"
+                      allowed_locations.append(location)
+                      # Use first layer (bronze) as default base location
+                      if default_base_location is None:
+                          default_base_location = location
+              else:
+                  # Fallback: Use standard bronze/silver/gold buckets if no layer config provided
+                  print("⚠️  No LAYER_CONFIG provided, using default buckets (bronze/silver/gold)")
+                  for bucket in ["iceberg-bronze", "iceberg-silver", "iceberg-gold"]:
+                      location = f"s3://{bucket}/"
+                      allowed_locations.append(location)
+                      if default_base_location is None:
+                          default_base_location = location
 
               print(f"Configuring catalog: {CATALOG_NAME}")
               print(f"  Allowed locations: {allowed_locations}")
@@ -260,7 +270,7 @@ spec:
                       if metadata_properties:
                           print(f"  Adding metadata properties: {metadata_properties}")
                           # Build namespace identifier (without catalog prefix for properties API)
-                          ns_identifier = ".".join(ns_parts)
+                          ns_identifier = ".".join(namespace_parts)
                           status, resp = api_request(
                               "POST",
                               f"/api/catalog/v1/{CATALOG_NAME}/namespaces/{ns_identifier}/properties",
